@@ -366,8 +366,44 @@ export default function ShiftGenerator() {
     setGenerationSummary(null);
     setHasChanges(false);
 
+    
+    // Check for existing shifts in the date range
+    const dateRange = generateDateRange(startDate, endDate);
+    const { data: existingShifts, error: checkError } = await supabase
+      .from('app_9213e72257_shifts')
+      .select('shift_date')
+      .in('shift_date', dateRange);
+    
+    if (!checkError && existingShifts && existingShifts.length > 0) {
+      const existingDates = [...new Set(existingShifts.map((s: any) => s.shift_date))];
+      const confirmed = window.confirm(
+        `以下の日付に既存のシフトがあります:\n${existingDates.join(', ')}\n\n上書きしてもよろしいですか？`
+      );
+      
+      if (!confirmed) {
+        setIsGenerating(false);
+        setGenerationResult('シフト生成がキャンセルされました。');
+        return;
+      }
+      
+      // Delete existing shifts in the date range
+      console.log('🗑️ Deleting existing shifts for dates:', existingDates);
+      const { error: deleteError } = await supabase
+        .from('app_9213e72257_shifts')
+        .delete()
+        .in('shift_date', dateRange);
+      
+      if (deleteError) {
+        console.error('❌ Failed to delete existing shifts:', deleteError);
+        setGenerationResult(`既存シフトの削除に失敗しました: ${deleteError.message}`);
+        setIsGenerating(false);
+        return;
+      }
+      
+      console.log('✅ Existing shifts deleted successfully');
+    }
     try {
-      const dateRange = generateDateRange(startDate, endDate);
+    
       const allShiftResults: ShiftResult[] = [];
       const allUnassignedBusinesses: string[] = [];
       let totalAssigned = 0;
