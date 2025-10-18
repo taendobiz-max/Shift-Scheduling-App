@@ -86,6 +86,32 @@ export async function generateShifts(
     
     console.log('📋 Loaded constraints:', constraintEngine.getConstraintCount());
     
+    
+    // Load vacation data for the target date
+    const { data: vacationData, error: vacationError } = await supabase
+      .from("app_9213e72257_vacation_masters")
+      .select("employee_id")
+      .eq("vacation_date", targetDate);
+    
+    const vacationEmployeeIds = new Set<string>();
+    if (!vacationError && vacationData) {
+      vacationData.forEach((v: any) => vacationEmployeeIds.add(v.employee_id));
+      console.log("🏖️ Employees on vacation:", vacationEmployeeIds.size, "IDs:", Array.from(vacationEmployeeIds));
+    } else if (vacationError) {
+      console.warn("⚠️ Failed to load vacation data:", vacationError.message);
+    }
+    
+    // Filter out employees on vacation
+    const availableEmployees = employees.filter(emp => {
+      const empId = emp.id || emp.従業員ID || emp.employee_id;
+      const isOnVacation = vacationEmployeeIds.has(empId);
+      if (isOnVacation) {
+        console.log("🏖️ Skipping employee on vacation:", emp.name || emp.氏名, empId);
+      }
+      return !isOnVacation;
+    });
+    
+    console.log("👥 Available employees after vacation filter:", availableEmployees.length, "of", employees.length);
     // Validate input data
     if (!employees || employees.length === 0) {
       console.error('❌ No employees provided');
@@ -176,7 +202,7 @@ export async function generateShifts(
       let bestEmployee = null;
       let minViolations = Infinity;
       
-      for (const emp of employees) {
+      for (const emp of availableEmployees) {
         const empId = emp.id || emp.従業員ID || emp.employee_id || `emp_${groupIndex}`;
         
         // Skip if employee already used
