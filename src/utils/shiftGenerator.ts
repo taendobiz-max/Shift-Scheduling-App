@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './supabaseClient';
 import { ConstraintEngine } from './constraintEngine';
 import { ConstraintManager } from './constraintManager';
@@ -73,7 +74,7 @@ export async function generateShifts(
   console.log('📍 Location:', location);
   
   try {
-    const batchId = crypto.randomUUID();
+    const batchId = uuidv4();
     const shifts: Shift[] = [];
     const violations: string[] = [];
     const unassigned_businesses: string[] = [];
@@ -324,7 +325,7 @@ export async function generateShifts(
     console.error('❌ Error in generateShifts:', error);
     return {
       success: false,
-      batch_id: crypto.randomUUID(),
+      batch_id: uuidv4(),
       shifts: [],
       violations: [`エラーが発生しました: ${error instanceof Error ? error.message : 'Unknown error'}`],
       generation_time: 0,
@@ -439,7 +440,7 @@ export class ShiftGenerator {
     createdBy: string = 'system'
   ): Promise<GenerationResult> {
     const startTime = Date.now();
-    const batchId = crypto.randomUUID();
+    const batchId = uuidv4();
     
     console.log(`🚀 [GEN] Starting enhanced shift generation from ${startDate} to ${endDate}, batch: ${batchId}`);
     console.log(`📍 [GEN] Location: ${location || 'all locations'}`);

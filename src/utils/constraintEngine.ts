@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { EnhancedConstraint, ConstraintViolation, ConstraintValidationResult } from '@/types/constraint';
 import { ConstraintManager } from './constraintManager';
 
@@ -142,7 +143,7 @@ export class ConstraintEngine {
     
     if (maxConsecutive > constraint.constraint_value) {
       return {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         constraint,
         employee_id: employee.id,
         violation_date: proposedShift.shift_date,
@@ -183,7 +184,7 @@ export class ConstraintEngine {
       
       if (restHours < constraint.constraint_value) {
         return {
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           constraint,
           employee_id: employee.id,
           violation_date: proposedShift.shift_date,
@@ -225,7 +226,7 @@ export class ConstraintEngine {
     
     if (totalWeeklyHours > constraint.constraint_value) {
       return {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         constraint,
         employee_id: employee.id,
         violation_date: proposedShift.shift_date,
@@ -263,7 +264,7 @@ export class ConstraintEngine {
     
     if (totalMonthlyHours > constraint.constraint_value) {
       return {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         constraint,
         employee_id: employee.id,
         violation_date: proposedShift.shift_date,
@@ -294,7 +295,7 @@ export class ConstraintEngine {
     
     if (totalShiftsForDay > constraint.constraint_value) {
       return {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         constraint,
         employee_id: employee.id,
         violation_date: proposedShift.shift_date,
