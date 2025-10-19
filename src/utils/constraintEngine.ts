@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { EnhancedConstraint, ConstraintViolation, ConstraintValidationResult } from '@/types/constraint';
 import { ConstraintManager } from './constraintManager';
+import { evaluateAllConstraintGroups } from './constraintGroupEvaluator';
 
 interface Employee {
   id: string;
@@ -48,13 +49,13 @@ export class ConstraintEngine {
   }
 
   /**
-   * シフト配置の制約チェック
+   * シフト配置の制約チェック（制約グループを含む）
    */
-  validateShiftAssignment(
+  async validateShiftAssignment(
     employee: Employee,
     proposedShift: Shift,
     existingShifts: Shift[]
-  ): ConstraintValidationResult {
+  ): Promise<ConstraintValidationResult> {
     const violations: ConstraintViolation[] = [];
     let canProceed = true;
     
@@ -75,6 +76,29 @@ export class ConstraintEngine {
           break;
         }
       }
+    }
+
+    // 制約グループの評価を追加
+    try {
+      const groupResult = await evaluateAllConstraintGroups(
+        employee,
+        proposedShift,
+        { existingShifts, proposedShift },
+        this
+      );
+      
+      // 制約グループの違反を追加
+      violations.push(...groupResult.violations);
+      
+      // 制約グループで配置不可の場合は全体も不可
+      if (!groupResult.canProceed) {
+        canProceed = false;
+      }
+      
+      console.log(`📊 [VALIDATE] Group evaluation: ${groupResult.isValid ? 'PASS' : 'FAIL'} (${groupResult.violations.length} violations)`);
+    } catch (error) {
+      console.error('❌ [VALIDATE] Error evaluating constraint groups:', error);
+      // エラー時は制約グループ評価をスキップして続行
     }
 
     return {

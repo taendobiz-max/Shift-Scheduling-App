@@ -30,7 +30,8 @@ import {
   Target,
   CheckCircle2,
   AlertCircle,
-  Info
+  Info,
+  Layers
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabaseClient';
@@ -44,6 +45,7 @@ import {
   PRIORITY_LEVELS
 } from '@/types/constraint';
 import { loadEmployeesFromExcel } from '@/utils/employeeExcelLoader';
+import ConstraintGroupManagement from './ConstraintGroupManagement';
 
 // Business Group interfaces
 interface BusinessGroup {
@@ -703,7 +705,7 @@ export default function MasterDataManagement() {
 
       {/* Tabs for Business Groups, Business Masters and Enhanced Constraints */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+        <TabsList className="grid w-full grid-cols-4 max-w-4xl">
           <TabsTrigger value="business-groups" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             業務グループ
@@ -715,6 +717,10 @@ export default function MasterDataManagement() {
           <TabsTrigger value="constraints" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             制約条件
+          </TabsTrigger>
+          <TabsTrigger value="constraint-groups" className="flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            制約グループ
           </TabsTrigger>
         </TabsList>
 
@@ -1320,6 +1326,11 @@ export default function MasterDataManagement() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Constraint Groups Tab */}
+        <TabsContent value="constraint-groups" className="space-y-6">
+          <ConstraintGroupManagement />
         </TabsContent>
       </Tabs>
     </div>
