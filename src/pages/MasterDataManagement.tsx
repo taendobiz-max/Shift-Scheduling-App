@@ -127,12 +127,10 @@ export default function MasterDataManagement() {
   const [constraintForm, setConstraintForm] = useState<ConstraintFormData>({
     constraint_name: '',
     constraint_category: 'その他',
-    constraint_type: '',
     constraint_value: 0,
     constraint_description: '',
     applicable_locations: [],
     priority_level: PRIORITY_LEVELS.MEDIUM,
-    enforcement_level: 'strict',
     is_active: true,
   });
 
@@ -458,8 +456,8 @@ export default function MasterDataManagement() {
   const handleConstraintSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!constraintForm.constraint_name || !constraintForm.constraint_type) {
-      toast.error('制約名と制約タイプは必須です');
+    if (!constraintForm.constraint_name) {
+      toast.error('制約名は必須です');
       return;
     }
 
@@ -491,12 +489,10 @@ export default function MasterDataManagement() {
     setConstraintForm({
       constraint_name: constraint.constraint_name,
       constraint_category: constraint.constraint_category,
-      constraint_type: constraint.constraint_type,
       constraint_value: constraint.constraint_value,
       constraint_description: constraint.constraint_description,
       applicable_locations: constraint.applicable_locations,
       priority_level: constraint.priority_level,
-      enforcement_level: constraint.enforcement_level,
       is_active: constraint.is_active,
     });
     setEditingConstraintId(constraint.id);
@@ -533,12 +529,10 @@ export default function MasterDataManagement() {
     setConstraintForm({
       constraint_name: '',
       constraint_category: 'その他',
-      constraint_type: '',
       constraint_value: 0,
       constraint_description: '',
       applicable_locations: [],
       priority_level: PRIORITY_LEVELS.MEDIUM,
-      enforcement_level: 'strict',
       is_active: true,
     });
     setEditingConstraintId(null);
@@ -1123,27 +1117,7 @@ export default function MasterDataManagement() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="constraint_type">制約タイプ *</Label>
-                    <Select
-                      value={constraintForm.constraint_type}
-                      onValueChange={(value) => setConstraintForm({ ...constraintForm, constraint_type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="制約タイプを選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CONSTRAINT_TYPES.map(type => (
-                          <SelectItem key={type.value} value={type.value}>
-                            <div>
-                              <div className="font-medium">{type.label}</div>
-                              <div className="text-xs text-muted-foreground">{type.description}</div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="constraint_value">制約値</Label>
                     <Input
@@ -1183,28 +1157,6 @@ export default function MasterDataManagement() {
                   </div>
                 </div>
 
-                {/* Enforcement Level */}
-                <div className="space-y-2">
-                  <Label htmlFor="enforcement_level">強制レベル</Label>
-                  <Select
-                    value={constraintForm.enforcement_level}
-                    onValueChange={(value: 'mandatory' | 'strict' | 'flexible') => setConstraintForm({ ...constraintForm, enforcement_level: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="強制レベルを選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ENFORCEMENT_LEVELS.map(level => (
-                        <SelectItem key={level.value} value={level.value}>
-                          <div>
-                            <div className={`font-medium ${level.color}`}>{level.label}</div>
-                            <div className="text-xs text-muted-foreground">{level.description}</div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 {/* Applicable Locations */}
                 <div className="space-y-3">
@@ -1293,7 +1245,7 @@ export default function MasterDataManagement() {
                   {constraints
                     .sort((a, b) => a.priority_level - b.priority_level) // Sort by priority
                     .map((constraint) => {
-                      const enforcementInfo = getEnforcementLevelInfo(constraint.enforcement_level);
+
                       return (
                         <div key={constraint.id} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
@@ -1347,11 +1299,7 @@ export default function MasterDataManagement() {
                           <div className="text-sm space-y-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <p><strong>制約タイプ:</strong> {getConstraintTypeLabel(constraint.constraint_type)}</p>
                                 <p><strong>制約値:</strong> {constraint.constraint_value}</p>
-                                <p className={`${enforcementInfo.color}`}>
-                                  <strong>強制レベル:</strong> {enforcementInfo.label}
-                                </p>
                               </div>
                               <div>
                                 <p><strong>適用拠点:</strong> {constraint.applicable_locations.join(', ')}</p>

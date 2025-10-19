@@ -4,12 +4,12 @@ export interface EnhancedConstraint {
   id: string;
   constraint_name: string;
   constraint_category: '法令遵守' | 'その他';
-  constraint_type: string;
+  constraint_type?: string;
   constraint_value: number;
   constraint_description: string;
   applicable_locations: string[];
   priority_level: number; // 0-100 (0が最高優先度・必須条件)
-  enforcement_level: 'mandatory' | 'strict' | 'flexible';
+  enforcement_level?: 'mandatory' | 'strict' | 'flexible';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -19,12 +19,12 @@ export interface EnhancedConstraint {
 export interface ConstraintFormData {
   constraint_name: string;
   constraint_category: '法令遵守' | 'その他';
-  constraint_type: string;
+  constraint_type?: string;
   constraint_value: number;
   constraint_description: string;
   applicable_locations: string[];
   priority_level: number;
-  enforcement_level: 'mandatory' | 'strict' | 'flexible';
+  enforcement_level?: 'mandatory' | 'strict' | 'flexible';
   is_active: boolean;
 }
 
