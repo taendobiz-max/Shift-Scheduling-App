@@ -17,9 +17,11 @@ import {
   AlertTriangle, 
   CheckCircle,
   Info,
-  UserX
+  UserX,
+  Home
 } from 'lucide-react';
 import { VacationManager } from '@/utils/vacationManager';
+import { Link } from 'react-router-dom';
 import { VacationMaster, VacationFormData } from '@/types/vacation';
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 
@@ -280,6 +282,17 @@ export default function VacationManagement() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Home Button */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">休暇管理</h1>
+        <Link to="/">
+          <Button variant="outline" className="flex items-center gap-2">
+            <Home className="h-4 w-4" />
+            ホームへ戻る
+          </Button>
+        </Link>
+      </div>
+      
       {/* ヘッダー */}
       <Card>
         <CardHeader>

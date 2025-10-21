@@ -21,8 +21,10 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onEmployeeUpdated
 
   useEffect(() => {
     if (employee) {
+      console.log('📝 EditEmployeeModal: Setting form data for employee:', employee);
       setFormData({ ...employee });
     } else {
+      console.log('⚠️ EditEmployeeModal: No employee data provided');
       setFormData({});
     }
   }, [employee]);
@@ -71,7 +73,10 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onEmployeeUpdated
     onClose();
   };
 
-  if (!employee) return null;
+  if (!employee) {
+    console.log('⚠️ EditEmployeeModal: No employee provided, not rendering modal');
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

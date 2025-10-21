@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw } from 'lucide-react';
+import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { generateShifts } from '@/utils/shiftGenerator';
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 import { loadBusinessMasterFromSupabase, BusinessMaster } from '@/utils/businessMasterLoader';
 import { VacationManager } from '@/utils/vacationManager';
+import { Link } from 'react-router-dom';
 import {
   DndContext,
   DragEndEvent,
@@ -417,7 +418,15 @@ export default function ShiftGenerator() {
       console.log(`👥 Filtered employees for location ${selectedLocation}:`, filteredEmployees);
 
       if (filteredEmployees.length === 0) {
-        setGenerationResult(`選択された拠点「${selectedLocation}」に従業員が見つかりません。`);
+        setGenerationResult(`選択された拠点「${selectedLocation}」に従業員が見つかりません。従業員管理画面で従業員を登録してください。`);
+        setIsGenerating(false);
+        return;
+      }
+
+      // Validate business masters data
+      if (!businessMasters || businessMasters.length === 0) {
+        setGenerationResult('業務マスタデータが見つかりません。マスターデータ管理画面で業務マスタを登録してください。');
+        setIsGenerating(false);
         return;
       }
 
@@ -1119,7 +1128,18 @@ export default function ShiftGenerator() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Home Button */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">シフト自動生成</h1>
+        <Link to="/">
+          <Button variant="outline" className="flex items-center gap-2">
+            <Home className="h-4 w-4" />
+            ホームへ戻る
+          </Button>
+        </Link>
+      </div>
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">

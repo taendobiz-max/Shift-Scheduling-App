@@ -129,6 +129,7 @@ export default function EmployeeManagement() {
   };
 
   const handleEditEmployee = (employee: EmployeeMaster) => {
+    console.log('📝 Opening edit modal for employee:', employee);
     setEditingEmployee(employee);
     setIsEditModalOpen(true);
   };
