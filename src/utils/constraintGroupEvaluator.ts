@@ -284,21 +284,29 @@ async function evaluateSplitRest(
 
 /**
  * すべての制約グループを評価
+ * @param cachedGroups - キャッシュされた制約グループ（オプション）
  */
 export async function evaluateAllConstraintGroups(
   employee: Employee,
   shift: Shift,
   context: ShiftContext,
-  constraintEngine: any
+  constraintEngine: any,
+  cachedGroups?: ConstraintGroup[]
 ): Promise<ConstraintValidationResult> {
   
   const allViolations: ConstraintViolation[] = [];
   let canProceed = true;
   
-  // すべての制約グループを取得
-  const groups = await getAllConstraintGroups();
+  // キャッシュされたグループを使用、なければ取得
+  const groups = cachedGroups || await getAllConstraintGroups();
   
   console.log(`🔍 [GROUP_EVAL] Evaluating ${groups.length} constraint groups`);
+  
+  // グループが0件の場合は評価をスキップ
+  if (groups.length === 0) {
+    console.log('🔍 [GROUP_EVAL] No constraint groups to evaluate, skipping');
+    return { isValid: true, violations: [], canProceed: true };
+  }
   
   for (const group of groups) {
     const result = await evaluateConstraintGroup(

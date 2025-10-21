@@ -23,6 +23,7 @@ interface Shift {
 export class ConstraintEngine {
   private constraints: EnhancedConstraint[] = [];
   private violationLog: ConstraintViolation[] = [];
+  private cachedConstraintGroups: any[] | null = null;
 
   /**
    * 指定拠点の制約条件を読み込み
@@ -80,11 +81,19 @@ export class ConstraintEngine {
 
     // 制約グループの評価を追加
     try {
+      // 制約グループをキャッシュから取得（初回のみロード）
+      if (this.cachedConstraintGroups === null) {
+        const { getAllConstraintGroups } = await import('./constraintGroupEvaluator');
+        this.cachedConstraintGroups = await getAllConstraintGroups();
+        console.log(`💾 [CONSTRAINT] Cached ${this.cachedConstraintGroups.length} constraint groups`);
+      }
+      
       const groupResult = await evaluateAllConstraintGroups(
         employee,
         proposedShift,
         { existingShifts, proposedShift },
-        this
+        this,
+        this.cachedConstraintGroups
       );
       
       // 制約グループの違反を追加
