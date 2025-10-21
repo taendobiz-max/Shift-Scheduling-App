@@ -91,9 +91,9 @@ export default function ShiftSchedule() {
       console.log('✅ Loaded shifts:', data?.length || 0);
       setShifts(data || []);
       
-      // Calculate unassigned employees for each date
-      if (data && employeesData) {
-        calculateUnassignedEmployees(data, employeesData);
+      // Calculate unassigned employees for each date in the range
+      if (employeesData) {
+        calculateUnassignedEmployees(data || [], employeesData, startDate, endDate);
       }
       
       if (data && data.length > 0) {
@@ -128,44 +128,80 @@ export default function ShiftSchedule() {
     loadShifts();
   };
   
-  const calculateUnassignedEmployees = (shiftsData: any[], employeesData: EmployeeData[]) => {
+  // Generate all dates in the range
+  const generateDateRange = (start: string, end: string): string[] => {
+    const dates: string[] = [];
+    const startDateObj = new Date(start);
+    const endDateObj = new Date(end);
+    
+    for (let d = new Date(startDateObj); d <= endDateObj; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    
+    return dates;
+  };
+  
+  const calculateUnassignedEmployees = (
+    shiftsData: any[], 
+    employeesData: EmployeeData[], 
+    start: string, 
+    end: string
+  ) => {
     console.log('🔍 [UNASSIGNED] Starting calculation...');
     console.log('🔍 [UNASSIGNED] Shifts data:', shiftsData.length);
     console.log('🔍 [UNASSIGNED] Employees data:', employeesData.length);
+    console.log('🔍 [UNASSIGNED] Date range:', start, 'to', end);
+    
+    // Generate all dates in the range
+    const allDates = generateDateRange(start, end);
+    console.log('🔍 [UNASSIGNED] All dates in range:', allDates.length);
     
     // Group shifts by date
     const shiftsByDate: {[date: string]: Set<string>} = {};
     
-    shiftsData.forEach(shift => {
-      if (!shiftsByDate[shift.shift_date]) {
-        shiftsByDate[shift.shift_date] = new Set();
-      }
-      shiftsByDate[shift.shift_date].add(shift.employee_id);
+    // Initialize all dates with empty sets
+    allDates.forEach(date => {
+      shiftsByDate[date] = new Set();
     });
     
-    console.log('🔍 [UNASSIGNED] Shifts by date:', Object.keys(shiftsByDate));
+    // Add assigned employees to each date
+    shiftsData.forEach(shift => {
+      if (shiftsByDate[shift.shift_date]) {
+        shiftsByDate[shift.shift_date].add(shift.employee_id);
+      }
+    });
+    
+    console.log('🔍 [UNASSIGNED] Shifts by date:', Object.keys(shiftsByDate).length);
     
     // Calculate unassigned employees for each date
     const unassigned: {[date: string]: EmployeeData[]} = {};
     
-    Object.keys(shiftsByDate).forEach(date => {
+    allDates.forEach(date => {
       const assignedIds = shiftsByDate[date];
       unassigned[date] = employeesData.filter(emp => !assignedIds.has(emp.employee_id));
       console.log(`🔍 [UNASSIGNED] ${date}: ${assignedIds.size} assigned, ${unassigned[date].length} unassigned`);
     });
     
     setUnassignedEmployees(unassigned);
-    console.log('📋 Calculated unassigned employees:', unassigned);
+    console.log('📋 Calculated unassigned employees for', Object.keys(unassigned).length, 'dates');
   };
 
   const groupShiftsByDate = () => {
     const grouped: { [date: string]: ShiftData[] } = {};
     
+    // Initialize all dates in the range with empty arrays
+    if (startDate && endDate) {
+      const allDates = generateDateRange(startDate, endDate);
+      allDates.forEach(date => {
+        grouped[date] = [];
+      });
+    }
+    
+    // Add shifts to their respective dates
     filteredShifts.forEach(shift => {
-      if (!grouped[shift.shift_date]) {
-        grouped[shift.shift_date] = [];
+      if (grouped[shift.shift_date]) {
+        grouped[shift.shift_date].push(shift);
       }
-      grouped[shift.shift_date].push(shift);
     });
     
     return grouped;
@@ -264,14 +300,14 @@ export default function ShiftSchedule() {
       </Card>
 
       {/* Shifts Display */}
-      {filteredShifts.length === 0 ? (
+      {dates.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
               <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-600 mb-2">指定期間にシフトデータがありません</p>
+              <p className="text-gray-600 mb-2">日付範囲を選択してください</p>
               <p className="text-sm text-gray-500">
-                シフト自動生成画面でシフトを生成してください
+                開始日と終了日を設定してシフトを表示します
               </p>
             </div>
           </CardContent>
@@ -306,33 +342,40 @@ export default function ShiftSchedule() {
               <CardContent className="pt-4">
                 <div className="space-y-4">
                   {/* Assigned Shifts */}
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3 text-gray-700">勤務者 ({groupedShifts[date].length}名)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {groupedShifts[date].map((shift, index) => (
-                        <div
-                          key={shift.id || `${date}-${index}`}
-                          className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center">
-                              <Users className="h-4 w-4 mr-2 text-blue-600" />
-                              <span className="font-medium">{shift.employee_name}</span>
+                  {groupedShifts[date].length > 0 ? (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 text-gray-700">勤務者 ({groupedShifts[date].length}名)</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {groupedShifts[date].map((shift, index) => (
+                          <div
+                            key={shift.id || `${date}-${index}`}
+                            className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center">
+                                <Users className="h-4 w-4 mr-2 text-blue-600" />
+                                <span className="font-medium">{shift.employee_name}</span>
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {shift.employee_id}
+                              </Badge>
                             </div>
-                            <Badge variant="secondary" className="text-xs">
-                              {shift.employee_id}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            <div className="flex items-center">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {shift.business_group}
+                            <div className="text-sm text-gray-600">
+                              <div className="flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {shift.business_group}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 text-gray-700">勤務者 (0名)</h3>
+                      <p className="text-sm text-gray-500">この日にシフトが割り当てられていません</p>
+                    </div>
+                  )}
                   
                   {/* Unassigned Employees */}
                   {unassignedEmployees[date] && unassignedEmployees[date].length > 0 ? (
