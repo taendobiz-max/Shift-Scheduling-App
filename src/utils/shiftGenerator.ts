@@ -196,12 +196,25 @@ export async function generateShifts(
     const singleBusinesses: any[] = [];
     const processedBusinesses = new Set<string>();
     
+    // First, group by business group (e.g., "309 A便")
+    const businessGroupMap = new Map<string, any[]>();
+    businessMasters.forEach((business) => {
+      const businessGroup = business.業務グループ || business.business_group;
+      if (businessGroup) {
+        if (!businessGroupMap.has(businessGroup)) {
+          businessGroupMap.set(businessGroup, []);
+        }
+        businessGroupMap.get(businessGroup)!.push(business);
+      }
+    });
+    
+    // Then, process each business
     businessMasters.forEach((business) => {
       const businessId = business.業務id || business.id || business.業務名 || business.name;
       
       if (processedBusinesses.has(businessId)) return;
       
-      // Check if this business has a pair
+      // Check if this business has a pair ID
       const pairBusinessId = business.ペア業務id || business.pair_business_id;
       if (pairBusinessId && pairGroups && pairGroups[pairBusinessId]) {
         const pairBusinesses = pairGroups[pairBusinessId];
@@ -211,8 +224,35 @@ export async function generateShifts(
             const pbId = pb.業務id || pb.id || pb.業務名 || pb.name;
             processedBusinesses.add(pbId);
           });
-          console.log(`🔗 Paired businesses: ${pairBusinesses.map(pb => pb.業務名 || pb.name).join(' ↔ ')}`);
+          console.log(`🔗 Paired businesses (by ID): ${pairBusinesses.map(pb => pb.業務名 || pb.name).join(' ↔ ')}`);
           return;
+        }
+      }
+      
+      // Check if this business has a business group with multiple businesses
+      const businessGroup = business.業務グループ || business.business_group;
+      if (businessGroup && businessGroupMap.has(businessGroup)) {
+        const groupBusinesses = businessGroupMap.get(businessGroup)!;
+        if (groupBusinesses.length > 1) {
+          // Check if any business in this group is already processed
+          const alreadyProcessed = groupBusinesses.some(gb => {
+            const gbId = gb.業務id || gb.id || gb.業務名 || gb.name;
+            return processedBusinesses.has(gbId);
+          });
+          
+          if (!alreadyProcessed) {
+            businessGroups.push(groupBusinesses);
+            groupBusinesses.forEach(gb => {
+              const gbId = gb.業務id || gb.id || gb.業務名 || gb.name;
+              processedBusinesses.add(gbId);
+            });
+            console.log(`🔗 Paired businesses (by group): ${groupBusinesses.map(gb => gb.業務名 || gb.name).join(' ↔ ')}`);
+            return;
+          } else {
+            // Already processed as part of a group
+            processedBusinesses.add(businessId);
+            return;
+          }
         }
       }
       
@@ -470,13 +510,25 @@ export async function generateShifts(
     
     // Log employee assignment distribution
     console.log('\n👥 Employee Assignment Distribution:');
+    const unassignedEmployees: any[] = [];
     employeeAssignmentCounts.forEach((count, empId) => {
+      const emp = availableEmployees.find(e => (e.id || e.従業員ID || e.employee_id) === empId);
+      const empName = emp ? (emp.name || emp.氏名 || '名前不明') : '不明';
       if (count > 0) {
-        const emp = availableEmployees.find(e => (e.id || e.従業員ID || e.employee_id) === empId);
-        const empName = emp ? (emp.name || emp.氏名 || '名前不明') : '不明';
         console.log(`  ${empName} (${empId}): ${count} 業務`);
+      } else {
+        // アサインされなかった従業員を非勤務者リストに追加
+        unassignedEmployees.push({
+          employee_id: empId,
+          name: empName,
+          shift_date: targetDate,
+          status: 'unassigned'
+        });
+        console.log(`  ${empName} (${empId}): 非勤務`);
       }
     });
+    
+    console.log(`\n📋 Unassigned employees: ${unassignedEmployees.length}`);
     
     // Consider it successful if we assigned at least some shifts
     const isSuccessful = shifts.length > 0;
@@ -488,7 +540,11 @@ export async function generateShifts(
       violations,
       generation_time: 0.1,
       unassigned_businesses,
-      assignment_summary,
+      unassigned_employees,
+      assignment_summary: {
+        ...assignment_summary,
+        unassigned_employees: unassignedEmployees.length
+      },
       assigned_count: assignedBusinesses,
       total_businesses: businessMasters.length,
       constraint_violations: constraintViolations,
