@@ -274,7 +274,7 @@ export async function generateShifts(
             status: 'scheduled'
           };
           
-          const validationResult = constraintEngine.validateShiftAssignment(
+          const validationResult = await constraintEngine.validateShiftAssignment(
             {
               id: empId,
               name: emp.name || emp.氏名 || '名前不明',
@@ -385,7 +385,7 @@ export async function generateShifts(
           status: 'scheduled'
         };
         
-        const validationResult = constraintEngine.validateShiftAssignment(
+        const validationResult = await constraintEngine.validateShiftAssignment(
           {
             id: empId,
             name: emp.name || emp.氏名 || '名前不明',
