@@ -839,7 +839,7 @@ export default function ShiftGenerator() {
     );
   };
 
-  // Calculate unassigned employees for a specific date
+  // Calculate unassigned employees for a specific date (filtered by selected location)
   const getUnassignedEmployees = (date: string) => {
     // Get all employees assigned to shifts on this date
     const assignedEmployeeIds = new Set(
@@ -856,9 +856,12 @@ export default function ShiftGenerator() {
     );
     
     // Filter employees who are not assigned and not in non-working list
+    // Also filter by selected location
     return employees.filter(emp => {
       const empId = emp.従業員ID || emp.id;
-      return !assignedEmployeeIds.has(empId) && !nonWorkingEmployeeIds.has(empId);
+      const empLocation = emp.拠点 || emp.location;
+      const matchesLocation = empLocation === selectedLocation;
+      return matchesLocation && !assignedEmployeeIds.has(empId) && !nonWorkingEmployeeIds.has(empId);
     });
   };
 
@@ -1084,69 +1087,137 @@ export default function ShiftGenerator() {
                       ))}
                     </tr>
                   ))}
-                  
-                  {/* Non-working members row */}
-                  <tr className="bg-red-25 border-t-2 border-red-200">
-                    <td className="border-b border-r border-gray-300 px-4 py-2 font-medium bg-red-50">
-                      <div className="flex items-center space-x-2">
-                        <UserX className="w-4 h-4 text-red-600" />
-                        <div>
-                          <div className="font-medium text-sm text-red-800">非出勤者</div>
-                          <div className="text-xs text-red-600">希望休・休暇</div>
-                        </div>
-                      </div>
-                    </td>
-                    {dates.map(date => (
-                      <td 
-                        key={`non-working-${date}`} 
-                        className="border-b border-r border-gray-300 px-2 py-2 text-center bg-red-25"
-                      >
-                        {renderNonWorkingCell(date)}
-                      </td>
-                    ))}
-                  </tr>
-                  
-                  {/* Unassigned employees row */}
-                  <tr className="bg-gray-50 border-t-2 border-gray-300">
-                    <td className="border-b border-r border-gray-300 px-4 py-2 font-medium bg-gray-100">
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-gray-600" />
-                        <div>
-                          <div className="font-medium text-sm text-gray-800">未割り当て従業員</div>
-                          <div className="text-xs text-gray-600">シフト未アサイン</div>
-                        </div>
-                      </div>
-                    </td>
-                    {dates.map(date => {
-                      const unassignedEmps = getUnassignedEmployees(date);
-                      return (
-                        <td 
-                          key={`unassigned-${date}`} 
-                          className="border-b border-r border-gray-300 px-2 py-2 text-center bg-gray-50"
-                        >
-                          {unassignedEmps.length === 0 ? (
-                            <div className="text-center text-gray-400 text-xs py-2">
-                              全員アサイン済み
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              {unassignedEmps.map((emp, idx) => (
-                                <div 
-                                  key={`${emp.id}-${idx}`}
-                                  className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
-                                  title={`従業員ID: ${emp.従業員ID || emp.id}`}
-                                >
-                                  {emp.name}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Non-working and Unassigned employees tables */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Non-working members table */}
+            <div className="border border-red-300 rounded-lg overflow-hidden">
+              <div className="bg-red-50 px-4 py-3 border-b border-red-300">
+                <div className="flex items-center space-x-2">
+                  <UserX className="w-5 h-5 text-red-600" />
+                  <div>
+                    <div className="font-semibold text-red-800">非出勤者</div>
+                    <div className="text-xs text-red-600">希望休・休暇（ドラッグで業務にアサイン可能）</div>
+                  </div>
+                </div>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                <table className="w-full border-collapse">
+                  <thead className="sticky top-0 bg-red-50">
+                    <tr>
+                      <th className="border-b border-r border-red-200 px-3 py-2 text-left text-sm font-medium">日付</th>
+                      <th className="border-b border-red-200 px-3 py-2 text-left text-sm font-medium">従業員</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dates.map(date => {
+                      const dateNonWorking = nonWorkingMembers.filter(nw => nw.date === date);
+                      if (dateNonWorking.length === 0) return null;
+                      return (
+                        <tr key={`nw-table-${date}`} className="hover:bg-red-25">
+                          <td className="border-b border-r border-red-200 px-3 py-2 text-sm align-top">
+                            {new Date(date).toLocaleDateString('ja-JP', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              weekday: 'short'
+                            })}
+                          </td>
+                          <td className="border-b border-red-200 px-3 py-2">
+                            <div className="space-y-1">
+                              {dateNonWorking.map(nw => (
+                                <DraggableNonWorking key={nw.id} member={nw}>
+                                  <div className="flex items-center space-x-1">
+                                    <Move className="w-3 h-3 opacity-50" />
+                                    <span title={`${nw.reason}${nw.source === 'vacation_master' ? ' (休暇登録)' : ''}`}>
+                                      {nw.employeeName}
+                                      {nw.source === 'vacation_master' && (
+                                        <span className="ml-1 text-xs">📅</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                </DraggableNonWorking>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Unassigned employees table */}
+            <div className="border border-gray-300 rounded-lg overflow-hidden">
+              <div className="bg-gray-100 px-4 py-3 border-b border-gray-300">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <div className="font-semibold text-gray-800">未割り当て従業員</div>
+                    <div className="text-xs text-gray-600">シフト未アサイン（ドラッグで業務にアサイン可能）</div>
+                  </div>
+                </div>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                <table className="w-full border-collapse">
+                  <thead className="sticky top-0 bg-gray-100">
+                    <tr>
+                      <th className="border-b border-r border-gray-300 px-3 py-2 text-left text-sm font-medium">日付</th>
+                      <th className="border-b border-gray-300 px-3 py-2 text-left text-sm font-medium">従業員</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dates.map(date => {
+                      const unassignedEmps = getUnassignedEmployees(date);
+                      if (unassignedEmps.length === 0) return null;
+                      return (
+                        <tr key={`ua-table-${date}`} className="hover:bg-gray-50">
+                          <td className="border-b border-r border-gray-300 px-3 py-2 text-sm align-top">
+                            {new Date(date).toLocaleDateString('ja-JP', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              weekday: 'short'
+                            })}
+                          </td>
+                          <td className="border-b border-gray-300 px-3 py-2">
+                            <div className="space-y-1">
+                              {unassignedEmps.map((emp, idx) => {
+                                // Create a temporary shift object for dragging
+                                const tempShift: ShiftResult = {
+                                  id: `unassigned-${emp.id}-${date}-${idx}`,
+                                  date: date,
+                                  businessMaster: '',
+                                  employeeName: emp.氏名 || emp.name,
+                                  employeeId: emp.従業員ID || emp.id
+                                };
+                                return (
+                                  <DraggableEmployee 
+                                    key={tempShift.id}
+                                    shift={tempShift} 
+                                    hasChanges={false}
+                                    isPair={false}
+                                  >
+                                    <div className="flex items-center space-x-1">
+                                      <Move className="w-3 h-3 opacity-50" />
+                                      <span title={`従業員ID: ${emp.従業員ID || emp.id}`}>
+                                        {emp.氏名 || emp.name}
+                                      </span>
+                                    </div>
+                                  </DraggableEmployee>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
