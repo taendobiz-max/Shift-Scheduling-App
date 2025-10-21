@@ -839,6 +839,29 @@ export default function ShiftGenerator() {
     );
   };
 
+  // Calculate unassigned employees for a specific date
+  const getUnassignedEmployees = (date: string) => {
+    // Get all employees assigned to shifts on this date
+    const assignedEmployeeIds = new Set(
+      shiftResults
+        .filter(shift => shift.date === date)
+        .map(shift => shift.employeeId)
+    );
+    
+    // Get employees in non-working list for this date
+    const nonWorkingEmployeeIds = new Set(
+      nonWorkingMembers
+        .filter(nw => nw.date === date)
+        .map(nw => nw.employeeId)
+    );
+    
+    // Filter employees who are not assigned and not in non-working list
+    return employees.filter(emp => {
+      const empId = emp.従業員ID || emp.id;
+      return !assignedEmployeeIds.has(empId) && !nonWorkingEmployeeIds.has(empId);
+    });
+  };
+
   const renderNonWorkingCell = (date: string) => {
     const dateNonWorking = nonWorkingMembers.filter(nw => nw.date === date);
     
@@ -1081,6 +1104,46 @@ export default function ShiftGenerator() {
                         {renderNonWorkingCell(date)}
                       </td>
                     ))}
+                  </tr>
+                  
+                  {/* Unassigned employees row */}
+                  <tr className="bg-gray-50 border-t-2 border-gray-300">
+                    <td className="border-b border-r border-gray-300 px-4 py-2 font-medium bg-gray-100">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-4 h-4 text-gray-600" />
+                        <div>
+                          <div className="font-medium text-sm text-gray-800">未割り当て従業員</div>
+                          <div className="text-xs text-gray-600">シフト未アサイン</div>
+                        </div>
+                      </div>
+                    </td>
+                    {dates.map(date => {
+                      const unassignedEmps = getUnassignedEmployees(date);
+                      return (
+                        <td 
+                          key={`unassigned-${date}`} 
+                          className="border-b border-r border-gray-300 px-2 py-2 text-center bg-gray-50"
+                        >
+                          {unassignedEmps.length === 0 ? (
+                            <div className="text-center text-gray-400 text-xs py-2">
+                              全員アサイン済み
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {unassignedEmps.map((emp, idx) => (
+                                <div 
+                                  key={`${emp.id}-${idx}`}
+                                  className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
+                                  title={`従業員ID: ${emp.従業員ID || emp.id}`}
+                                >
+                                  {emp.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 </tbody>
               </table>
