@@ -21,6 +21,12 @@ interface ShiftData {
   created_at?: string;
 }
 
+interface EmployeeData {
+  employee_id: string;
+  name: string;
+  office?: string;
+}
+
 export default function ShiftSchedule() {
   const [shifts, setShifts] = useState<ShiftData[]>([]);
   const [filteredShifts, setFilteredShifts] = useState<ShiftData[]>([]);
@@ -29,6 +35,8 @@ export default function ShiftSchedule() {
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
   const [locations, setLocations] = useState<string[]>([]);
+  const [allEmployees, setAllEmployees] = useState<EmployeeData[]>([]);
+  const [unassignedEmployees, setUnassignedEmployees] = useState<{[date: string]: EmployeeData[]}>({});
 
   useEffect(() => {
     // Set default date range (current month)
@@ -56,6 +64,16 @@ export default function ShiftSchedule() {
       console.log('🔄 Loading shifts from Supabase...');
       console.log('Date range:', startDate, 'to', endDate);
       
+      // Load all employees
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('app_9213e72257_employees')
+        .select('employee_id, name, office');
+      
+      if (!employeesError && employeesData) {
+        setAllEmployees(employeesData);
+        console.log('👥 Loaded employees:', employeesData.length);
+      }
+      
       const { data, error } = await supabase
         .from('app_9213e72257_shifts')
         .select('*')
@@ -72,6 +90,11 @@ export default function ShiftSchedule() {
 
       console.log('✅ Loaded shifts:', data?.length || 0);
       setShifts(data || []);
+      
+      // Calculate unassigned employees for each date
+      if (data && employeesData) {
+        calculateUnassignedEmployees(data, employeesData);
+      }
       
       if (data && data.length > 0) {
         toast.success(`${data.length}件のシフトを読み込みました`);
@@ -103,6 +126,29 @@ export default function ShiftSchedule() {
 
   const refreshData = () => {
     loadShifts();
+  };
+  
+  const calculateUnassignedEmployees = (shiftsData: any[], employeesData: EmployeeData[]) => {
+    // Group shifts by date
+    const shiftsByDate: {[date: string]: Set<string>} = {};
+    
+    shiftsData.forEach(shift => {
+      if (!shiftsByDate[shift.shift_date]) {
+        shiftsByDate[shift.shift_date] = new Set();
+      }
+      shiftsByDate[shift.shift_date].add(shift.employee_id);
+    });
+    
+    // Calculate unassigned employees for each date
+    const unassigned: {[date: string]: EmployeeData[]} = {};
+    
+    Object.keys(shiftsByDate).forEach(date => {
+      const assignedIds = shiftsByDate[date];
+      unassigned[date] = employeesData.filter(emp => !assignedIds.has(emp.employee_id));
+    });
+    
+    setUnassignedEmployees(unassigned);
+    console.log('📋 Calculated unassigned employees:', unassigned);
   };
 
   const groupShiftsByDate = () => {
@@ -251,29 +297,53 @@ export default function ShiftSchedule() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {groupedShifts[date].map((shift, index) => (
-                    <div
-                      key={shift.id || `${date}-${index}`}
-                      className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2 text-blue-600" />
-                          <span className="font-medium">{shift.employee_name}</span>
+                <div className="space-y-4">
+                  {/* Assigned Shifts */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 text-gray-700">勤務者 ({groupedShifts[date].length}名)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {groupedShifts[date].map((shift, index) => (
+                        <div
+                          key={shift.id || `${date}-${index}`}
+                          className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center">
+                              <Users className="h-4 w-4 mr-2 text-blue-600" />
+                              <span className="font-medium">{shift.employee_name}</span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {shift.employee_id}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <div className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {shift.business_group}
+                            </div>
+                          </div>
                         </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {shift.employee_id}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {shift.business_group}
-                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Unassigned Employees */}
+                  {unassignedEmployees[date] && unassignedEmployees[date].length > 0 && (
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-semibold mb-3 text-gray-700">非勤務者 ({unassignedEmployees[date].length}名)</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {unassignedEmployees[date].map((employee) => (
+                          <div
+                            key={employee.employee_id}
+                            className="border border-gray-200 rounded-lg p-2 bg-gray-50 text-center"
+                          >
+                            <div className="text-sm font-medium text-gray-700">{employee.name}</div>
+                            <div className="text-xs text-gray-500">{employee.employee_id}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
