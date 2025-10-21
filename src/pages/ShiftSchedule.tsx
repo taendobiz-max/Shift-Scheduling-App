@@ -129,6 +129,10 @@ export default function ShiftSchedule() {
   };
   
   const calculateUnassignedEmployees = (shiftsData: any[], employeesData: EmployeeData[]) => {
+    console.log('🔍 [UNASSIGNED] Starting calculation...');
+    console.log('🔍 [UNASSIGNED] Shifts data:', shiftsData.length);
+    console.log('🔍 [UNASSIGNED] Employees data:', employeesData.length);
+    
     // Group shifts by date
     const shiftsByDate: {[date: string]: Set<string>} = {};
     
@@ -139,12 +143,15 @@ export default function ShiftSchedule() {
       shiftsByDate[shift.shift_date].add(shift.employee_id);
     });
     
+    console.log('🔍 [UNASSIGNED] Shifts by date:', Object.keys(shiftsByDate));
+    
     // Calculate unassigned employees for each date
     const unassigned: {[date: string]: EmployeeData[]} = {};
     
     Object.keys(shiftsByDate).forEach(date => {
       const assignedIds = shiftsByDate[date];
       unassigned[date] = employeesData.filter(emp => !assignedIds.has(emp.employee_id));
+      console.log(`🔍 [UNASSIGNED] ${date}: ${assignedIds.size} assigned, ${unassigned[date].length} unassigned`);
     });
     
     setUnassignedEmployees(unassigned);
@@ -328,7 +335,7 @@ export default function ShiftSchedule() {
                   </div>
                   
                   {/* Unassigned Employees */}
-                  {unassignedEmployees[date] && unassignedEmployees[date].length > 0 && (
+                  {unassignedEmployees[date] && unassignedEmployees[date].length > 0 ? (
                     <div className="border-t pt-4">
                       <h3 className="text-sm font-semibold mb-3 text-gray-700">非勤務者 ({unassignedEmployees[date].length}名)</h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -342,6 +349,11 @@ export default function ShiftSchedule() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  ) : (
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-semibold mb-3 text-gray-500">非勤務者 (0名)</h3>
+                      <p className="text-sm text-gray-400">全員が勤務しています</p>
                     </div>
                   )}
                 </div>
