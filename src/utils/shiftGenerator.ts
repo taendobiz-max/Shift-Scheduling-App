@@ -82,9 +82,13 @@ function canAssignBusiness(employeeId: string, business: any, currentShifts: Shi
   const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
   const newStart = business.開始時間 || business.start_time || '09:00:00';
   const newEnd = business.終了時間 || business.end_time || '17:00:00';
+  const businessName = business.業務名 || business.name || 'Unknown';
+  
+  // console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd})`);
   
   for (const shift of employeeShifts) {
     if (timeRangesOverlap(shift.start_time, shift.end_time, newStart, newEnd)) {
+      console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_name} (${shift.start_time}-${shift.end_time}), conflicts with ${businessName} (${newStart}-${newEnd})`);
       return false; // Time conflict
     }
   }
@@ -243,12 +247,56 @@ export async function generateShifts(
           });
           
           if (!alreadyProcessed) {
-            businessGroups.push(groupBusinesses);
-            groupBusinesses.forEach(gb => {
+            // Filter out businesses that have time conflicts with each other
+            const nonConflictingGroups: any[][] = [];
+            const tempProcessed = new Set<string>();
+            
+            for (const gb of groupBusinesses) {
               const gbId = gb.業務id || gb.id || gb.業務名 || gb.name;
-              processedBusinesses.add(gbId);
+              if (tempProcessed.has(gbId)) continue;
+              
+              // Start a new group with this business
+              const group: any[] = [gb];
+              tempProcessed.add(gbId);
+              
+              const gbStart = gb.開始時間 || gb.start_time || '09:00:00';
+              const gbEnd = gb.終了時間 || gb.end_time || '17:00:00';
+              
+              // Find other businesses that don't conflict with this one
+              for (const other of groupBusinesses) {
+                const otherId = other.業務id || other.id || other.業務名 || other.name;
+                if (tempProcessed.has(otherId)) continue;
+                
+                const otherStart = other.開始時間 || other.start_time || '09:00:00';
+                const otherEnd = other.終了時間 || other.end_time || '17:00:00';
+                
+                // Check if times don't overlap
+                if (!timeRangesOverlap(gbStart, gbEnd, otherStart, otherEnd)) {
+                  group.push(other);
+                  tempProcessed.add(otherId);
+                }
+              }
+              
+              // Add this group if it has more than 1 business
+              if (group.length > 1) {
+                nonConflictingGroups.push(group);
+              } else {
+                // Single business, add to singles later
+                singleBusinesses.push(gb);
+                processedBusinesses.add(gbId);
+              }
+            }
+            
+            // Add non-conflicting groups
+            nonConflictingGroups.forEach(group => {
+              businessGroups.push(group);
+              group.forEach(gb => {
+                const gbId = gb.業務id || gb.id || gb.業務名 || gb.name;
+                processedBusinesses.add(gbId);
+              });
+              console.log(`🔗 Paired businesses (by group, non-conflicting): ${group.map(gb => gb.業務名 || gb.name).join(' ↔ ')}`);
             });
-            console.log(`🔗 Paired businesses (by group): ${groupBusinesses.map(gb => gb.業務名 || gb.name).join(' ↔ ')}`);
+            
             return;
           } else {
             // Already processed as part of a group
