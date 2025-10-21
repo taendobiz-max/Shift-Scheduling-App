@@ -509,12 +509,50 @@ export default function ShiftGenerator() {
         let message = `シフト生成が完了しました。期間: ${startDate} ～ ${endDate} (${dateRange.length}日間)\n`;
         message += `✅ アサイン成功: ${totalAssigned}件\n`;
         if (totalUnassigned > 0) {
-          message += `⚠️ アサイン失敗: ${totalUnassigned}件（従業員不足）`;
+          message += `⚠️ アサイン失敗: ${totalUnassigned}件（制約条件または従業員不足）`;
         }
         setGenerationResult(message);
         setShowResults(true);
       } else {
-        setGenerationResult('シフトを生成できませんでした。従業員データまたは業務マスタデータを確認してください。');
+        // 詳細なエラーメッセージを生成
+        let errorMessage = 'シフトを生成できませんでした。\n\n';
+        
+        // 各日付の結果を確認
+        let hasConstraintViolations = false;
+        let hasEmployeeShortage = false;
+        let violationDetails: string[] = [];
+        
+        for (const date of dateRange) {
+          console.log(`📊 Checking generation result for ${date}`);
+          // Note: resultはループ内で生成されるため、ここではアクセスできない
+        }
+        
+        if (allUnassignedBusinesses.length > 0) {
+          hasConstraintViolations = true;
+          errorMessage += `⚠️ 制約条件を満たす従業員がいません\n`;
+          errorMessage += `アサインできなかった業務: ${allUnassignedBusinesses.length}件\n\n`;
+        }
+        
+        if (filteredEmployees.length < businessMasters.length) {
+          hasEmployeeShortage = true;
+          errorMessage += `⚠️ 従業員不足\n`;
+          errorMessage += `従業員数: ${filteredEmployees.length}名 / 業務数: ${businessMasters.length}件\n\n`;
+        }
+        
+        errorMessage += '■ 考えられる原因:\n';
+        if (hasConstraintViolations) {
+          errorMessage += '1. 必須の制約条件（休息時間、連続勤務日数など）が満たせない\n';
+        }
+        if (hasEmployeeShortage) {
+          errorMessage += '2. 業務数に対して従業員数が不足している\n';
+        }
+        errorMessage += '3. 点呼対応可能な従業員が不足している\n\n';
+        errorMessage += '■ 対応方法:\n';
+        errorMessage += '- 従業員管理画面で従業員を追加\n';
+        errorMessage += '- 制約条件を緩和（優先度を下げる）\n';
+        errorMessage += '- 生成期間を短くする';
+        
+        setGenerationResult(errorMessage);
       }
 
     } catch (error) {

@@ -5,12 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 import { loadEmployeesFromExcel, reloadEmployeesFromExcel, EmployeeMaster, updateEmployeeInSupabase } from '@/utils/employeeExcelLoader';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
-import { EditEmployeeModal } from '@/components/EditEmployeeModal';
-import { AddEmployeeModal } from '@/components/AddEmployeeModal';
 
 export default function EmployeeManagement() {
   const [employees, setEmployees] = useState<EmployeeMaster[]>([]);
@@ -20,9 +19,9 @@ export default function EmployeeManagement() {
   const [selectedOffice, setSelectedOffice] = useState<string>('all');
   const [rollCallFilter, setRollCallFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
-  const [editingEmployee, setEditingEmployee] = useState<EmployeeMaster | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<EmployeeMaster>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load data on component mount
   useEffect(() => {
@@ -87,7 +86,7 @@ export default function EmployeeManagement() {
   const filterEmployees = () => {
     let filtered = employees;
     
-    // Filter by search term - using English column names
+    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(employee => 
         employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,52 +95,77 @@ export default function EmployeeManagement() {
       );
     }
     
-    // Filter by selected office - using English column names
+    // Filter by selected office
     if (selectedOffice !== 'all') {
       filtered = filtered.filter(employee => employee.office === selectedOffice);
     }
-
+    
     // Filter by roll call capability
-    if (rollCallFilter !== 'all') {
-      if (rollCallFilter === 'capable') {
-        filtered = filtered.filter(employee => 
-          employee.roll_call_capable === true || employee.roll_call_duty === '1'
-        );
-      } else if (rollCallFilter === 'not_capable') {
-        filtered = filtered.filter(employee => 
-          employee.roll_call_capable === false || employee.roll_call_duty === '0'
-        );
-      }
+    if (rollCallFilter === 'capable') {
+      filtered = filtered.filter(employee => 
+        employee.roll_call_capable === true || employee.roll_call_duty === '1'
+      );
+    } else if (rollCallFilter === 'not_capable') {
+      filtered = filtered.filter(employee => 
+        employee.roll_call_capable !== true && employee.roll_call_duty !== '1'
+      );
     }
     
     setFilteredEmployees(filtered);
   };
 
+  const getUniqueOffices = () => {
+    const offices = employees
+      .map(emp => emp.office)
+      .filter((office): office is string => office !== undefined && office !== null && office !== '');
+    return [...new Set(offices)];
+  };
+
   const getStatusBadge = (employee: EmployeeMaster) => {
-    const isCapable = employee.roll_call_capable || employee.roll_call_duty === '1';
-    
-    if (isCapable) {
-      return { variant: 'default' as const, text: '点呼対応可', icon: CheckCircle };
-    } else if (employee.roll_call_capable === false || employee.roll_call_duty === '0') {
-      return { variant: 'secondary' as const, text: '点呼対応不可', icon: XCircle };
+    if (employee.roll_call_capable || employee.roll_call_duty === '1') {
+      return { variant: 'default' as const, text: '対応可能', icon: UserCheck };
+    } else if (employee.roll_call_duty === '0') {
+      return { variant: 'secondary' as const, text: '対応不可', icon: UserX };
     }
     return { variant: 'outline' as const, text: '未設定', icon: UserX };
   };
 
-  const handleEditEmployee = (employee: EmployeeMaster) => {
-    console.log('📝 Opening edit modal for employee:', employee);
-    setEditingEmployee(employee);
-    setIsEditModalOpen(true);
+  const handleStartEdit = (employee: EmployeeMaster) => {
+    console.log('📝 Starting edit for employee:', employee);
+    setEditingEmployeeId(employee.employee_id || null);
+    setEditFormData({ ...employee });
   };
 
-  const handleEmployeeUpdated = () => {
-    // Reload data after employee update
-    loadData();
+  const handleCancelEdit = () => {
+    setEditingEmployeeId(null);
+    setEditFormData({});
   };
 
-  const handleEmployeeAdded = () => {
-    // Reload data after employee addition
-    loadData();
+  const handleSaveEdit = async (employeeId: string) => {
+    if (!employeeId) {
+      toast.error('従業員IDが見つかりません');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log('💾 Saving employee data:', editFormData);
+      const success = await updateEmployeeInSupabase(employeeId, editFormData);
+      
+      if (success) {
+        toast.success('従業員データを更新しました');
+        setEditingEmployeeId(null);
+        setEditFormData({});
+        await loadData(); // Reload data
+      } else {
+        toast.error('従業員データの更新に失敗しました');
+      }
+    } catch (error) {
+      console.error('❌ Error updating employee:', error);
+      toast.error('従業員データの更新中にエラーが発生しました');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleQuickToggleRollCall = async (employee: EmployeeMaster) => {
@@ -151,129 +175,103 @@ export default function EmployeeManagement() {
     const newCapable = !currentCapable;
 
     try {
-      const success = await updateEmployeeInSupabase(employee.employee_id, {
+      const updateData: EmployeeMaster = {
+        ...employee,
         roll_call_capable: newCapable,
         roll_call_duty: newCapable ? '1' : '0'
-      });
+      };
 
+      const success = await updateEmployeeInSupabase(employee.employee_id, updateData);
+      
       if (success) {
         toast.success(`${employee.name}の点呼対応を${newCapable ? '可能' : '不可'}に変更しました`);
-        loadData(); // Reload to reflect changes
+        await loadData();
       } else {
-        toast.error('点呼対応設定の変更に失敗しました');
+        toast.error('点呼対応の変更に失敗しました');
       }
     } catch (error) {
-      console.error('Error toggling roll call capability:', error);
-      toast.error('点呼対応設定の変更中にエラーが発生しました');
+      console.error('Error toggling roll call:', error);
+      toast.error('点呼対応の変更中にエラーが発生しました');
     }
   };
 
-  const getUniqueOffices = () => {
-    const offices = employees.map(emp => emp.office).filter(Boolean);
-    return [...new Set(offices)];
-  };
-
-  const getRollCallStats = () => {
-    const capable = employees.filter(e => e.roll_call_capable === true || e.roll_call_duty === '1').length;
-    const notCapable = employees.filter(e => e.roll_call_capable === false || e.roll_call_duty === '0').length;
-    const unset = employees.length - capable - notCapable;
-    return { capable, notCapable, unset };
+  const handleEditFormChange = (field: string, value: any) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="flex items-center space-x-2">
-            <RefreshCw className="h-6 w-6 animate-spin" />
-            <span className="text-lg">データを読込中...</span>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <p className="text-gray-600">従業員データを読み込み中...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  const rollCallStats = getRollCallStats();
-
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">従業員管理</h1>
-          <p className="text-muted-foreground mt-2">従業員データの表示・管理・点呼対応設定</p>
+          <h1 className="text-3xl font-bold text-gray-900">従業員管理</h1>
+          <p className="text-gray-600 mt-2">従業員情報の確認・編集を行います</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => window.location.href = '/'} variant="outline">
-            <Home className="h-4 w-4 mr-2" />
-            ホーム
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleForceReload} disabled={isLoading}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            再読み込み
           </Button>
-          <Button onClick={() => setIsAddModalOpen(true)} variant="default">
-            <Plus className="h-4 w-4 mr-2" />
-            新規追加
-          </Button>
-          <Button onClick={handleForceReload} variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            Excel再読込
-          </Button>
-          <Button onClick={loadData} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            更新
-          </Button>
+          <Link to="/">
+            <Button variant="outline">
+              <Home className="w-4 h-4 mr-2" />
+              ホーム
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Users className="h-4 w-4 mr-2" />
-              総従業員数
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">総従業員数</p>
+                <p className="text-2xl font-bold">{employees.length}名</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-600" />
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <UserCheck className="h-4 w-4 mr-2" />
-              表示中
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{filteredEmployees.length}</div>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">点呼対応可能</p>
+                <p className="text-2xl font-bold">
+                  {employees.filter(emp => emp.roll_call_capable || emp.roll_call_duty === '1').length}名
+                </p>
+              </div>
+              <UserCheck className="h-8 w-8 text-green-600" />
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-              点呼対応可
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{rollCallStats.capable}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <XCircle className="h-4 w-4 mr-2 text-red-600" />
-              点呼対応不可
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{rollCallStats.notCapable}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">営業所数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getUniqueOffices().length}</div>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">表示中</p>
+                <p className="text-2xl font-bold">{filteredEmployees.length}名</p>
+              </div>
+              <Search className="h-8 w-8 text-purple-600" />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -281,20 +279,17 @@ export default function EmployeeManagement() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>フィルター・検索</CardTitle>
+          <CardTitle>検索・フィルター</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="氏名、従業員ID、営業所で検索..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                placeholder="従業員名、ID、営業所で検索..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
             </div>
             <div className="md:w-48">
               <Select value={selectedOffice} onValueChange={setSelectedOffice}>
@@ -350,41 +345,117 @@ export default function EmployeeManagement() {
               {filteredEmployees.map((employee, index) => {
                 const status = getStatusBadge(employee);
                 const StatusIcon = status.icon;
+                const isEditing = editingEmployeeId === employee.employee_id;
+                
                 return (
                   <div key={employee.employee_id || index} className="border rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
-                      <div>
-                        <div className="font-medium">{employee.name}</div>
-                        <div className="text-sm text-muted-foreground">ID: {employee.employee_id}</div>
+                    {isEditing ? (
+                      // Edit Mode
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium">従業員ID</label>
+                            <Input
+                              value={editFormData.employee_id || ''}
+                              disabled
+                              className="bg-muted mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">氏名</label>
+                            <Input
+                              value={editFormData.name || ''}
+                              onChange={(e) => handleEditFormChange('name', e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">営業所</label>
+                            <Select
+                              value={editFormData.office || ''}
+                              onValueChange={(value) => handleEditFormChange('office', value)}
+                            >
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="営業所を選択" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="川越">川越</SelectItem>
+                                <SelectItem value="東京">東京</SelectItem>
+                                <SelectItem value="川口">川口</SelectItem>
+                                <SelectItem value="その他">その他</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">点呼対応</label>
+                            <div className="flex items-center space-x-2 mt-3">
+                              <Checkbox
+                                checked={editFormData.roll_call_capable || editFormData.roll_call_duty === '1'}
+                                onCheckedChange={(checked) => {
+                                  handleEditFormChange('roll_call_capable', checked);
+                                  handleEditFormChange('roll_call_duty', checked ? '1' : '0');
+                                }}
+                              />
+                              <span className="text-sm">対応可能</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                          >
+                            <XIcon className="h-4 w-4 mr-1" />
+                            キャンセル
+                          </Button>
+                          <Button 
+                            size="sm"
+                            onClick={() => handleSaveEdit(employee.employee_id || '')}
+                            disabled={isSaving}
+                          >
+                            <Save className="h-4 w-4 mr-1" />
+                            {isSaving ? '保存中...' : '保存'}
+                          </Button>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium">{employee.office || '-'}</div>
-                        <div className="text-sm text-muted-foreground">営業所</div>
+                    ) : (
+                      // View Mode
+                      <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                        <div>
+                          <div className="font-medium">{employee.name}</div>
+                          <div className="text-sm text-muted-foreground">ID: {employee.employee_id}</div>
+                        </div>
+                        <div>
+                          <div className="font-medium">{employee.office || '-'}</div>
+                          <div className="text-sm text-muted-foreground">営業所</div>
+                        </div>
+                        <div>
+                          <Badge variant={status.variant} className="flex items-center gap-1 w-fit">
+                            <StatusIcon className="h-3 w-3" />
+                            {status.text}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            checked={employee.roll_call_capable || employee.roll_call_duty === '1'}
+                            onCheckedChange={() => handleQuickToggleRollCall(employee)}
+                          />
+                          <span className="text-sm">点呼対応</span>
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleStartEdit(employee)}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            編集
+                          </Button>
+                        </div>
                       </div>
-                      <div>
-                        <Badge variant={status.variant} className="flex items-center gap-1">
-                          <StatusIcon className="h-3 w-3" />
-                          {status.text}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          checked={employee.roll_call_capable || employee.roll_call_duty === '1'}
-                          onCheckedChange={() => handleQuickToggleRollCall(employee)}
-                        />
-                        <span className="text-sm">点呼対応</span>
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditEmployee(employee)}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          編集
-                        </Button>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -392,19 +463,7 @@ export default function EmployeeManagement() {
           )}
         </CardContent>
       </Card>
-
-      <EditEmployeeModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        employee={editingEmployee}
-        onEmployeeUpdated={handleEmployeeUpdated}
-      />
-
-      <AddEmployeeModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onEmployeeAdded={handleEmployeeAdded}
-      />
     </div>
   );
 }
+
