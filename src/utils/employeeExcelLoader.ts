@@ -23,7 +23,15 @@ export const loadEmployeesFromExcel = async (): Promise<EmployeeMaster[]> => {
 
     if (!fetchError && existingData && existingData.length > 0) {
       console.log(`✅ Loaded ${existingData.length} employees from Supabase`);
-      return existingData;
+      
+      // Normalize roll_call_duty values
+      const normalizedData = existingData.map(emp => ({
+        ...emp,
+        roll_call_duty: emp.roll_call_duty === 'true' || emp.roll_call_duty === '1' ? '1' : '0',
+        roll_call_capable: emp.roll_call_capable || emp.roll_call_duty === '1' || emp.roll_call_duty === 'true'
+      }));
+      
+      return normalizedData;
     }
 
     console.log('📁 No data in Supabase, loading from Excel file...');
