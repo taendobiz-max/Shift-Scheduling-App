@@ -149,8 +149,20 @@ export default function EmployeeManagement() {
 
     setIsSaving(true);
     try {
-      console.log('💾 Saving employee data:', editFormData);
-      const success = await updateEmployeeInSupabase(employeeId, editFormData);
+      console.log('💾 Saving employee data for ID:', employeeId);
+      console.log('💾 Edit form data:', JSON.stringify(editFormData, null, 2));
+      
+      // Ensure roll_call_capable and roll_call_duty are properly set
+      const updateData: EmployeeMaster = {
+        name: editFormData.name,
+        office: editFormData.office,
+        roll_call_capable: editFormData.roll_call_capable || false,
+        roll_call_duty: editFormData.roll_call_duty || '0'
+      };
+      
+      console.log('💾 Update data to send:', JSON.stringify(updateData, null, 2));
+      
+      const success = await updateEmployeeInSupabase(employeeId, updateData);
       
       if (success) {
         toast.success('従業員データを更新しました');
