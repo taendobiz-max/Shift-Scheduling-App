@@ -171,11 +171,13 @@ export async function generateShifts(
         violations: ['業務マスターデータが見つかりません'],
         generation_time: 0,
         unassigned_businesses: [],
+        unassigned_employees: [],
         assignment_summary: {
           total_businesses: 0,
           assigned_businesses: 0,
           unassigned_businesses: 0,
-          total_employees: availableEmployees.length
+          total_employees: availableEmployees.length,
+          unassigned_employees: 0
         },
         assigned_count: 0,
         total_businesses: 0,
@@ -560,11 +562,13 @@ export async function generateShifts(
       violations: [`エラーが発生しました: ${error instanceof Error ? error.message : 'Unknown error'}`],
       generation_time: 0,
       unassigned_businesses: [],
+      unassigned_employees: [],
       assignment_summary: {
         total_businesses: businessMasters?.length || 0,
         assigned_businesses: 0,
         unassigned_businesses: businessMasters?.length || 0,
-        total_employees: employees?.length || 0
+        total_employees: employees?.length || 0,
+        unassigned_employees: 0
       },
       assigned_count: 0,
       total_businesses: businessMasters?.length || 0,
