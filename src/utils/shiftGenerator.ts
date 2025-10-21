@@ -542,7 +542,7 @@ export async function generateShifts(
       violations,
       generation_time: 0.1,
       unassigned_businesses,
-      unassigned_employees,
+      unassigned_employees: unassignedEmployees,
       assignment_summary: {
         ...assignment_summary,
         unassigned_employees: unassignedEmployees.length
