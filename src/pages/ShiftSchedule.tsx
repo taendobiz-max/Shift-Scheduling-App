@@ -65,13 +65,20 @@ export default function ShiftSchedule() {
       console.log('Date range:', startDate, 'to', endDate);
       
       // Load all employees
+      console.log('🔄 Loading employees from table: app_9213e72257_employees');
       const { data: employeesData, error: employeesError } = await supabase
         .from('app_9213e72257_employees')
         .select('employee_id, name, office');
       
-      if (!employeesError && employeesData) {
+      if (employeesError) {
+        console.error('❌ Error loading employees:', employeesError);
+        toast.error('従業員データの読み込みに失敗しました: ' + employeesError.message);
+      } else if (employeesData) {
         setAllEmployees(employeesData);
         console.log('👥 Loaded employees:', employeesData.length);
+        console.log('👥 Sample employee:', employeesData[0]);
+      } else {
+        console.warn('⚠️ No employees data returned');
       }
       
       const { data, error } = await supabase
