@@ -78,17 +78,35 @@ function getEmployeeShifts(employeeId: string, shifts: Shift[]): Shift[] {
 }
 
 // Helper function to check if a business can be assigned to an employee (time-wise)
-function canAssignBusiness(employeeId: string, business: any, currentShifts: Shift[]): boolean {
+function canAssignBusiness(employeeId: string, business: any, currentShifts: Shift[], allBusinessMasters?: any[]): boolean {
   const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
   const newStart = business.開始時間 || business.start_time || '09:00:00';
   const newEnd = business.終了時間 || business.end_time || '17:00:00';
   const businessName = business.業務名 || business.name || 'Unknown';
+  const newPairId = business.ペア業務ID || business.pair_business_id;
   
-  // console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd})`);
+  console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd}, pairId: ${newPairId || 'none'})`);
   
   for (const shift of employeeShifts) {
+    // Get the business master data for the existing shift to check pair ID
+    let shiftPairId = null;
+    if (allBusinessMasters) {
+      const shiftBusiness = allBusinessMasters.find(bm => 
+        (bm.業務名 || bm.name) === shift.business_group
+      );
+      if (shiftBusiness) {
+        shiftPairId = shiftBusiness.ペア業務ID || shiftBusiness.pair_business_id;
+      }
+    }
+    
+    // If both businesses have the same pair ID, allow overlap (pair business)
+    if (newPairId && shiftPairId && newPairId === shiftPairId) {
+      console.log(`✅ [PAIR_BUSINESS] Allowing overlap for pair businesses: ${businessName} ↔ ${shift.business_group} (pairId: ${newPairId})`);
+      continue;
+    }
+    
     if (timeRangesOverlap(shift.start_time, shift.end_time, newStart, newEnd)) {
-      console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_name} (${shift.start_time}-${shift.end_time}), conflicts with ${businessName} (${newStart}-${newEnd})`);
+      console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_group} (${shift.start_time}-${shift.end_time}), conflicts with ${businessName} (${newStart}-${newEnd})`);
       return false; // Time conflict
     }
   }
@@ -341,7 +359,7 @@ export async function generateShifts(
         // Check time conflicts
         let hasTimeConflict = false;
         for (const business of businessGroup) {
-          if (!canAssignBusiness(empId, business, shifts)) {
+          if (!canAssignBusiness(empId, business, shifts, businessMasters)) {
             hasTimeConflict = true;
             break;
           }
@@ -462,7 +480,7 @@ export async function generateShifts(
         if (currentCount >= 3) continue;
         
         // Check time conflicts
-        if (!canAssignBusiness(empId, business, shifts)) continue;
+        if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
         // Test constraint validation
         const testShift: Shift = {
