@@ -633,6 +633,13 @@ export default function ShiftGenerator() {
         
         console.log('📝 Moving from non-working to shift:', activeNonWorking);
         
+        // Check for time conflicts
+        const conflictCheck = hasTimeConflict(activeNonWorking.employeeId, targetDate, targetBusiness);
+        if (conflictCheck.conflict) {
+          toast.error(`⚠️ 時間が重複しています: ${activeNonWorking.employeeName}は${targetDate}に${conflictCheck.conflictingBusiness} (${conflictCheck.conflictingTime})に既にアサインされています。`);
+          return;
+        }
+        
         // Check if target cell is occupied
         const targetShift = shiftResults.find(shift => 
           shift.businessMaster === targetBusiness && shift.date === targetDate
@@ -696,6 +703,54 @@ export default function ShiftGenerator() {
       activeShift: { business: activeShift.businessMaster, date: activeShift.date, employee: activeShift.employeeName }, 
       target: { targetBusiness, targetDate } 
     });
+    
+    // Check for time conflicts (skip if moving within the same date)
+    if (activeShift.date !== targetDate) {
+      const conflictCheck = hasTimeConflict(activeShift.employeeId, targetDate, targetBusiness);
+      if (conflictCheck.conflict) {
+        toast.error(`⚠️ 時間が重複しています: ${activeShift.employeeName}は${targetDate}に${conflictCheck.conflictingBusiness} (${conflictCheck.conflictingTime})に既にアサインされています。`);
+        return;
+      }
+    } else {
+      // Moving within the same date - need to check excluding the current shift
+      const otherShiftsOnDate = shiftResults.filter(shift => 
+        shift.employeeId === activeShift.employeeId && 
+        shift.date === targetDate && 
+        shift.id !== activeShift.id
+      );
+      
+      const targetBusinessData = businessMasters.find(bm => 
+        (bm.name || bm.業務名) === targetBusiness
+      );
+      
+      if (targetBusinessData) {
+        const targetStart = targetBusinessData.開始時間 || targetBusinessData.start_time || '09:00:00';
+        const targetEnd = targetBusinessData.終了時間 || targetBusinessData.end_time || '17:00:00';
+        const targetPairId = targetBusinessData.ペア業務ID || targetBusinessData.pair_business_id;
+        
+        for (const shift of otherShiftsOnDate) {
+          const shiftBusinessData = businessMasters.find(bm => 
+            (bm.name || bm.業務名) === shift.businessMaster
+          );
+          
+          if (!shiftBusinessData) continue;
+          
+          const shiftStart = shiftBusinessData.開始時間 || shiftBusinessData.start_time || '09:00:00';
+          const shiftEnd = shiftBusinessData.終了時間 || shiftBusinessData.end_time || '17:00:00';
+          const shiftPairId = shiftBusinessData.ペア業務ID || shiftBusinessData.pair_business_id;
+          
+          // If both are pair businesses with the same pair ID, allow overlap
+          if (targetPairId && shiftPairId && targetPairId === shiftPairId) {
+            continue;
+          }
+          
+          if (timeRangesOverlap(targetStart, targetEnd, shiftStart, shiftEnd)) {
+            toast.error(`⚠️ 時間が重複しています: ${activeShift.employeeName}は${targetDate}に${shift.businessMaster} (${shiftStart}-${shiftEnd})に既にアサインされています。`);
+            return;
+          }
+        }
+      }
+    }
 
     // Find if there's already a shift in the target cell
     const targetShift = shiftResults.find(shift => 
@@ -749,6 +804,69 @@ export default function ShiftGenerator() {
 
     setShiftResults(updatedShifts);
     setHasChanges(true);
+  };
+
+  // Helper function to check if two time ranges overlap
+  const timeRangesOverlap = (start1: string, end1: string, start2: string, end2: string): boolean => {
+    const s1 = new Date(`2000-01-01T${start1}`);
+    const e1 = new Date(`2000-01-01T${end1}`);
+    const s2 = new Date(`2000-01-01T${start2}`);
+    const e2 = new Date(`2000-01-01T${end2}`);
+    return s1 < e2 && s2 < e1;
+  };
+
+  // Check if employee has time conflict on a specific date
+  const hasTimeConflict = (employeeId: string, targetDate: string, targetBusiness: string): { conflict: boolean; conflictingBusiness?: string; conflictingTime?: string } => {
+    // Get target business hours
+    const targetBusinessData = businessMasters.find(bm => 
+      (bm.name || bm.業務名) === targetBusiness
+    );
+    
+    if (!targetBusinessData) {
+      return { conflict: false };
+    }
+    
+    const targetStart = targetBusinessData.開始時間 || targetBusinessData.start_time || '09:00:00';
+    const targetEnd = targetBusinessData.終了時間 || targetBusinessData.end_time || '17:00:00';
+    
+    // Check if target business is a pair business
+    const targetPairId = targetBusinessData.ペア業務ID || targetBusinessData.pair_business_id;
+    
+    // Get all shifts for this employee on the target date
+    const employeeShiftsOnDate = shiftResults.filter(shift => 
+      shift.employeeId === employeeId && shift.date === targetDate
+    );
+    
+    for (const shift of employeeShiftsOnDate) {
+      const shiftBusinessData = businessMasters.find(bm => 
+        (bm.name || bm.業務名) === shift.businessMaster
+      );
+      
+      if (!shiftBusinessData) continue;
+      
+      const shiftStart = shiftBusinessData.開始時間 || shiftBusinessData.start_time || '09:00:00';
+      const shiftEnd = shiftBusinessData.終了時間 || shiftBusinessData.end_time || '17:00:00';
+      
+      // Check if shift business is a pair business
+      const shiftPairId = shiftBusinessData.ペア業務ID || shiftBusinessData.pair_business_id;
+      
+      // If both are pair businesses with the same pair ID, allow overlap
+      if (targetPairId && shiftPairId && targetPairId === shiftPairId) {
+        console.log(`✅ [PAIR_BUSINESS] Allowing same employee for pair businesses: ${targetBusiness} ↔ ${shift.businessMaster}`);
+        continue;
+      }
+      
+      // Check for time overlap
+      if (timeRangesOverlap(targetStart, targetEnd, shiftStart, shiftEnd)) {
+        return {
+          conflict: true,
+          conflictingBusiness: shift.businessMaster,
+          conflictingTime: `${shiftStart}-${shiftEnd}`
+        };
+      }
+    }
+    
+    return { conflict: false };
   };
 
   const resetShifts = () => {
@@ -897,6 +1015,68 @@ export default function ShiftGenerator() {
     );
   };
 
+  // Detect time conflicts in current shifts
+  const detectTimeConflicts = () => {
+    const conflicts: { date: string; employee: string; businesses: string[] }[] = [];
+    const dates = [...new Set(shiftResults.map(r => r.date))].sort();
+    
+    dates.forEach(date => {
+      const employeeShifts: { [empId: string]: { name: string; shifts: { business: string; start: string; end: string; pairId?: string }[] } } = {};
+      
+      // Group shifts by employee for this date
+      shiftResults
+        .filter(shift => shift.date === date)
+        .forEach(shift => {
+          if (!employeeShifts[shift.employeeId]) {
+            employeeShifts[shift.employeeId] = {
+              name: shift.employeeName,
+              shifts: []
+            };
+          }
+          
+          const businessData = businessMasters.find(bm => 
+            (bm.name || bm.業務名) === shift.businessMaster
+          );
+          
+          if (businessData) {
+            employeeShifts[shift.employeeId].shifts.push({
+              business: shift.businessMaster,
+              start: businessData.開始時間 || businessData.start_time || '09:00:00',
+              end: businessData.終了時間 || businessData.end_time || '17:00:00',
+              pairId: businessData.ペア業務ID || businessData.pair_business_id
+            });
+          }
+        });
+      
+      // Check for conflicts
+      Object.entries(employeeShifts).forEach(([empId, data]) => {
+        if (data.shifts.length < 2) return;
+        
+        for (let i = 0; i < data.shifts.length; i++) {
+          for (let j = i + 1; j < data.shifts.length; j++) {
+            const shift1 = data.shifts[i];
+            const shift2 = data.shifts[j];
+            
+            // Skip if both are pair businesses with the same pair ID
+            if (shift1.pairId && shift2.pairId && shift1.pairId === shift2.pairId) {
+              continue;
+            }
+            
+            if (timeRangesOverlap(shift1.start, shift1.end, shift2.start, shift2.end)) {
+              conflicts.push({
+                date,
+                employee: data.name,
+                businesses: [shift1.business, shift2.business]
+              });
+            }
+          }
+        }
+      });
+    });
+    
+    return conflicts;
+  };
+
   const renderShiftMatrix = () => {
     if (shiftResults.length === 0) return null;
 
@@ -924,6 +1104,7 @@ export default function ShiftGenerator() {
     });
 
     const vacationCount = nonWorkingMembers.filter(nw => nw.source === 'vacation_master').length;
+    const timeConflicts = detectTimeConflicts();
 
     return (
       <DndContext
@@ -1018,6 +1199,25 @@ export default function ShiftGenerator() {
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {timeConflicts.length > 0 && (
+            <Alert className="mb-6 border-red-500 bg-red-50">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertDescription>
+                <div className="font-semibold mb-2 text-red-800">⚠️ 時間重複が検出されました ({timeConflicts.length}件):</div>
+                <div className="max-h-32 overflow-y-auto">
+                  {timeConflicts.map((conflict, index) => (
+                    <div key={index} className="text-sm text-red-700 mb-1">
+                      • {conflict.date}: {conflict.employee} → {conflict.businesses.join(' ↔ ')}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-red-600 mt-2">
+                  ※ ペア業務以外で同じ従業員が時間重複する業務にアサインされています。ドラッグ&ドロップで修正してください。
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
           {unassignedBusinesses.length > 0 && (
