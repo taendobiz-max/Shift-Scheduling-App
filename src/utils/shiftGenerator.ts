@@ -85,14 +85,20 @@ function canAssignBusiness(employeeId: string, business: any, currentShifts: Shi
   const businessName = business.業務名 || business.name || 'Unknown';
   
   console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd})`);
+  console.log(`🔍 [TIME_CHECK] Employee has ${employeeShifts.length} existing shifts:`, employeeShifts.map(s => `${s.business_group} (${s.start_time}-${s.end_time})`));
   
   for (const shift of employeeShifts) {
-    if (timeRangesOverlap(shift.start_time, shift.end_time, newStart, newEnd)) {
+    console.log(`🔍 [TIME_CHECK] Comparing with existing shift: ${shift.business_group} (${shift.start_time}-${shift.end_time})`);
+    const overlap = timeRangesOverlap(shift.start_time, shift.end_time, newStart, newEnd);
+    console.log(`🔍 [TIME_CHECK] Overlap result: ${overlap}`);
+    
+    if (overlap) {
       console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_group} (${shift.start_time}-${shift.end_time}), conflicts with ${businessName} (${newStart}-${newEnd})`);
       return false; // Time conflict
     }
   }
   
+  console.log(`✅ [TIME_CHECK] No conflict found for ${employeeId} - ${businessName}`);
   return true;
 }
 
@@ -262,7 +268,7 @@ export async function generateShifts(
               const gbStart = gb.開始時間 || gb.start_time || '09:00:00';
               const gbEnd = gb.終了時間 || gb.end_time || '17:00:00';
               
-              // Find other businesses that don't conflict with this one
+              // Find other businesses that don't conflict with ANY business in the current group
               for (const other of groupBusinesses) {
                 const otherId = other.業務id || other.id || other.業務名 || other.name;
                 if (tempProcessed.has(otherId)) continue;
@@ -270,8 +276,19 @@ export async function generateShifts(
                 const otherStart = other.開始時間 || other.start_time || '09:00:00';
                 const otherEnd = other.終了時間 || other.end_time || '17:00:00';
                 
-                // Check if times don't overlap
-                if (!timeRangesOverlap(gbStart, gbEnd, otherStart, otherEnd)) {
+                // Check if times don't overlap with ANY business in the current group
+                let hasConflict = false;
+                for (const groupBusiness of group) {
+                  const groupStart = groupBusiness.開始時間 || groupBusiness.start_time || '09:00:00';
+                  const groupEnd = groupBusiness.終了時間 || groupBusiness.end_time || '17:00:00';
+                  
+                  if (timeRangesOverlap(groupStart, groupEnd, otherStart, otherEnd)) {
+                    hasConflict = true;
+                    break;
+                  }
+                }
+                
+                if (!hasConflict) {
                   group.push(other);
                   tempProcessed.add(otherId);
                 }
@@ -312,6 +329,21 @@ export async function generateShifts(
     });
     
     console.log(`📊 Business groups: ${businessGroups.length} pairs, ${singleBusinesses.length} singles`);
+    console.log('📊 Business groups detail:');
+    businessGroups.forEach((group, index) => {
+      console.log(`  Group ${index + 1}:`, group.map(b => {
+        const name = b.業務名 || b.name;
+        const start = b.開始時間 || b.start_time || '09:00:00';
+        const end = b.終了時間 || b.end_time || '17:00:00';
+        return `${name} (${start}-${end})`;
+      }));
+    });
+    console.log('📊 Single businesses:', singleBusinesses.map(b => {
+      const name = b.業務名 || b.name;
+      const start = b.開始時間 || b.start_time || '09:00:00';
+      const end = b.終了時間 || b.end_time || '17:00:00';
+      return `${name} (${start}-${end})`;
+    }));
     
     let assignedBusinesses = 0;
     
@@ -338,12 +370,38 @@ export async function generateShifts(
         // Skip if employee already has 3 assignments
         if (currentCount >= 3) continue;
         
-        // Check time conflicts
+        // Check time conflicts with existing shifts
         let hasTimeConflict = false;
         for (const business of businessGroup) {
           if (!canAssignBusiness(empId, business, shifts, businessMasters)) {
             hasTimeConflict = true;
             break;
+          }
+        }
+        
+        if (hasTimeConflict) continue;
+        
+        // Check time conflicts within the business group itself
+        if (businessGroup.length > 1) {
+          for (let i = 0; i < businessGroup.length; i++) {
+            for (let j = i + 1; j < businessGroup.length; j++) {
+              const business1 = businessGroup[i];
+              const business2 = businessGroup[j];
+              
+              const start1 = business1.開始時間 || business1.start_time || '09:00:00';
+              const end1 = business1.終了時間 || business1.end_time || '17:00:00';
+              const start2 = business2.開始時間 || business2.start_time || '09:00:00';
+              const end2 = business2.終了時間 || business2.end_time || '17:00:00';
+              
+              if (timeRangesOverlap(start1, end1, start2, end2)) {
+                const name1 = business1.業務名 || business1.name || 'Unknown';
+                const name2 = business2.業務名 || business2.name || 'Unknown';
+                console.log(`⚠️ [GROUP_CONFLICT] Cannot assign ${empId} to business group: ${name1} (${start1}-${end1}) conflicts with ${name2} (${start2}-${end2})`);
+                hasTimeConflict = true;
+                break;
+              }
+            }
+            if (hasTimeConflict) break;
           }
         }
         
