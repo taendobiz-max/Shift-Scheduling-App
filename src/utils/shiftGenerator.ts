@@ -83,28 +83,10 @@ function canAssignBusiness(employeeId: string, business: any, currentShifts: Shi
   const newStart = business.開始時間 || business.start_time || '09:00:00';
   const newEnd = business.終了時間 || business.end_time || '17:00:00';
   const businessName = business.業務名 || business.name || 'Unknown';
-  const newPairId = business.ペア業務ID || business.pair_business_id;
   
-  console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd}, pairId: ${newPairId || 'none'})`);
+  console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd})`);
   
   for (const shift of employeeShifts) {
-    // Get the business master data for the existing shift to check pair ID
-    let shiftPairId = null;
-    if (allBusinessMasters) {
-      const shiftBusiness = allBusinessMasters.find(bm => 
-        (bm.業務名 || bm.name) === shift.business_group
-      );
-      if (shiftBusiness) {
-        shiftPairId = shiftBusiness.ペア業務ID || shiftBusiness.pair_business_id;
-      }
-    }
-    
-    // If both businesses have the same pair ID, allow overlap (pair business)
-    if (newPairId && shiftPairId && newPairId === shiftPairId) {
-      console.log(`✅ [PAIR_BUSINESS] Allowing overlap for pair businesses: ${businessName} ↔ ${shift.business_group} (pairId: ${newPairId})`);
-      continue;
-    }
-    
     if (timeRangesOverlap(shift.start_time, shift.end_time, newStart, newEnd)) {
       console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_group} (${shift.start_time}-${shift.end_time}), conflicts with ${businessName} (${newStart}-${newEnd})`);
       return false; // Time conflict

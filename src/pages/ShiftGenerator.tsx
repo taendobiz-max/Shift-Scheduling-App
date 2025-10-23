@@ -778,7 +778,7 @@ export default function ShiftGenerator() {
       ).join('\n');
       
       const confirmSave = window.confirm(
-        `⚠️ 時間重複が検出されました (${timeConflicts.length}件):\n\n${conflictMessages}\n\n※ ペア業務以外で同じ従業員が時間重複する業務にアサインされています。\n\nこのまま保存しますか？`
+        `⚠️ 時間重複が検出されました (${timeConflicts.length}件):\n\n${conflictMessages}\n\n※ 同じ従業員が時間重複する業務にアサインされています。\n\nこのまま保存しますか？`
       );
       
       if (!confirmSave) {
@@ -965,11 +965,6 @@ export default function ShiftGenerator() {
             const shift1 = data.shifts[i];
             const shift2 = data.shifts[j];
             
-            // Skip if both are pair businesses with the same pair ID
-            if (shift1.pairId && shift2.pairId && shift1.pairId === shift2.pairId) {
-              continue;
-            }
-            
             if (timeRangesOverlap(shift1.start, shift1.end, shift2.start, shift2.end)) {
               conflicts.push({
                 date,
@@ -1122,7 +1117,7 @@ export default function ShiftGenerator() {
                   ))}
                 </div>
                 <div className="text-xs text-red-600 mt-2">
-                  ※ ペア業務以外で同じ従業員が時間重複する業務にアサインされています。ドラッグ&ドロップで修正してください。
+                  ※ 同じ従業員が時間重複する業務にアサインされています。ドラッグ&ドロップで修正してください。
                 </div>
               </AlertDescription>
             </Alert>
