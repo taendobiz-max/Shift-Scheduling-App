@@ -13,11 +13,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ShiftData {
   id: string;
-  shift_date: string;
+  date: string;
   employee_id: string;
   employee_name: string;
   business_master_id: string;
   business_group: string;
+  location?: string;
   created_at?: string;
 }
 
@@ -82,11 +83,11 @@ export default function ShiftSchedule() {
       }
       
       const { data, error } = await supabase
-        .from('app_9213e72257_shifts')
+        .from('shifts')
         .select('*')
-        .gte('shift_date', startDate)
-        .lte('shift_date', endDate)
-        .order('shift_date', { ascending: true });
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
 
       if (error) {
         console.error('❌ Error loading shifts:', error);
@@ -173,8 +174,8 @@ export default function ShiftSchedule() {
     
     // Add assigned employees to each date
     shiftsData.forEach(shift => {
-      if (shiftsByDate[shift.shift_date]) {
-        shiftsByDate[shift.shift_date].add(shift.employee_id);
+      if (shiftsByDate[shift.date]) {
+        shiftsByDate[shift.date].add(shift.employee_id);
       }
     });
     
@@ -206,8 +207,8 @@ export default function ShiftSchedule() {
     
     // Add shifts to their respective dates
     filteredShifts.forEach(shift => {
-      if (grouped[shift.shift_date]) {
-        grouped[shift.shift_date].push(shift);
+      if (grouped[shift.date]) {
+        grouped[shift.date].push(shift);
       }
     });
     

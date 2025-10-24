@@ -789,15 +789,20 @@ export default function ShiftGenerator() {
 
     setIsGenerating(true);
     try {
-      const shiftsToSave = shiftResults.map(result => ({
-        employee_id: result.employeeId,
-        business_master_id: businessMasters.find(bm => 
-          (bm.name || bm.業務名) === result.businessMaster
-        )?.id || '',
-        date: result.date,
-        location: selectedLocation,
-        created_at: new Date().toISOString()
-      }));
+      const shiftsToSave = shiftResults.map(result => {
+        const business = businessMasters.find(bm => 
+          (bm.業務名 || bm.name) === result.businessMaster
+        );
+        const businessMasterId = business?.業務id || business?.id || result.businessMaster;
+        
+        return {
+          employee_id: result.employeeId,
+          business_master_id: businessMasterId,
+          date: result.date,
+          location: selectedLocation,
+          created_at: new Date().toISOString()
+        };
+      });
 
       const { error } = await supabase
         .from('shifts')
