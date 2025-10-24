@@ -5,19 +5,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Info } from 'lucide-react';
+import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  useDraggable,
+  useDroppable,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ShiftData {
   id: string;
   date: string;
   employee_id: string;
-  employee_name: string;
+  employee_name?: string;
   business_master_id: string;
-  business_group: string;
+  business_name?: string;
+  start_time?: string;
+  end_time?: string;
   location?: string;
   created_at?: string;
 }
@@ -28,391 +43,620 @@ interface EmployeeData {
   office?: string;
 }
 
+interface BusinessMaster {
+  業務id?: string;
+  業務名?: string;
+  開始時間?: string;
+  終了時間?: string;
+  業務グループ?: string;
+}
+
+interface TimeSlot {
+  hour: number;
+  label: string;
+}
+
+// Generate time slots from 5:00 to next day 4:59
+const generateTimeSlots = (): TimeSlot[] => {
+  const slots: TimeSlot[] = [];
+  for (let i = 0; i < 24; i++) {
+    const hour = (i + 5) % 24;
+    const label = `${hour.toString().padStart(2, '0')}:00`;
+    slots.push({ hour, label });
+  }
+  return slots;
+};
+
+// Draggable Employee Component
+const DraggableEmployee = ({ 
+  employeeId, 
+  employeeName, 
+  shiftId 
+}: { 
+  employeeId: string; 
+  employeeName: string;
+  shiftId?: string;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({
+    id: shiftId || `employee-${employeeId}`,
+    data: { employeeId, employeeName, type: 'employee' }
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+    cursor: 'grab',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="inline-block"
+    >
+      <Badge variant="secondary" className="cursor-grab active:cursor-grabbing">
+        {employeeName}
+      </Badge>
+    </div>
+  );
+};
+
+// Droppable Cell Component
+const DroppableCell = ({ 
+  id, 
+  children, 
+  isEmpty 
+}: { 
+  id: string; 
+  children: React.ReactNode;
+  isEmpty?: boolean;
+}) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`
+        min-h-[40px] p-1 border-r border-b
+        ${isOver ? 'bg-blue-50' : isEmpty ? 'bg-gray-50' : 'bg-white'}
+        ${isEmpty ? 'hover:bg-gray-100' : ''}
+        transition-colors
+      `}
+    >
+      {children}
+    </div>
+  );
+};
+
 export default function ShiftSchedule() {
   const [shifts, setShifts] = useState<ShiftData[]>([]);
-  const [filteredShifts, setFilteredShifts] = useState<ShiftData[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
   const [locations, setLocations] = useState<string[]>([]);
   const [allEmployees, setAllEmployees] = useState<EmployeeData[]>([]);
-  const [unassignedEmployees, setUnassignedEmployees] = useState<{[date: string]: EmployeeData[]}>({});
+  const [businessMasters, setBusinessMasters] = useState<BusinessMaster[]>([]);
+  const [unassignedEmployees, setUnassignedEmployees] = useState<EmployeeData[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const timeSlots = generateTimeSlots();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   useEffect(() => {
-    // Set default date range (current month)
+    // Set default date to today
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
-    setStartDate(firstDay.toISOString().split('T')[0]);
-    setEndDate(lastDay.toISOString().split('T')[0]);
+    setSelectedDate(today.toISOString().split('T')[0]);
   }, []);
 
   useEffect(() => {
-    if (startDate && endDate) {
-      loadShifts();
+    if (selectedDate) {
+      loadData();
     }
-  }, [startDate, endDate]);
+  }, [selectedDate]);
 
   useEffect(() => {
     filterShifts();
   }, [shifts, selectedLocation]);
 
-  const loadShifts = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      console.log('🔄 Loading shifts from Supabase...');
-      console.log('Date range:', startDate, 'to', endDate);
+      console.log('🔄 Loading data for date:', selectedDate);
       
-      // Load all employees
-      console.log('🔄 Loading employees from table: app_9213e72257_employees');
+      // Load employees
       const { data: employeesData, error: employeesError } = await supabase
         .from('app_9213e72257_employees')
         .select('employee_id, name, office');
       
       if (employeesError) {
         console.error('❌ Error loading employees:', employeesError);
-        toast.error('従業員データの読み込みに失敗しました: ' + employeesError.message);
+        toast.error('従業員データの読み込みに失敗しました');
       } else if (employeesData) {
         setAllEmployees(employeesData);
         console.log('👥 Loaded employees:', employeesData.length);
-        console.log('👥 Sample employee:', employeesData[0]);
-      } else {
-        console.warn('⚠️ No employees data returned');
-      }
-      
-      const { data, error } = await supabase
-        .from('shifts')
-        .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
-
-      if (error) {
-        console.error('❌ Error loading shifts:', error);
-        toast.error('シフトデータの読み込みに失敗しました');
-        setShifts([]);
-        return;
-      }
-
-      console.log('✅ Loaded shifts:', data?.length || 0);
-      setShifts(data || []);
-      
-      // Calculate unassigned employees for each date in the range
-      if (employeesData) {
-        calculateUnassignedEmployees(data || [], employeesData, startDate, endDate);
-      }
-      
-      if (data && data.length > 0) {
-        toast.success(`${data.length}件のシフトを読み込みました`);
         
         // Extract unique locations
-        const uniqueLocations = [...new Set(data.map((shift: any) => shift.location).filter(Boolean))];
+        const uniqueLocations = [...new Set(employeesData.map(e => e.office).filter(Boolean))] as string[];
         setLocations(uniqueLocations);
+      }
+
+      // Load business masters
+      const { data: businessData, error: businessError } = await supabase
+        .from('app_9213e72257_business_master')
+        .select('*');
+      
+      if (businessError) {
+        console.error('❌ Error loading business masters:', businessError);
+      } else if (businessData) {
+        setBusinessMasters(businessData);
+        console.log('📋 Loaded business masters:', businessData.length);
+      }
+      
+      // Load shifts for selected date
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('date', selectedDate);
+
+      if (shiftsError) {
+        console.error('❌ Error loading shifts:', shiftsError);
+        toast.error('シフトデータの読み込みに失敗しました');
+        setShifts([]);
       } else {
-        toast.info('指定期間にシフトデータがありません');
+        console.log('✅ Loaded shifts:', shiftsData?.length || 0);
+        
+        // Enrich shift data with employee names and business info
+        const enrichedShifts = (shiftsData || []).map(shift => {
+          const employee = employeesData?.find(e => e.employee_id === shift.employee_id);
+          const business = businessData?.find(b => 
+            (b.業務id || b.id) === shift.business_master_id
+          );
+          
+          return {
+            ...shift,
+            employee_name: employee?.name || shift.employee_id,
+            business_name: business?.業務名 || shift.business_master_id,
+            start_time: business?.開始時間 || '09:00:00',
+            end_time: business?.終了時間 || '17:00:00',
+          };
+        });
+        
+        setShifts(enrichedShifts);
       }
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('💥 Error loading data:', error);
       toast.error('データの読み込み中にエラーが発生しました');
-      setShifts([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const filterShifts = () => {
-    let filtered = shifts;
-    
-    if (selectedLocation !== 'all') {
-      filtered = filtered.filter(shift => shift.location === selectedLocation);
+    if (selectedLocation === 'all') {
+      calculateUnassignedEmployees(shifts, allEmployees);
+    } else {
+      const filtered = shifts.filter(s => s.location === selectedLocation);
+      const filteredEmployees = allEmployees.filter(e => e.office === selectedLocation);
+      calculateUnassignedEmployees(filtered, filteredEmployees);
     }
-    
-    setFilteredShifts(filtered);
   };
 
-  const refreshData = () => {
-    loadShifts();
-  };
-  
-  // Generate all dates in the range
-  const generateDateRange = (start: string, end: string): string[] => {
-    const dates: string[] = [];
-    const startDateObj = new Date(start);
-    const endDateObj = new Date(end);
-    
-    for (let d = new Date(startDateObj); d <= endDateObj; d.setDate(d.getDate() + 1)) {
-      dates.push(d.toISOString().split('T')[0]);
-    }
-    
-    return dates;
-  };
-  
-  const calculateUnassignedEmployees = (
-    shiftsData: any[], 
-    employeesData: EmployeeData[], 
-    start: string, 
-    end: string
-  ) => {
-    console.log('🔍 [UNASSIGNED] Starting calculation...');
-    console.log('🔍 [UNASSIGNED] Shifts data:', shiftsData.length);
-    console.log('🔍 [UNASSIGNED] Employees data:', employeesData.length);
-    console.log('🔍 [UNASSIGNED] Date range:', start, 'to', end);
-    
-    // Generate all dates in the range
-    const allDates = generateDateRange(start, end);
-    console.log('🔍 [UNASSIGNED] All dates in range:', allDates.length);
-    
-    // Group shifts by date
-    const shiftsByDate: {[date: string]: Set<string>} = {};
-    
-    // Initialize all dates with empty sets
-    allDates.forEach(date => {
-      shiftsByDate[date] = new Set();
-    });
-    
-    // Add assigned employees to each date
-    shiftsData.forEach(shift => {
-      if (shiftsByDate[shift.date]) {
-        shiftsByDate[shift.date].add(shift.employee_id);
-      }
-    });
-    
-    console.log('🔍 [UNASSIGNED] Shifts by date:', Object.keys(shiftsByDate).length);
-    
-    // Calculate unassigned employees for each date
-    const unassigned: {[date: string]: EmployeeData[]} = {};
-    
-    allDates.forEach(date => {
-      const assignedIds = shiftsByDate[date];
-      unassigned[date] = employeesData.filter(emp => !assignedIds.has(emp.employee_id));
-      console.log(`🔍 [UNASSIGNED] ${date}: ${assignedIds.size} assigned, ${unassigned[date].length} unassigned`);
-    });
-    
+  const calculateUnassignedEmployees = (shiftsData: ShiftData[], employeesData: EmployeeData[]) => {
+    const assignedEmployeeIds = new Set(shiftsData.map(s => s.employee_id));
+    const unassigned = employeesData.filter(e => !assignedEmployeeIds.has(e.employee_id));
     setUnassignedEmployees(unassigned);
-    console.log('📋 Calculated unassigned employees for', Object.keys(unassigned).length, 'dates');
+    console.log('🔍 Unassigned employees:', unassigned.length);
   };
 
-  const groupShiftsByDate = () => {
-    const grouped: { [date: string]: ShiftData[] } = {};
-    
-    // Initialize all dates in the range with empty arrays
-    if (startDate && endDate) {
-      const allDates = generateDateRange(startDate, endDate);
-      allDates.forEach(date => {
-        grouped[date] = [];
-      });
-    }
-    
-    // Add shifts to their respective dates
-    filteredShifts.forEach(shift => {
-      if (grouped[shift.date]) {
-        grouped[shift.date].push(shift);
-      }
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const overId = over.id as string;
+
+    console.log('🎯 Drag end:', { 
+      active: active.id, 
+      over: overId,
+      activeData 
     });
+
+    // Parse the drop target
+    // Format: "cell-{employeeId}-{hour}"
+    if (overId.startsWith('cell-')) {
+      const parts = overId.split('-');
+      if (parts.length >= 3) {
+        const targetEmployeeId = parts.slice(1, -1).join('-');
+        const targetHour = parseInt(parts[parts.length - 1]);
+        
+        console.log('📍 Drop target:', { targetEmployeeId, targetHour });
+        
+        // Check if dragging from unassigned employees
+        if (activeData?.type === 'employee' && !activeData.shiftId) {
+          // Dragging unassigned employee to a cell
+          const sourceEmployeeId = activeData.employeeId;
+          
+          if (sourceEmployeeId !== targetEmployeeId) {
+            // Swap: move unassigned employee to target, and move target's shift to unassigned
+            const targetShift = shifts.find(s => s.employee_id === targetEmployeeId);
+            
+            if (targetShift) {
+              // Update the shift to assign to the source employee
+              const updatedShifts = shifts.map(s => {
+                if (s.id === targetShift.id) {
+                  return {
+                    ...s,
+                    employee_id: sourceEmployeeId,
+                    employee_name: activeData.employeeName,
+                  };
+                }
+                return s;
+              });
+              
+              setShifts(updatedShifts);
+              setHasChanges(true);
+              toast.success(`${activeData.employeeName}と${targetShift.employee_name}を交換しました`);
+            } else {
+              toast.info('交換先の従業員にシフトがありません');
+            }
+          }
+        } else if (activeData?.shiftId) {
+          // Dragging existing shift to another cell
+          const activeShift = shifts.find(s => s.id === activeData.shiftId);
+          
+          if (activeShift && activeShift.employee_id !== targetEmployeeId) {
+            // Swap with target employee's shift
+            const targetShift = shifts.find(s => s.employee_id === targetEmployeeId);
+            
+            if (targetShift) {
+              // Swap the two shifts
+              const updatedShifts = shifts.map(s => {
+                if (s.id === activeShift.id) {
+                  return {
+                    ...s,
+                    employee_id: targetEmployeeId,
+                    employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
+                  };
+                } else if (s.id === targetShift.id) {
+                  return {
+                    ...s,
+                    employee_id: activeShift.employee_id,
+                    employee_name: activeShift.employee_name,
+                  };
+                }
+                return s;
+              });
+              
+              setShifts(updatedShifts);
+              setHasChanges(true);
+              toast.success(`シフトを交換しました`);
+            } else {
+              // Move shift to target employee (no swap)
+              const updatedShifts = shifts.map(s => {
+                if (s.id === activeShift.id) {
+                  return {
+                    ...s,
+                    employee_id: targetEmployeeId,
+                    employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
+                  };
+                }
+                return s;
+              });
+              
+              setShifts(updatedShifts);
+              setHasChanges(true);
+              toast.success(`シフトを移動しました`);
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const saveChanges = async () => {
+    if (!hasChanges) return;
+
+    setIsLoading(true);
+    try {
+      console.log('💾 Saving shifts to database...');
+      
+      // Delete all existing shifts for this date
+      const { error: deleteError } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('date', selectedDate)
+        .eq('location', selectedLocation === 'all' ? undefined : selectedLocation);
+      
+      if (deleteError) {
+        console.error('❌ Error deleting old shifts:', deleteError);
+        throw deleteError;
+      }
+      
+      // Insert updated shifts
+      const shiftsToSave = shifts.map(shift => ({
+        employee_id: shift.employee_id,
+        business_master_id: shift.business_master_id,
+        date: shift.date,
+        location: shift.location || selectedLocation,
+        created_at: new Date().toISOString(),
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('shifts')
+        .insert(shiftsToSave);
+      
+      if (insertError) {
+        console.error('❌ Error inserting shifts:', insertError);
+        throw insertError;
+      }
+      
+      console.log('✅ Saved', shiftsToSave.length, 'shifts');
+      toast.success('変更を保存しました');
+      setHasChanges(false);
+      
+      // Reload data to get fresh IDs
+      await loadData();
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast.error('保存中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate time bar position and width
+  const getTimeBarStyle = (startTime: string, endTime: string) => {
+    const parseTime = (time: string) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      // Adjust for 5:00 start time
+      let adjustedHours = hours - 5;
+      if (adjustedHours < 0) adjustedHours += 24;
+      return adjustedHours + minutes / 60;
+    };
+
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
     
-    return grouped;
+    const left = (start / 24) * 100;
+    const width = ((end - start) / 24) * 100;
+
+    return {
+      left: `${left}%`,
+      width: `${width}%`,
+    };
   };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const weekday = weekdays[date.getDay()];
-    return `${month}月${day}日（${weekday}）`;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-600">シフトデータを読み込み中...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const groupedShifts = groupShiftsByDate();
-  const dates = Object.keys(groupedShifts).sort();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Home Button */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">シフト管理</h1>
-        <Link to="/">
-          <Button variant="outline" className="flex items-center gap-2">
-            <Home className="h-4 w-4" />
-            ホームへ戻る
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link to="/">
+            <Button variant="outline" size="sm">
+              <Home className="h-4 w-4 mr-2" />
+              ホーム
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
+        </div>
+        {hasChanges && (
+          <Button onClick={saveChanges} disabled={isLoading}>
+            <Save className="h-4 w-4 mr-2" />
+            変更を保存
           </Button>
-        </Link>
+        )}
       </div>
 
-      {/* Header */}
+      {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Calendar className="w-5 h-5 mr-2" />
-            シフト表示
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            フィルター
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="startDate">開始日</Label>
+              <Label htmlFor="date">日付</Label>
               <Input
-                id="startDate"
+                id="date"
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="endDate">終了日</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={startDate}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="location">拠点フィルター</Label>
+              <Label htmlFor="location">拠点</Label>
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger>
+                <SelectTrigger id="location">
                   <SelectValue placeholder="拠点を選択" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">全拠点</SelectItem>
-                  {locations.map(location => (
-                    <SelectItem key={location} value={location}>{location}</SelectItem>
+                  <SelectItem value="all">すべて</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {loc}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          
-          <div className="flex justify-end">
-            <Button onClick={refreshData} disabled={isLoading}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              更新
-            </Button>
+
+            <div className="flex items-end">
+              <Button onClick={loadData} disabled={isLoading} className="w-full">
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                再読み込み
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Shifts Display */}
-      {dates.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-600 mb-2">日付範囲を選択してください</p>
-              <p className="text-sm text-gray-500">
-                開始日と終了日を設定してシフトを表示します
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <div className="font-semibold">表示中のシフト情報</div>
-              <div className="text-sm mt-1">
-                期間: {startDate} ～ {endDate} | 
-                シフト数: {filteredShifts.length}件 | 
-                日数: {dates.length}日間
-              </div>
-            </AlertDescription>
-          </Alert>
-
-          {dates.map(date => (
-            <Card key={date}>
-              <CardHeader className="bg-blue-50">
-                <CardTitle className="text-lg flex items-center justify-between">
-                  <span className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    {formatDate(date)}
-                  </span>
-                  <Badge variant="outline">
-                    {groupedShifts[date].length}件
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-4">
-                  {/* Assigned Shifts */}
-                  {groupedShifts[date].length > 0 ? (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-3 text-gray-700">勤務者 ({groupedShifts[date].length}名)</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {groupedShifts[date].map((shift, index) => (
-                          <div
-                            key={shift.id || `${date}-${index}`}
-                            className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center">
-                                <Users className="h-4 w-4 mr-2 text-blue-600" />
-                                <span className="font-medium">{shift.employee_name}</span>
-                              </div>
-                              <Badge variant="secondary" className="text-xs">
-                                {shift.employee_id}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              <div className="flex items-center">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {shift.business_group}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+      {/* Matrix Display */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            シフトマトリクス - {selectedDate}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="overflow-x-auto">
+              <div className="min-w-[1200px]">
+                {/* Time Header */}
+                <div className="flex border-b-2 border-gray-300 bg-gray-100 sticky top-0 z-10">
+                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center">
+                    従業員名
+                  </div>
+                  <div className="flex-1 relative">
+                    <div className="flex">
+                      {timeSlots.map((slot, index) => (
+                        <div
+                          key={index}
+                          className="flex-1 p-2 text-center text-xs border-r border-gray-300 font-medium"
+                        >
+                          {slot.label}
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-3 text-gray-700">勤務者 (0名)</h3>
-                      <p className="text-sm text-gray-500">この日にシフトが割り当てられていません</p>
-                    </div>
-                  )}
-                  
-                  {/* Unassigned Employees */}
-                  {unassignedEmployees[date] && unassignedEmployees[date].length > 0 ? (
-                    <div className="border-t pt-4">
-                      <h3 className="text-sm font-semibold mb-3 text-gray-700">非勤務者 ({unassignedEmployees[date].length}名)</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                        {unassignedEmployees[date].map((employee) => (
-                          <div
-                            key={employee.employee_id}
-                            className="border border-gray-200 rounded-lg p-2 bg-gray-50 text-center"
-                          >
-                            <div className="text-sm font-medium text-gray-700">{employee.name}</div>
-                            <div className="text-xs text-gray-500">{employee.employee_id}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="border-t pt-4">
-                      <h3 className="text-sm font-semibold mb-3 text-gray-500">非勤務者 (0名)</h3>
-                      <p className="text-sm text-gray-400">全員が勤務しています</p>
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+
+                {/* Employee Rows */}
+                {allEmployees
+                  .filter(emp => selectedLocation === 'all' || emp.office === selectedLocation)
+                  .map((employee) => {
+                    const employeeShifts = shifts.filter(s => s.employee_id === employee.employee_id);
+                    
+                    return (
+                      <div key={employee.employee_id} className="flex border-b border-gray-200 hover:bg-gray-50">
+                        {/* Employee Name Column */}
+                        <div className="w-40 p-2 border-r-2 border-gray-300 font-medium flex items-center">
+                          {employee.name}
+                        </div>
+                        
+                        {/* Time Grid Column */}
+                        <div className="flex-1 relative" style={{ height: '60px' }}>
+                          {/* Time Grid Background */}
+                          <div className="absolute inset-0 flex">
+                            {timeSlots.map((slot, index) => (
+                              <DroppableCell
+                                key={`${employee.employee_id}-${index}`}
+                                id={`cell-${employee.employee_id}-${slot.hour}`}
+                                isEmpty={employeeShifts.length === 0}
+                              >
+                                {/* Empty cell */}
+                              </DroppableCell>
+                            ))}
+                          </div>
+                          
+                          {/* Shift Bars */}
+                          {employeeShifts.map((shift) => {
+                            const barStyle = getTimeBarStyle(
+                              shift.start_time || '09:00:00',
+                              shift.end_time || '17:00:00'
+                            );
+                            
+                            return (
+                              <div
+                                key={shift.id}
+                                className="absolute top-2 bottom-2 bg-blue-500 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md hover:bg-blue-600 transition-colors z-20"
+                                style={{
+                                  left: barStyle.left,
+                                  width: barStyle.width,
+                                }}
+                              >
+                                <DraggableEmployee
+                                  employeeId={shift.employee_id}
+                                  employeeName={shift.employee_name || employee.name}
+                                  shiftId={shift.id}
+                                />
+                                <span className="ml-2 truncate">{shift.business_name}</span>
+                                <span className="ml-2 text-xs opacity-75">
+                                  {shift.start_time?.substring(0, 5)} - {shift.end_time?.substring(0, 5)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                
+                {allEmployees.filter(emp => selectedLocation === 'all' || emp.office === selectedLocation).length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    従業員データがありません
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <DragOverlay>
+              {activeId && (
+                <Badge variant="secondary" className="cursor-grabbing">
+                  ドラッグ中...
+                </Badge>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </CardContent>
+      </Card>
+
+      {/* Unassigned Employees */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            未割り当て従業員 ({unassignedEmployees.length}名)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {unassignedEmployees.map((emp) => (
+              <DraggableEmployee
+                key={emp.employee_id}
+                employeeId={emp.employee_id}
+                employeeName={emp.name}
+              />
+            ))}
+            {unassignedEmployees.length === 0 && (
+              <p className="text-gray-500">すべての従業員がアサインされています</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
