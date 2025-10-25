@@ -557,6 +557,23 @@ export default function ShiftSchedule() {
                 {/* Employee Rows */}
                 {allEmployees
                   .filter(emp => selectedLocation === 'all' || emp.office === selectedLocation)
+                  .sort((a, b) => {
+                    // Sort employees with roll call shifts to the top
+                    const aHasRollCall = shifts.some(s => 
+                      s.employee_id === a.employee_id && 
+                      (s.business_name?.includes('点呼') || s.business_group?.includes('点呼'))
+                    );
+                    const bHasRollCall = shifts.some(s => 
+                      s.employee_id === b.employee_id && 
+                      (s.business_name?.includes('点呼') || s.business_group?.includes('点呼'))
+                    );
+                    
+                    if (aHasRollCall && !bHasRollCall) return -1;
+                    if (!aHasRollCall && bHasRollCall) return 1;
+                    
+                    // Otherwise, sort by name
+                    return (a.name || '').localeCompare(b.name || '');
+                  })
                   .map((employee) => {
                     const employeeShifts = shifts.filter(s => s.employee_id === employee.employee_id);
                     

@@ -347,6 +347,104 @@ export async function generateShifts(
     
     let assignedBusinesses = 0;
     
+    // PHASE 0: Assign roll call businesses first (highest priority)
+    console.log('\n📞 PHASE 0: Assigning roll call businesses...');
+    const rollCallBusinesses: any[] = [];
+    const nonRollCallSingles: any[] = [];
+    
+    singleBusinesses.forEach(business => {
+      const businessName = business.業務名 || business.name || '';
+      const businessGroup = business.業務グループ || business.business_group || '';
+      
+      // Check if this is a roll call business
+      if (businessName.includes('点呼') || businessGroup.includes('点呼')) {
+        rollCallBusinesses.push(business);
+      } else {
+        nonRollCallSingles.push(business);
+      }
+    });
+    
+    console.log(`📞 Found ${rollCallBusinesses.length} roll call businesses`);
+    
+    for (const business of rollCallBusinesses) {
+      const businessName = business.業務名 || business.name || 'Unknown';
+      const businessId = business.業務id || business.id || 'unknown';
+      
+      console.log(`🔄 Processing roll call business: ${businessName}`);
+      
+      // Filter employees who are capable of roll call duty
+      const rollCallCapableEmployees = availableEmployees.filter(emp => {
+        return emp.roll_call_capable === true || emp.roll_call_duty === '1';
+      });
+      
+      console.log(`👥 Found ${rollCallCapableEmployees.length} roll call capable employees`);
+      
+      if (rollCallCapableEmployees.length === 0) {
+        console.warn('⚠️ No roll call capable employees found, using all available employees');
+      }
+      
+      const candidateEmployees = rollCallCapableEmployees.length > 0 
+        ? rollCallCapableEmployees 
+        : availableEmployees;
+      
+      // Sort by assignment count
+      const sortedEmployees = candidateEmployees.sort((a, b) => {
+        const aId = a.id || a.従業員ID || a.employee_id;
+        const bId = b.id || b.従業員ID || b.employee_id;
+        return (employeeAssignmentCounts.get(aId) || 0) - (employeeAssignmentCounts.get(bId) || 0);
+      });
+      
+      let selectedEmployee = null;
+      
+      for (const emp of sortedEmployees) {
+        const empId = emp.id || emp.従業員ID || emp.employee_id;
+        const currentCount = employeeAssignmentCounts.get(empId) || 0;
+        
+        // Skip if employee already has 3 assignments
+        if (currentCount >= 3) continue;
+        
+        // Check time conflicts
+        if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
+        
+        selectedEmployee = emp;
+        break;
+      }
+      
+      if (selectedEmployee) {
+        const empId = selectedEmployee.id || selectedEmployee.従業員ID || selectedEmployee.employee_id;
+        const empName = selectedEmployee.name || selectedEmployee.氏名 || '名前不明';
+        
+        const shift: Shift = {
+          shift_date: targetDate,
+          date: targetDate,
+          employee_id: empId,
+          employee_name: empName,
+          business_group: business.業務グループ || '点呼',
+          business_master_id: businessId,
+          shift_type: 'regular',
+          start_time: business.開始時間 || '05:00:00',
+          end_time: business.終了時間 || '05:30:00',
+          status: 'scheduled',
+          generation_batch_id: batchId,
+          location: location
+        };
+        
+        shifts.push(shift);
+        assignedBusinesses++;
+        employeeAssignmentCounts.set(empId, (employeeAssignmentCounts.get(empId) || 0) + 1);
+        
+        console.log(`✅ Assigned roll call business to ${empName} (${empId})`);
+      } else {
+        unassigned_businesses.push(businessName);
+        violations.push(`${businessName}: 点呼対応可能な従業員がいません`);
+        console.log(`⚠️ No available employee for roll call business: ${businessName}`);
+      }
+    }
+    
+    // Update singleBusinesses to exclude roll call businesses
+    singleBusinesses.length = 0;
+    singleBusinesses.push(...nonRollCallSingles);
+    
     // PHASE 1: Assign pair businesses (priority)
     console.log('\n🔗 PHASE 1: Assigning pair businesses...');
     for (let groupIndex = 0; groupIndex < businessGroups.length; groupIndex++) {
