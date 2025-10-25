@@ -353,9 +353,19 @@ export default function MasterDataManagement() {
         toast.success('業務マスターを更新しました');
       } else {
         // Create new business master
+        // Generate a unique business ID
+        const timestamp = Date.now();
+        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const newBusinessId = `BIZ${timestamp}${randomSuffix}`;
+        
+        const newBusinessMaster = {
+          ...businessMasterForm,
+          業務id: newBusinessId
+        };
+        
         const { error } = await supabase
           .from('app_9213e72257_business_master')
-          .insert([businessMasterForm]);
+          .insert([newBusinessMaster]);
 
         if (error) throw error;
         toast.success('業務マスターを作成しました');
