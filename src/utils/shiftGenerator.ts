@@ -203,6 +203,15 @@ export async function generateShifts(
       employeeAssignmentCounts.set(empId, 0);
     });
     
+    // Track employee business assignment history for diversity
+    const employeeBusinessHistory = new Map<string, Set<string>>();
+    availableEmployees.forEach(emp => {
+      const empId = emp.id || emp.従業員ID || emp.employee_id;
+      employeeBusinessHistory.set(empId, new Set<string>());
+    });
+    
+    console.log('🔄 Business diversity tracking enabled');
+    
     // Group businesses by pair (if they have pair information)
     const businessGroups: any[][] = [];
     const singleBusinesses: any[] = [];
@@ -433,7 +442,12 @@ export async function generateShifts(
         assignedBusinesses++;
         employeeAssignmentCounts.set(empId, (employeeAssignmentCounts.get(empId) || 0) + 1);
         
-        console.log(`✅ Assigned roll call business to ${empName} (${empId})`);
+        // Update business history for diversity tracking
+        const history = employeeBusinessHistory.get(empId) || new Set();
+        history.add(businessId);
+        employeeBusinessHistory.set(empId, history);
+        
+        console.log(`✅ Assigned roll call business to ${empName} (${empId}, unique businesses: ${history.size})`);
       } else {
         unassigned_businesses.push(businessName);
         violations.push(`${businessName}: 点呼対応可能な従業員がいません`);
@@ -554,6 +568,8 @@ export async function generateShifts(
         const empName = selectedEmployee.name || selectedEmployee.氏名 || '名前不明';
         
         // Assign all businesses in the pair to this employee
+        const history = employeeBusinessHistory.get(empId) || new Set();
+        
         businessGroup.forEach((business) => {
           const businessName = business.業務名 || business.name || `Business_${groupIndex}`;
           const businessId = business.業務id || business.id || `business_${groupIndex}`;
@@ -576,11 +592,17 @@ export async function generateShifts(
           shifts.push(shift);
           assignedBusinesses++;
           
+          // Update business history for diversity tracking
+          history.add(businessId);
+          
           console.log(`✅ Assigned ${empName} (${empId}) to ${businessName}`);
         });
         
-        // Update assignment count
+        // Update assignment count and history
         employeeAssignmentCounts.set(empId, (employeeAssignmentCounts.get(empId) || 0) + businessGroup.length);
+        employeeBusinessHistory.set(empId, history);
+        
+        console.log(`📊 ${empName} now has ${employeeAssignmentCounts.get(empId)} assignments, ${history.size} unique businesses`);
       } else {
         // No available employee for this pair
         businessGroup.forEach((business) => {
@@ -604,9 +626,29 @@ export async function generateShifts(
       let minViolations = Infinity;
       
       // Find employee with least assignments who can handle this business
+      // Prioritize employees who haven't done this business before (diversity)
       const sortedEmployees = availableEmployees.sort((a, b) => {
         const aId = a.id || a.従業員ID || a.employee_id;
         const bId = b.id || b.従業員ID || b.employee_id;
+        
+        // Check if employee has done this business before
+        const aHistory = employeeBusinessHistory.get(aId) || new Set();
+        const bHistory = employeeBusinessHistory.get(bId) || new Set();
+        const aHasDoneBusiness = aHistory.has(businessId);
+        const bHasDoneBusiness = bHistory.has(businessId);
+        
+        // Prioritize employees who haven't done this business
+        if (!aHasDoneBusiness && bHasDoneBusiness) return -1;
+        if (aHasDoneBusiness && !bHasDoneBusiness) return 1;
+        
+        // If both have or haven't done it, prioritize by diversity (fewer unique businesses)
+        const aDiversity = aHistory.size;
+        const bDiversity = bHistory.size;
+        if (aDiversity !== bDiversity) {
+          return aDiversity - bDiversity; // Prefer less diverse employees to balance
+        }
+        
+        // Finally, sort by assignment count
         return (employeeAssignmentCounts.get(aId) || 0) - (employeeAssignmentCounts.get(bId) || 0);
       });
       
@@ -681,7 +723,12 @@ export async function generateShifts(
         // Update assignment count
         employeeAssignmentCounts.set(empId, (employeeAssignmentCounts.get(empId) || 0) + 1);
         
-        console.log(`✅ Assigned ${empName} (${empId}) to ${businessName} (total: ${employeeAssignmentCounts.get(empId)})`);
+        // Update business history for diversity tracking
+        const history = employeeBusinessHistory.get(empId) || new Set();
+        history.add(businessId);
+        employeeBusinessHistory.set(empId, history);
+        
+        console.log(`✅ Assigned ${empName} (${empId}) to ${businessName} (total: ${employeeAssignmentCounts.get(empId)}, unique businesses: ${history.size})`);
       } else {
         unassigned_businesses.push(businessName);
         violations.push(`${businessName}: アサイン可能な従業員がいません`);
