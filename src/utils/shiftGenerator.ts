@@ -60,6 +60,7 @@ export interface GenerationResult {
   total_businesses?: number;
   constraint_violations?: any[];
   constraint_report?: any;
+  business_history?: Map<string, Set<string>>;
 }
 
 // Helper function to check if two time ranges overlap
@@ -108,7 +109,8 @@ export async function generateShifts(
   businessMasters: any[],
   targetDate: string,
   pairGroups?: { [key: string]: any[] },
-  location?: string
+  location?: string,
+  existingBusinessHistory?: Map<string, Set<string>>
 ): Promise<GenerationResult> {
   console.log('🚀 Starting enhanced shift generation with multi-assignment for:', targetDate);
   console.log('👥 Available employees:', employees.length);
@@ -204,13 +206,28 @@ export async function generateShifts(
     });
     
     // Track employee business assignment history for diversity
-    const employeeBusinessHistory = new Map<string, Set<string>>();
+    const employeeBusinessHistory = existingBusinessHistory || new Map<string, Set<string>>();
+    
+    // Initialize history for employees who don't have one yet
     availableEmployees.forEach(emp => {
       const empId = emp.id || emp.従業員ID || emp.employee_id;
-      employeeBusinessHistory.set(empId, new Set<string>());
+      if (!employeeBusinessHistory.has(empId)) {
+        employeeBusinessHistory.set(empId, new Set<string>());
+      }
     });
     
-    console.log('🔄 Business diversity tracking enabled');
+    if (existingBusinessHistory) {
+      console.log('🔄 Business diversity tracking enabled (using existing history)');
+      // Log current diversity status
+      let totalUniqueBusinesses = 0;
+      employeeBusinessHistory.forEach((history, empId) => {
+        totalUniqueBusinesses += history.size;
+      });
+      const avgDiversity = totalUniqueBusinesses / employeeBusinessHistory.size;
+      console.log(`📊 Average business diversity: ${avgDiversity.toFixed(2)} unique businesses per employee`);
+    } else {
+      console.log('🔄 Business diversity tracking enabled (new history)');
+    }
     
     // Group businesses by pair (if they have pair information)
     const businessGroups: any[][] = [];
@@ -801,7 +818,8 @@ export async function generateShifts(
       assigned_count: assignedBusinesses,
       total_businesses: businessMasters.length,
       constraint_violations: constraintViolations,
-      constraint_report
+      constraint_report,
+      business_history: employeeBusinessHistory
     };
     
   } catch (error) {

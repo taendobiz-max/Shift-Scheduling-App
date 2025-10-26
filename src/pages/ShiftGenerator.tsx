@@ -436,6 +436,9 @@ export default function ShiftGenerator() {
       const pairGroups = getPairBusinesses(businessMasters);
       console.log('🔗 Pair business groups:', pairGroups);
 
+      // Initialize business history to track across multiple days
+      let businessHistory: Map<string, Set<string>> | undefined = undefined;
+
       // Generate shifts for each date in the range
       for (const date of dateRange) {
         console.log(`📅 Processing date: ${date}`);
@@ -444,8 +447,16 @@ export default function ShiftGenerator() {
           filteredEmployees,
           businessMasters,
           date,
-          pairGroups
+          pairGroups,
+          selectedLocation,
+          businessHistory
         );
+        
+        // Update business history for next iteration
+        if (result.business_history) {
+          businessHistory = result.business_history;
+          console.log(`📊 Business history updated for next day`);
+        }
 
         console.log(`📊 Generation result for ${date}:`, {
           success: result.success,
