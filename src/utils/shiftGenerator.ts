@@ -654,7 +654,7 @@ export async function generateShifts(
         // Assign all businesses in the pair to this employee
         const history = employeeBusinessHistory.get(empId) || new Set();
         
-        businessGroup.forEach((business) => {
+        for (const business of businessGroup) {
           const businessName = business.業務名 || business.name || `Business_${groupIndex}`;
           const businessId = business.業務id || business.id || `business_${groupIndex}`;
           
@@ -683,7 +683,7 @@ export async function generateShifts(
           await saveBusinessHistoryToDB(empId, businessId, targetDate);
           
           console.log(`✅ Assigned ${empName} (${empId}) to ${businessName}`);
-        });
+        }
         
         // Update assignment count and history
         employeeAssignmentCounts.set(empId, (employeeAssignmentCounts.get(empId) || 0) + businessGroup.length);
