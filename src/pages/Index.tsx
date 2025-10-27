@@ -10,7 +10,7 @@ export default function Index() {
         {/* ヘッダー */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            バス会社シフト管理システム
+            シフト管理システム
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             効率的なシフト管理で、運行の安全性と従業員の働きやすさを実現
