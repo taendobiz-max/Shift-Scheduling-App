@@ -3,6 +3,66 @@ import { supabase } from './supabaseClient';
 import { ConstraintEngine } from './constraintEngine';
 import { ConstraintManager } from './constraintManager';
 
+// Load business history from database
+async function loadBusinessHistoryFromDB(): Promise<Map<string, Set<string>>> {
+  const history = new Map<string, Set<string>>();
+  
+  try {
+    const { data, error } = await supabase
+      .from('app_9213e72257_employee_business_history')
+      .select('employee_id, business_id');
+    
+    if (error) {
+      console.error('⚠️ Failed to load business history from DB:', error);
+      return history;
+    }
+    
+    if (data) {
+      data.forEach((record: any) => {
+        const empId = record.employee_id;
+        const bizId = record.business_id;
+        
+        if (!history.has(empId)) {
+          history.set(empId, new Set<string>());
+        }
+        history.get(empId)!.add(bizId);
+      });
+    }
+    
+    console.log(`📊 Loaded ${data?.length || 0} business history records`);
+  } catch (err) {
+    console.error('❌ Error loading business history:', err);
+  }
+  
+  return history;
+}
+
+// Save business history to database
+async function saveBusinessHistoryToDB(
+  employeeId: string,
+  businessId: string,
+  assignedDate: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('app_9213e72257_employee_business_history')
+      .upsert({
+        employee_id: employeeId,
+        business_id: businessId,
+        last_assigned_date: assignedDate,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'employee_id,business_id'
+      });
+    
+    if (error) {
+      console.error('⚠️ Failed to save business history:', error);
+    }
+  } catch (err) {
+    console.error('❌ Error saving business history:', err);
+  }
+}
+
 export interface ShiftConstraint {
   id: string;
   constraint_name: string;
@@ -128,6 +188,16 @@ export async function generateShifts(
     const constraintEngine = new ConstraintEngine();
     await constraintEngine.loadConstraints(location);
     
+    // Load business history from DB if not provided
+    let employeeBusinessHistory: Map<string, Set<string>>;
+    if (existingBusinessHistory) {
+      employeeBusinessHistory = existingBusinessHistory;
+      console.log('📚 Using provided business history');
+    } else {
+      employeeBusinessHistory = await loadBusinessHistoryFromDB();
+      console.log('📚 Loaded business history from DB:', employeeBusinessHistory.size, 'employees');
+    }
+    
     console.log('📋 Loaded constraints:', constraintEngine.getConstraintCount());
     
     // Load vacation data for the target date
@@ -205,9 +275,6 @@ export async function generateShifts(
       employeeAssignmentCounts.set(empId, 0);
     });
     
-    // Track employee business assignment history for diversity
-    const employeeBusinessHistory = existingBusinessHistory || new Map<string, Set<string>>();
-    
     // Initialize history for employees who don't have one yet
     availableEmployees.forEach(emp => {
       const empId = emp.id || emp.従業員ID || emp.employee_id;
@@ -216,17 +283,14 @@ export async function generateShifts(
       }
     });
     
-    if (existingBusinessHistory) {
-      console.log('🔄 Business diversity tracking enabled (using existing history)');
-      // Log current diversity status
-      let totalUniqueBusinesses = 0;
-      employeeBusinessHistory.forEach((history, empId) => {
-        totalUniqueBusinesses += history.size;
-      });
+    // Log current diversity status
+    let totalUniqueBusinesses = 0;
+    employeeBusinessHistory.forEach((history, empId) => {
+      totalUniqueBusinesses += history.size;
+    });
+    if (employeeBusinessHistory.size > 0) {
       const avgDiversity = totalUniqueBusinesses / employeeBusinessHistory.size;
       console.log(`📊 Average business diversity: ${avgDiversity.toFixed(2)} unique businesses per employee`);
-    } else {
-      console.log('🔄 Business diversity tracking enabled (new history)');
     }
     
     // Group businesses by pair (if they have pair information)
@@ -464,6 +528,9 @@ export async function generateShifts(
         history.add(businessId);
         employeeBusinessHistory.set(empId, history);
         
+        // Save to database
+        await saveBusinessHistoryToDB(empId, businessId, targetDate);
+        
         console.log(`✅ Assigned roll call business to ${empName} (${empId}, unique businesses: ${history.size})`);
       } else {
         unassigned_businesses.push(businessName);
@@ -612,6 +679,9 @@ export async function generateShifts(
           // Update business history for diversity tracking
           history.add(businessId);
           
+          // Save to database
+          await saveBusinessHistoryToDB(empId, businessId, targetDate);
+          
           console.log(`✅ Assigned ${empName} (${empId}) to ${businessName}`);
         });
         
@@ -744,6 +814,9 @@ export async function generateShifts(
         const history = employeeBusinessHistory.get(empId) || new Set();
         history.add(businessId);
         employeeBusinessHistory.set(empId, history);
+        
+        // Save to database
+        await saveBusinessHistoryToDB(empId, businessId, targetDate);
         
         console.log(`✅ Assigned ${empName} (${empId}) to ${businessName} (total: ${employeeAssignmentCounts.get(empId)}, unique businesses: ${history.size})`);
       } else {
