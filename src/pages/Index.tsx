@@ -1,20 +1,32 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX } from 'lucide-react';
+import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { logout, getCurrentUser } from '@/utils/auth';
 
 export default function Index() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-6 py-12">
         {/* ヘッダー */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            シフト管理システム
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            効率的なシフト管理で、運行の安全性と従業員の働きやすさを実現
-          </p>
+        <div className="flex justify-between items-center mb-12">
+          <div className="flex-1 text-center">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              シフト管理システム
+            </h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              効率的なシフト管理で、運行の安全性と従業員の働きやすさを実現
+            </p>
+          </div>
+          <div className="absolute top-6 right-6">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">{getCurrentUser()?.name}</span>
+              <Button variant="outline" size="sm" onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                ログアウト
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* メイン機能カード */}

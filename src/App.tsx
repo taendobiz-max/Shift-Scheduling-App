@@ -10,6 +10,8 @@ import ShiftSchedule from './pages/ShiftSchedule';
 import SkillMatrixManagement from './pages/SkillMatrixManagement';
 import ShiftGenerator from './pages/ShiftGenerator';
 import VacationManagement from './pages/VacationManagement';
+import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const queryClient = new QueryClient();
 
@@ -20,13 +22,14 @@ const App = () => {
         <Toaster />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/master-data" element={<MasterDataManagement />} />
-            <Route path="/employees" element={<EmployeeManagement />} />
-            <Route path="/shift-schedule" element={<ShiftSchedule />} />
-            <Route path="/shift-generator" element={<ShiftGenerator />} />
-            <Route path="/skill-matrix" element={<SkillMatrixManagement />} />
-            <Route path="/vacation-management" element={<VacationManagement />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/master-data" element={<ProtectedRoute><MasterDataManagement /></ProtectedRoute>} />
+            <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
+            <Route path="/shift-schedule" element={<ProtectedRoute><ShiftSchedule /></ProtectedRoute>} />
+            <Route path="/shift-generator" element={<ProtectedRoute><ShiftGenerator /></ProtectedRoute>} />
+            <Route path="/skill-matrix" element={<ProtectedRoute><SkillMatrixManagement /></ProtectedRoute>} />
+            <Route path="/vacation-management" element={<ProtectedRoute><VacationManagement /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
