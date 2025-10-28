@@ -437,26 +437,30 @@ export default function ShiftGenerator() {
       console.log('🔗 Pair business groups:', pairGroups);
 
       // Initialize business history to track across multiple days
+      // Always start by loading from DB to ensure consistency
       let businessHistory: Map<string, Set<string>> | undefined = undefined;
 
       // Generate shifts for each date in the range
       for (const date of dateRange) {
         console.log(`📅 Processing date: ${date}`);
         
+        // Always pass undefined to force DB load for each day
+        // This ensures we get the latest business history including what was saved in previous iterations
         const result = await generateShifts(
           filteredEmployees,
           businessMasters,
           date,
           pairGroups,
           selectedLocation,
-          businessHistory
+          undefined  // Force DB load each time
         );
         
-        // Update business history for next iteration
-        if (result.business_history) {
-          businessHistory = result.business_history;
-          console.log(`📊 Business history updated for next day`);
-        }
+        // Business history is now managed entirely in DB
+        // No need to track in memory
+        console.log(`📊 Business history saved to DB for ${date}`);
+        
+        // Small delay to ensure DB writes are completed
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         console.log(`📊 Generation result for ${date}:`, {
           success: result.success,
