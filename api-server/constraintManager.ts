@@ -21,8 +21,8 @@ interface ConstraintStatistics {
 }
 
 export class ConstraintManager {
-  private static readonly TABLE_NAME = 'app_9213e72257_enhanced_constraints';
-  private static readonly VIOLATIONS_TABLE = 'app_9213e72257_constraint_violations';
+  private static readonly TABLE_NAME = 'enhanced_constraints';
+  private static readonly VIOLATIONS_TABLE = 'constraint_violations';
 
   /**
    * 全ての制約条件を取得

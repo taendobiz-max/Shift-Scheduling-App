@@ -46,7 +46,7 @@ interface ShiftContext {
 export async function getAllConstraintGroups(): Promise<ConstraintGroup[]> {
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_constraint_groups')
+      .from('constraint_groups')
       .select('*')
       .eq('is_active', true)
       .order('priority_level', { ascending: true });
@@ -69,7 +69,7 @@ export async function getAllConstraintGroups(): Promise<ConstraintGroup[]> {
 export async function getConstraintsByGroupId(groupId: string): Promise<EnhancedConstraint[]> {
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_enhanced_constraints')
+      .from('enhanced_constraints')
       .select('*')
       .eq('constraint_group_id', groupId)
       .eq('is_active', true);

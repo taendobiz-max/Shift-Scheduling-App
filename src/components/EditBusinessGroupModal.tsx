@@ -55,7 +55,7 @@ export const EditBusinessGroupModal: React.FC<EditBusinessGroupModalProps> = ({
     try {
       // Check for duplicate names (excluding current record)
       const { data: existing, error: checkError } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .select('id')
         .eq('name', name.trim())
         .neq('id', businessGroup.id)
@@ -72,7 +72,7 @@ export const EditBusinessGroupModal: React.FC<EditBusinessGroupModalProps> = ({
 
       // Update business group
       const { error: updateError } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .update({
           name: name.trim(),
           description: description.trim() || null,

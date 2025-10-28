@@ -38,7 +38,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
     setIsLoading(true);
     try {
       const { error } = await supabase
-        .from('app_9213e72257_employees')
+        .from('employees')
         .insert([formData]);
 
       if (error) {

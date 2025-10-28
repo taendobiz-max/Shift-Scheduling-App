@@ -27,7 +27,7 @@ export const loadAndSaveBusinessMasterFromExcel = async (): Promise<BusinessMast
     console.log('Loading business master data from Excel...');
     
     // Clear existing data first
-    await supabase.from('app_9213e72257_business_master').delete().neq('業務ID', '');
+    await supabase.from('business_master').delete().neq('業務ID', '');
     
     // Read the uploaded Excel file
     const response = await fetch('/uploads/業務マスタ.xlsx');
@@ -60,7 +60,7 @@ export const loadAndSaveBusinessMasterFromExcel = async (): Promise<BusinessMast
     // Save to Supabase database
     if (businessData.length > 0) {
       const { error } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .insert(businessData.map(item => ({
           業務ID: item.業務ID,
           業務名: item.業務名,
@@ -136,7 +136,7 @@ export const loadAndSaveBusinessMasterFromExcel = async (): Promise<BusinessMast
     // Save fallback data to database
     if (fallbackData.length > 0) {
       const { error } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .insert(fallbackData.map(item => ({
           業務ID: item.業務ID,
           業務名: item.業務名,
@@ -164,7 +164,7 @@ export const loadAndSaveEmployeeMasterFromCSV = async (): Promise<EmployeeMaster
     console.log('Loading employee master data from CSV...');
     
     // Clear existing data first
-    await supabase.from('app_9213e72257_employee_master').delete().neq('employee_id', '');
+    await supabase.from('employee_master').delete().neq('employee_id', '');
     
     // Read the uploaded CSV file
     const response = await fetch('/uploads/乗務員マスタ.csv');
@@ -199,7 +199,7 @@ export const loadAndSaveEmployeeMasterFromCSV = async (): Promise<EmployeeMaster
     // Save to Supabase database
     if (employeeData.length > 0) {
       const { error } = await supabase
-        .from('app_9213e72257_employee_master')
+        .from('employee_master')
         .insert(employeeData.map(item => ({
           employee_id: item.従業員番号,
           name: item.氏名,
@@ -230,7 +230,7 @@ export const loadAndSaveEmployeeMasterFromCSV = async (): Promise<EmployeeMaster
     // Save fallback data
     if (fallbackEmployees.length > 0) {
       const { error } = await supabase
-        .from('app_9213e72257_employee_master')
+        .from('employee_master')
         .insert(fallbackEmployees.map(item => ({
           employee_id: item.従業員番号,
           name: item.氏名,

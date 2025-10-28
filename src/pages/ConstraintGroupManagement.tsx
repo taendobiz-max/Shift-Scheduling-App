@@ -83,7 +83,7 @@ export default function ConstraintGroupManagement() {
   const loadAvailableConstraints = async () => {
     try {
       const { data, error } = await supabase
-        .from('app_9213e72257_enhanced_constraints')
+        .from('enhanced_constraints')
         .select('*')
         .eq('is_active', true)
         .order('constraint_name');
@@ -140,7 +140,7 @@ export default function ConstraintGroupManagement() {
       if (editingGroupId) {
         // 更新
         const { error } = await supabase
-          .from('app_9213e72257_constraint_groups')
+          .from('constraint_groups')
           .update({
             ...formData,
             updated_at: new Date().toISOString()
@@ -156,7 +156,7 @@ export default function ConstraintGroupManagement() {
       } else {
         // 新規作成
         const { data, error } = await supabase
-          .from('app_9213e72257_constraint_groups')
+          .from('constraint_groups')
           .insert(formData)
           .select()
           .single();
@@ -185,14 +185,14 @@ export default function ConstraintGroupManagement() {
     try {
       // 既存の関連付けをすべて解除
       await supabase
-        .from('app_9213e72257_enhanced_constraints')
+        .from('enhanced_constraints')
         .update({ constraint_group_id: null })
         .eq('constraint_group_id', groupId);
       
       // 新しい関連付けを設定
       if (constraintIds.length > 0) {
         await supabase
-          .from('app_9213e72257_enhanced_constraints')
+          .from('enhanced_constraints')
           .update({ constraint_group_id: groupId })
           .in('id', constraintIds);
       }
@@ -211,13 +211,13 @@ export default function ConstraintGroupManagement() {
     try {
       // 関連付けを解除
       await supabase
-        .from('app_9213e72257_enhanced_constraints')
+        .from('enhanced_constraints')
         .update({ constraint_group_id: null })
         .eq('constraint_group_id', groupId);
       
       // グループを削除
       const { error } = await supabase
-        .from('app_9213e72257_constraint_groups')
+        .from('constraint_groups')
         .delete()
         .eq('id', groupId);
       

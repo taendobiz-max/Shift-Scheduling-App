@@ -21,7 +21,7 @@ export const loadBusinessMasterFromSupabase = async (): Promise<BusinessMaster[]
     console.log('🔄 Loading business master data from Supabase...');
     
     const { data, error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .select('*')
       .order('業務id');
 
@@ -53,7 +53,7 @@ export const updateBusinessMasterInSupabase = async (
     console.log(`🔄 Updating business master ${businessId} in Supabase...`, updates);
     
     const { error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .update(updates)
       .eq('業務id', businessId);
 
@@ -80,7 +80,7 @@ export const saveBusinessMasterToSupabase = async (businessData: BusinessMaster[
     }
 
     const { error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .insert(businessData);
 
     if (error) {
@@ -101,7 +101,7 @@ export const clearBusinessMasterFromSupabase = async (): Promise<void> => {
     console.log('🗑️ Clearing all business master data from Supabase...');
     
     const { error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
@@ -124,7 +124,7 @@ export const getBusinessMasterStats = async (): Promise<{
 }> => {
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .select('業務グループ');
 
     if (error) {

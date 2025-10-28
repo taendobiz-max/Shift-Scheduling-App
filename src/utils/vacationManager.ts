@@ -9,7 +9,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { data, error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .insert({
           employee_id: vacation.employee_id,
           employee_name: vacation.employee_name,
@@ -39,7 +39,7 @@ export class VacationManager {
     try {
       // Try to select from the table to check if it exists
       const { error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .select('id')
         .limit(1);
 
@@ -64,7 +64,7 @@ export class VacationManager {
         console.error('Error creating vacation table:', error);
         // Fallback: try direct SQL execution
         const createTableSQL = `
-          CREATE TABLE IF NOT EXISTS app_9213e72257_vacation_masters (
+          CREATE TABLE IF NOT EXISTS vacation_masters (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             employee_id VARCHAR(50) NOT NULL,
             employee_name VARCHAR(100) NOT NULL,
@@ -75,9 +75,9 @@ export class VacationManager {
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );
           
-          CREATE INDEX IF NOT EXISTS idx_vacation_employee_id ON app_9213e72257_vacation_masters(employee_id);
-          CREATE INDEX IF NOT EXISTS idx_vacation_date ON app_9213e72257_vacation_masters(vacation_date);
-          CREATE INDEX IF NOT EXISTS idx_vacation_location ON app_9213e72257_vacation_masters(location);
+          CREATE INDEX IF NOT EXISTS idx_vacation_employee_id ON vacation_masters(employee_id);
+          CREATE INDEX IF NOT EXISTS idx_vacation_date ON vacation_masters(vacation_date);
+          CREATE INDEX IF NOT EXISTS idx_vacation_location ON vacation_masters(location);
         `;
         
         // This will need to be executed via Supabase dashboard or migration
@@ -94,7 +94,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { data, error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .select('*')
         .gte('vacation_date', startDate)
         .lte('vacation_date', endDate)
@@ -117,7 +117,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { data, error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .select('*')
         .eq('location', location)
         .order('vacation_date', { ascending: true });
@@ -139,7 +139,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { data, error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .select('*')
         .order('vacation_date', { ascending: true });
 
@@ -160,7 +160,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { data, error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .update({
           ...vacation,
           updated_at: new Date().toISOString()
@@ -186,7 +186,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .delete()
         .eq('id', id);
 
@@ -207,7 +207,7 @@ export class VacationManager {
       await this.ensureTableExists();
       
       const { data, error } = await supabase
-        .from('app_9213e72257_vacation_masters')
+        .from('vacation_masters')
         .select('id')
         .eq('employee_id', employeeId)
         .eq('vacation_date', vacationDate);

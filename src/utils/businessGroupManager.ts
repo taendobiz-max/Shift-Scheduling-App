@@ -11,7 +11,7 @@ export interface BusinessGroup {
 export const getBusinessGroupsFromMaster = async (): Promise<string[]> => {
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .select('業務グループ, スキルマップ項目名')
       .not('業務グループ', 'is', null)
       .not('業務グループ', 'eq', '');
@@ -58,7 +58,7 @@ export const addBusinessGroup = async (groupName: string, description?: string):
     }
 
     const { error } = await supabase
-      .from('app_9213e72257_business_groups')
+      .from('business_groups')
       .insert([
         {
           name: groupName.trim(),
@@ -89,7 +89,7 @@ export const getAllBusinessGroups = async (): Promise<string[]> => {
     
     // Get groups from business_groups table
     const { data: groupsData, error } = await supabase
-      .from('app_9213e72257_business_groups')
+      .from('business_groups')
       .select('name')
       .order('name');
 
@@ -108,7 +108,7 @@ export const getAllBusinessGroups = async (): Promise<string[]> => {
 export const updateBusinessGroup = async (businessId: string, newGroup: string): Promise<boolean> => {
   try {
     const { error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .update({ 業務グループ: newGroup })
       .eq('業務id', businessId);
 

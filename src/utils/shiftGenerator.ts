@@ -10,7 +10,7 @@ async function loadBusinessHistoryFromDB(): Promise<Map<string, Set<string>>> {
   
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_employee_business_history')
+      .from('employee_business_history')
       .select('employee_id, business_id');
     
     if (error) {
@@ -46,7 +46,7 @@ async function saveBusinessHistoryToDB(
 ): Promise<void> {
   try {
     const { error } = await supabase
-      .from('app_9213e72257_employee_business_history')
+      .from('employee_business_history')
       .upsert({
         employee_id: employeeId,
         business_id: businessId,
@@ -206,7 +206,7 @@ export async function generateShifts(
     
     // Load vacation data for the target date
     const { data: vacationData, error: vacationError } = await supabase
-      .from("app_9213e72257_vacation_masters")
+      .from("vacation_masters")
       .select("employee_id")
       .eq("vacation_date", targetDate);
     

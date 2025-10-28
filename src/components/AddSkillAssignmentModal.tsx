@@ -55,7 +55,7 @@ export const AddSkillAssignmentModal: React.FC<AddSkillAssignmentModalProps> = (
     try {
       console.log('🔄 Loading employees...');
       const { data, error } = await supabase
-        .from('app_9213e72257_employees')
+        .from('employees')
         .select('employee_id, name')
         .order('name');
 
@@ -79,7 +79,7 @@ export const AddSkillAssignmentModal: React.FC<AddSkillAssignmentModalProps> = (
       
       // Load from business_groups table first
       const { data: businessGroupsData, error: businessGroupsError } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .select('*')
         .order('name');
 
@@ -92,7 +92,7 @@ export const AddSkillAssignmentModal: React.FC<AddSkillAssignmentModalProps> = (
 
       // Also check business_master table for additional groups
       const { data: masterData, error: masterError } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .select('業務グループ')
         .not('業務グループ', 'is', null)
         .neq('業務グループ', '');
@@ -120,7 +120,7 @@ export const AddSkillAssignmentModal: React.FC<AddSkillAssignmentModalProps> = (
           }));
           
           const { data: insertedData, error: insertError } = await supabase
-            .from('app_9213e72257_business_groups')
+            .from('business_groups')
             .insert(missingGroupsData)
             .select();
           
@@ -188,7 +188,7 @@ export const AddSkillAssignmentModal: React.FC<AddSkillAssignmentModalProps> = (
       const duplicateChecks = await Promise.all(
         selectedBusinessGroups.map(async (businessGroup) => {
           const { data, error } = await supabase
-            .from('app_9213e72257_skill_matrix')
+            .from('skill_matrix')
             .select('id')
             .eq('employee_id', selectedEmployee)
             .eq('business_group', businessGroup)
@@ -222,7 +222,7 @@ export const AddSkillAssignmentModal: React.FC<AddSkillAssignmentModalProps> = (
       console.log('📝 Inserting data:', insertData);
 
       const { error: insertError } = await supabase
-        .from('app_9213e72257_skill_matrix')
+        .from('skill_matrix')
         .insert(insertData);
 
       if (insertError) {

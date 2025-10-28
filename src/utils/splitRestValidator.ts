@@ -146,7 +146,7 @@ export async function checkMonthlySplitRestLimit(
   try {
     // 月間の分割休息使用回数を取得
     const { data: splitRestData, error: splitRestError } = await supabase
-      .from('app_9213e72257_split_rest_usage')
+      .from('split_rest_usage')
       .select('*')
       .eq('employee_id', employeeId)
       .gte('shift_date', monthStartStr)
@@ -161,7 +161,7 @@ export async function checkMonthlySplitRestLimit(
     
     // 月間の総勤務回数を取得
     const { data: shiftsData, error: shiftsError } = await supabase
-      .from('app_9213e72257_shifts')
+      .from('shifts')
       .select('shift_date')
       .eq('employee_id', employeeId)
       .gte('shift_date', monthStartStr)
@@ -209,7 +209,7 @@ export async function recordSplitRestUsage(
   
   try {
     const { error } = await supabase
-      .from('app_9213e72257_split_rest_usage')
+      .from('split_rest_usage')
       .insert({
         employee_id: employeeId,
         shift_date: shiftDate,

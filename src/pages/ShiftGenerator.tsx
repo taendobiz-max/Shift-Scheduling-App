@@ -371,7 +371,7 @@ export default function ShiftGenerator() {
     // Check for existing shifts in the date range
     const dateRange = generateDateRange(startDate, endDate);
     const { data: existingShifts, error: checkError } = await supabase
-      .from('app_9213e72257_shifts')
+      .from('shifts')
       .select('shift_date')
       .in('shift_date', dateRange);
     
@@ -390,7 +390,7 @@ export default function ShiftGenerator() {
       // Delete existing shifts in the date range
       console.log('🗑️ Deleting existing shifts for dates:', existingDates);
       const { error: deleteError } = await supabase
-        .from('app_9213e72257_shifts')
+        .from('shifts')
         .delete()
         .in('shift_date', dateRange);
       

@@ -26,7 +26,7 @@ export async function login(userId: string, password: string): Promise<{ success
     
     // ユーザーを検索
     const { data: users, error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .select('*')
       .eq('user_id', userId)
       .eq('password_hash', passwordHash)
@@ -45,7 +45,7 @@ export async function login(userId: string, password: string): Promise<{ success
     
     // 最終ログイン日時を更新
     await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .update({ last_login: new Date().toISOString() })
       .eq('id', user.id);
     

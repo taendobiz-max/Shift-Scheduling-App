@@ -10,7 +10,7 @@
       if (editingBusinessMasterId) {
         // Update existing business master
         const { error } = await supabase
-          .from('app_9213e72257_business_master')
+          .from('business_master')
           .update(businessMasterForm)
           .eq('業務id', editingBusinessMasterId);
 
@@ -29,7 +29,7 @@
         };
         
         const { error } = await supabase
-          .from('app_9213e72257_business_master')
+          .from('business_master')
           .insert([newBusinessMaster]);
 
         if (error) throw error;

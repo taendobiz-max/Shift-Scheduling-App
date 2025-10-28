@@ -39,7 +39,7 @@ export const DeleteBusinessGroupModal: React.FC<DeleteBusinessGroupModalProps> =
     try {
       // Check for related skill matrix records
       const { count, error } = await supabase
-        .from('app_9213e72257_skill_matrix')
+        .from('skill_matrix')
         .select('*', { count: 'exact', head: true })
         .eq('business_group', businessGroup.name);
 
@@ -65,7 +65,7 @@ export const DeleteBusinessGroupModal: React.FC<DeleteBusinessGroupModalProps> =
     try {
       // Delete the business group
       const { error: deleteError } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .delete()
         .eq('id', businessGroup.id);
 

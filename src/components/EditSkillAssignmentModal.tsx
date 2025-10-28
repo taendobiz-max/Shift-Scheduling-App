@@ -65,7 +65,7 @@ export const EditSkillAssignmentModal: React.FC<EditSkillAssignmentModalProps> =
       
       // Load from business_groups table first
       const { data: businessGroupsData, error: businessGroupsError } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .select('*')
         .order('name');
 
@@ -78,7 +78,7 @@ export const EditSkillAssignmentModal: React.FC<EditSkillAssignmentModalProps> =
 
       // Also check business_master table for additional groups
       const { data: masterData, error: masterError } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .select('業務グループ')
         .not('業務グループ', 'is', null)
         .neq('業務グループ', '');
@@ -106,7 +106,7 @@ export const EditSkillAssignmentModal: React.FC<EditSkillAssignmentModalProps> =
           }));
           
           const { data: insertedData, error: insertError } = await supabase
-            .from('app_9213e72257_business_groups')
+            .from('business_groups')
             .insert(missingGroupsData)
             .select();
           
@@ -138,7 +138,7 @@ export const EditSkillAssignmentModal: React.FC<EditSkillAssignmentModalProps> =
       console.log('🔄 Loading existing skills for employee:', employee.name);
       
       const { data, error } = await supabase
-        .from('app_9213e72257_skill_matrix')
+        .from('skill_matrix')
         .select('id, business_group, skill_level')
         .eq('employee_id', employee.employee_id);
 
@@ -212,7 +212,7 @@ export const EditSkillAssignmentModal: React.FC<EditSkillAssignmentModalProps> =
 
       // Delete all existing skill assignments for this employee
       const { error: deleteError } = await supabase
-        .from('app_9213e72257_skill_matrix')
+        .from('skill_matrix')
         .delete()
         .eq('employee_id', employee.employee_id);
 
@@ -233,7 +233,7 @@ export const EditSkillAssignmentModal: React.FC<EditSkillAssignmentModalProps> =
         console.log('📝 Inserting updated data:', insertData);
 
         const { error: insertError } = await supabase
-          .from('app_9213e72257_skill_matrix')
+          .from('skill_matrix')
           .insert(insertData);
 
         if (insertError) {

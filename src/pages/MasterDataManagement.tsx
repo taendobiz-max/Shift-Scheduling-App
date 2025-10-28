@@ -204,7 +204,7 @@ export default function MasterDataManagement() {
     setIsBusinessGroupLoading(true);
     try {
       const { data, error } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -234,7 +234,7 @@ export default function MasterDataManagement() {
       if (editingBusinessGroupId) {
         // Update existing business group
         const { error } = await supabase
-          .from('app_9213e72257_business_groups')
+          .from('business_groups')
           .update(businessGroupForm)
           .eq('id', editingBusinessGroupId);
 
@@ -243,7 +243,7 @@ export default function MasterDataManagement() {
       } else {
         // Create new business group
         const { error } = await supabase
-          .from('app_9213e72257_business_groups')
+          .from('business_groups')
           .insert([businessGroupForm]);
 
         if (error) throw error;
@@ -274,7 +274,7 @@ export default function MasterDataManagement() {
 
     try {
       const { error } = await supabase
-        .from('app_9213e72257_business_groups')
+        .from('business_groups')
         .delete()
         .eq('id', id);
 
@@ -304,7 +304,7 @@ export default function MasterDataManagement() {
       console.log('🔄 Loading business masters with Japanese column names...');
       
       const { data, error } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .select('*')  // 全ての日本語カラムを取得
         .order('業務id', { ascending: true });
 
@@ -345,7 +345,7 @@ export default function MasterDataManagement() {
       if (editingBusinessMasterId) {
         // Update existing business master
         const { error } = await supabase
-          .from('app_9213e72257_business_master')
+          .from('business_master')
           .update(businessMasterForm)
           .eq('業務id', editingBusinessMasterId);
 
@@ -364,7 +364,7 @@ export default function MasterDataManagement() {
         };
         
         const { error } = await supabase
-          .from('app_9213e72257_business_master')
+          .from('business_master')
           .insert([newBusinessMaster]);
 
         if (error) throw error;
@@ -401,7 +401,7 @@ export default function MasterDataManagement() {
 
     try {
       const { error } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .delete()
         .eq('業務id', id);
 

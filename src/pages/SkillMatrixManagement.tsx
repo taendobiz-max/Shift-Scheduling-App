@@ -57,7 +57,7 @@ export default function SkillMatrixManagement() {
       // Step 1: Load employees directly from database
       console.log('📊 Step 1: Loading employees...');
       const { data: employees, error: employeesError } = await supabase
-        .from('app_9213e72257_employees')
+        .from('employees')
         .select('employee_id, name')
         .order('name');
 
@@ -79,7 +79,7 @@ export default function SkillMatrixManagement() {
       // Step 2: Load skill matrix data
       console.log('📊 Step 2: Loading skill matrix...');
       const { data: skillMatrix, error: skillError } = await supabase
-        .from('app_9213e72257_skill_matrix')
+        .from('skill_matrix')
         .select('*')
         .order('employee_id, business_group');
 
@@ -123,7 +123,7 @@ export default function SkillMatrixManagement() {
       // Also check business groups table
       try {
         const { data: businessGroupsData, error: bgError } = await supabase
-          .from('app_9213e72257_business_groups')
+          .from('business_groups')
           .select('name');
         
         if (!bgError && businessGroupsData) {

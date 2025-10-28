@@ -97,7 +97,7 @@ export const saveCorrectBusinessMasterToSupabase = async (businessData: CorrectB
     }
 
     const { error } = await supabase
-      .from('app_9213e72257_business_master')
+      .from('business_master')
       .insert(businessData.map(item => ({
         業務id: item.業務ID,  // Use lowercase column name
         業務名: item.業務名,

@@ -21,7 +21,7 @@ export const loadEmployeesFromCSV = async (): Promise<Employee[]> => {
     
     // First try to load from Supabase
     const { data: existingData, error: fetchError } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .select('*')
       .order('社員番号');
 
@@ -53,7 +53,7 @@ export const loadEmployeesFromCSV = async (): Promise<Employee[]> => {
             if (employees.length > 0) {
               // Save to Supabase
               const { error: insertError } = await supabase
-                .from('app_9213e72257_employees')
+                .from('employees')
                 .insert(employees);
 
               if (insertError) {
@@ -95,7 +95,7 @@ export const saveEmployeesToSupabase = async (employees: Employee[]): Promise<vo
 
     // Clear existing data first
     const { error: deleteError } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .delete()
       .neq('社員番号', '');
 
@@ -105,7 +105,7 @@ export const saveEmployeesToSupabase = async (employees: Employee[]): Promise<vo
 
     // Insert new data
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .insert(employees);
 
     if (error) {

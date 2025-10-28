@@ -49,7 +49,7 @@ export const loadSkillMatrixData = async (): Promise<SkillMatrixRecord[]> => {
     console.log('🔄 Loading skill matrix data from Supabase...');
     
     const { data, error } = await supabase
-      .from('app_9213e72257_skill_matrix')
+      .from('skill_matrix')
       .select('*')
       .order('employee_id');
 
@@ -239,7 +239,7 @@ export const getEmployeeSkills = async (employeeName: string): Promise<SkillMatr
     console.log(`🔄 Loading skills for employee: ${employeeName}`);
     
     const { data, error } = await supabase
-      .from('app_9213e72257_skill_matrix')
+      .from('skill_matrix')
       .select('*')
       .eq('employee_id', employeeName)
       .order('business_group');
@@ -267,7 +267,7 @@ export const addEmployeeSkill = async (
     console.log(`💾 Adding skill for ${employeeName}: ${businessGroup}`);
     
     const { error } = await supabase
-      .from('app_9213e72257_skill_matrix')
+      .from('skill_matrix')
       .insert({
         employee_id: employeeName,
         skill_name: businessGroup,
@@ -297,7 +297,7 @@ export const removeEmployeeSkill = async (
     console.log(`🗑️ Removing skill for ${employeeName}: ${businessGroup}`);
     
     const { error } = await supabase
-      .from('app_9213e72257_skill_matrix')
+      .from('skill_matrix')
       .delete()
       .eq('employee_id', employeeName)
       .eq('business_group', businessGroup);
@@ -325,7 +325,7 @@ export const updateEmployeeSkill = async (
     console.log(`💾 Updating skill for ${employeeName}: ${businessGroup} -> ${skillLevel}`);
     
     const { error } = await supabase
-      .from('app_9213e72257_skill_matrix')
+      .from('skill_matrix')
       .upsert({
         employee_id: employeeName,
         skill_name: businessGroup,
@@ -358,7 +358,7 @@ export const toggleEmployeeSkill = async (
     
     // Check if skill exists
     const { data: existingSkill, error: checkError } = await supabase
-      .from('app_9213e72257_skill_matrix')
+      .from('skill_matrix')
       .select('id')
       .eq('employee_id', employeeName)
       .eq('business_group', businessGroup)

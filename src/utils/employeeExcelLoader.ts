@@ -17,7 +17,7 @@ export const loadEmployeesFromExcel = async (): Promise<EmployeeMaster[]> => {
     
     // Load from Supabase using correct English column names
     const { data: existingData, error: fetchError } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .select('*')
       .order('employee_id');
 
@@ -117,7 +117,7 @@ export const saveEmployeesToSupabase = async (employees: EmployeeMaster[]): Prom
 
     // Clear existing data first
     const { error: deleteError } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000');
 
@@ -129,7 +129,7 @@ export const saveEmployeesToSupabase = async (employees: EmployeeMaster[]): Prom
 
     // Insert new data
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .insert(employees);
 
     if (error) {
@@ -149,7 +149,7 @@ const ensureRollCallCapableColumn = async (): Promise<void> => {
   try {
     // Try to select the column to check if it exists
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .select('roll_call_capable')
       .limit(1);
 
@@ -238,7 +238,7 @@ export const updateEmployeeInSupabase = async (employeeId: string, updatedData: 
     console.log('💾 Updating employee in Supabase:', employeeId, updatedData);
     
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .update(updatedData)
       .eq('employee_id', employeeId);
 

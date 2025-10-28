@@ -19,7 +19,7 @@ export const loadEmployeesFromSupabase = async (): Promise<Employee[]> => {
     console.log('🔄 Loading employees from Supabase...');
     
     const { data, error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .select('*')
       .order('社員番号');
 
@@ -46,7 +46,7 @@ export const saveEmployeesToSupabase = async (employees: Employee[]): Promise<vo
     }
 
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .insert(employees);
 
     if (error) {
@@ -70,7 +70,7 @@ export const updateEmployeeInSupabase = async (
     console.log(`🔄 Updating employee ${employeeId} in Supabase...`, updates);
     
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .update(updates)
       .eq('社員番号', employeeId);
 
@@ -93,7 +93,7 @@ export const deleteEmployeeFromSupabase = async (employeeId: string): Promise<bo
     console.log(`🗑️ Deleting employee ${employeeId} from Supabase...`);
     
     const { error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .delete()
       .eq('社員番号', employeeId);
 
@@ -119,7 +119,7 @@ export const getEmployeeStats = async (): Promise<{
 }> => {
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_employees')
+      .from('employees')
       .select('所属, 退職年月日');
 
     if (error) {

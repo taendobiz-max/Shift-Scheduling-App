@@ -12,7 +12,7 @@ async function loadBusinessHistory() {
   
   try {
     const { data, error } = await supabase
-      .from('app_9213e72257_employee_business_history')
+      .from('employee_business_history')
       .select('employee_id, business_id');
     
     if (error) {
@@ -41,7 +41,7 @@ async function loadBusinessHistory() {
 async function saveBusinessHistory(employeeId, businessId, date) {
   try {
     await supabase
-      .from('app_9213e72257_employee_business_history')
+      .from('employee_business_history')
       .upsert({
         employee_id: employeeId,
         business_id: businessId,
@@ -121,7 +121,7 @@ async function generateShiftsForDay(employees, businessMasters, targetDate, pair
   
   // Load vacation data
   const { data: vacationData } = await supabase
-    .from("app_9213e72257_vacation_masters")
+    .from("vacation_masters")
     .select("employee_id")
     .eq("vacation_date", targetDate);
   
@@ -252,7 +252,7 @@ async function generateShiftsForDay(employees, businessMasters, targetDate, pair
   // Save shifts to DB
   if (shifts.length > 0) {
     const { error } = await supabase
-      .from('app_9213e72257_shifts')
+      .from('shifts')
       .insert(shifts);
     
     if (error) {

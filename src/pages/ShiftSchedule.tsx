@@ -183,7 +183,7 @@ export default function ShiftSchedule() {
       
       // Load employees
       const { data: employeesData, error: employeesError } = await supabase
-        .from('app_9213e72257_employees')
+        .from('employees')
         .select('employee_id, name, office');
       
       if (employeesError) {
@@ -200,7 +200,7 @@ export default function ShiftSchedule() {
 
       // Load business masters
       const { data: businessData, error: businessError } = await supabase
-        .from('app_9213e72257_business_master')
+        .from('business_master')
         .select('*');
       
       if (businessError) {
