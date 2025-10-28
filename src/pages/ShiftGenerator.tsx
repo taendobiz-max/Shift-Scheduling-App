@@ -786,7 +786,11 @@ export default function ShiftGenerator() {
   };
 
   const saveShifts = async () => {
-    if (shiftResults.length === 0) return;
+    console.log('💾 saveShifts called, shiftResults.length:', shiftResults.length);
+    if (shiftResults.length === 0) {
+      console.log('⚠️ shiftResults is empty, aborting save');
+      return;
+    }
 
     // Check for time conflicts before saving
     const timeConflicts = detectTimeConflicts();
