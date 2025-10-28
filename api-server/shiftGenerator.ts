@@ -142,6 +142,70 @@ function getEmployeeShifts(employeeId: string, shifts: Shift[]): Shift[] {
   return shifts.filter(s => s.employee_id === employeeId);
 }
 
+/**
+ * Calculate diversity score for employee-business assignment
+ * Higher score = better candidate for diversity
+ */
+function calculateDiversityScore(
+  employee: any,
+  businessId: string,
+  employeeBusinessHistory: Map<string, Set<string>>,
+  employeeAssignmentCounts: Map<string, number>
+): number {
+  const empId = employee.id || employee.従業員ID || employee.employee_id;
+  const history = employeeBusinessHistory.get(empId) || new Set();
+  const currentCount = employeeAssignmentCounts.get(empId) || 0;
+  
+  let score = 0;
+  
+  // 1. Bonus for not having done this business before (+100 points)
+  if (!history.has(businessId)) {
+    score += 100;
+  }
+  
+  // 2. Diversity score: prefer employees with fewer unique businesses
+  // Range: 0-100 points (fewer unique businesses = higher score)
+  const diversityScore = Math.max(0, 100 - (history.size * 10));
+  score += diversityScore;
+  
+  // 3. Load balancing: prefer employees with fewer assignments today
+  // Range: 0-100 points (fewer assignments = higher score)
+  const loadScore = Math.max(0, 100 - (currentCount * 30));
+  score += loadScore;
+  
+  return score;
+}
+
+/**
+ * Calculate diversity score for pair business assignment
+ */
+function calculatePairDiversityScore(
+  employee: any,
+  businessIds: string[],
+  employeeBusinessHistory: Map<string, Set<string>>,
+  employeeAssignmentCounts: Map<string, number>
+): number {
+  const empId = employee.id || employee.従業員ID || employee.employee_id;
+  const history = employeeBusinessHistory.get(empId) || new Set();
+  const currentCount = employeeAssignmentCounts.get(empId) || 0;
+  
+  let score = 0;
+  
+  // 1. Bonus for not having done ANY of these businesses before
+  const newBusinessCount = businessIds.filter(id => !history.has(id)).length;
+  score += newBusinessCount * 50; // 50 points per new business
+  
+  // 2. Diversity score
+  const diversityScore = Math.max(0, 100 - (history.size * 10));
+  score += diversityScore;
+  
+  // 3. Load balancing
+  const loadScore = Math.max(0, 100 - (currentCount * 30));
+  score += loadScore;
+  
+  return score;
+}
+
 // Helper function to check if a business can be assigned to an employee (time-wise)
 function canAssignBusiness(employeeId: string, business: any, currentShifts: Shift[], allBusinessMasters?: any[]): boolean {
   const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
@@ -484,11 +548,11 @@ export async function generateShifts(
         ? rollCallCapableEmployees 
         : availableEmployees;
       
-      // Sort by assignment count
+      // Sort by diversity score (prioritize employees who haven't done this business)
       const sortedEmployees = candidateEmployees.sort((a, b) => {
-        const aId = a.id || a.従業員ID || a.employee_id;
-        const bId = b.id || b.従業員ID || b.employee_id;
-        return (employeeAssignmentCounts.get(aId) || 0) - (employeeAssignmentCounts.get(bId) || 0);
+        const aScore = calculateDiversityScore(a, businessId, employeeBusinessHistory, employeeAssignmentCounts);
+        const bScore = calculateDiversityScore(b, businessId, employeeBusinessHistory, employeeAssignmentCounts);
+        return bScore - aScore; // Higher score first
       });
       
       let selectedEmployee = null;
@@ -560,11 +624,12 @@ export async function generateShifts(
       let selectedEmployee = null;
       let minViolations = Infinity;
       
-      // Find employee with least assignments who can handle this pair
+      // Find employee with best diversity score who can handle this pair
+      const businessIds = businessGroup.map(b => b.業務id || b.id || 'unknown');
       const sortedEmployees = availableEmployees.sort((a, b) => {
-        const aId = a.id || a.従業員ID || a.employee_id;
-        const bId = b.id || b.従業員ID || b.employee_id;
-        return (employeeAssignmentCounts.get(aId) || 0) - (employeeAssignmentCounts.get(bId) || 0);
+        const aScore = calculatePairDiversityScore(a, businessIds, employeeBusinessHistory, employeeAssignmentCounts);
+        const bScore = calculatePairDiversityScore(b, businessIds, employeeBusinessHistory, employeeAssignmentCounts);
+        return bScore - aScore; // Higher score first
       });
       
       for (const emp of sortedEmployees) {

@@ -32,6 +32,9 @@ app.post('/api/generate-shifts', async (req, res) => {
     const allViolations: string[] = [];
     const allUnassigned: string[] = [];
     
+    // Load initial business history from DB
+    let cumulativeHistory: Map<string, Set<string>> | undefined = undefined;
+    
     // Generate shifts for each date
     for (const date of dateRange) {
       console.log(`📅 Processing ${date}`);
@@ -42,7 +45,7 @@ app.post('/api/generate-shifts', async (req, res) => {
         date,
         pairGroups,
         location,
-        undefined  // Force DB load each time
+        cumulativeHistory  // Pass cumulative history
       );
       
       if (result.shifts) {
@@ -58,6 +61,12 @@ app.post('/api/generate-shifts', async (req, res) => {
       }
       
       console.log(`✅ ${date}: ${result.shifts?.length || 0} shifts generated`);
+      
+      // Update cumulative history with today's assignments
+      if (result.business_history) {
+        cumulativeHistory = result.business_history;
+        console.log(`📚 Updated cumulative history: ${cumulativeHistory.size} employees`);
+      }
       
       // Small delay to ensure DB writes complete
       await new Promise(resolve => setTimeout(resolve, 100));
