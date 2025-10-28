@@ -794,6 +794,7 @@ export default function ShiftGenerator() {
 
     // Check for time conflicts before saving
     const timeConflicts = detectTimeConflicts();
+    console.log('⌚ Time conflicts detected:', timeConflicts.length);
     if (timeConflicts.length > 0) {
       const conflictMessages = timeConflicts.map(c => 
         `${c.date}: ${c.employee} → ${c.businesses.join(' ↔ ')}`
@@ -953,6 +954,7 @@ export default function ShiftGenerator() {
 
   // Detect time conflicts in current shifts
   const detectTimeConflicts = () => {
+    console.log('🔍 detectTimeConflicts called');
     const conflicts: { date: string; employee: string; businesses: string[] }[] = [];
     const dates = [...new Set(shiftResults.map(r => r.date))].sort();
     
@@ -1005,6 +1007,7 @@ export default function ShiftGenerator() {
       });
     });
     
+    console.log('🔍 detectTimeConflicts result:', conflicts.length, 'conflicts');
     return conflicts;
   };
 
