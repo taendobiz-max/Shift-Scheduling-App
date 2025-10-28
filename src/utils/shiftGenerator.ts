@@ -5,6 +5,7 @@ import { ConstraintManager } from './constraintManager';
 
 // Load business history from database
 async function loadBusinessHistoryFromDB(): Promise<Map<string, Set<string>>> {
+  console.log('🔍 [DEBUG] loadBusinessHistoryFromDB called');
   const history = new Map<string, Set<string>>();
   
   try {
@@ -189,11 +190,14 @@ export async function generateShifts(
     await constraintEngine.loadConstraints(location);
     
     // Load business history from DB if not provided
+    console.log('🔍 [DEBUG] existingBusinessHistory:', existingBusinessHistory);
     let employeeBusinessHistory: Map<string, Set<string>>;
     if (existingBusinessHistory) {
+      console.log('🔍 [DEBUG] Using existing business history');
       employeeBusinessHistory = existingBusinessHistory;
       console.log('📚 Using provided business history');
     } else {
+      console.log('🔍 [DEBUG] Loading business history from DB');
       employeeBusinessHistory = await loadBusinessHistoryFromDB();
       console.log('📚 Loaded business history from DB:', employeeBusinessHistory.size, 'employees');
     }
