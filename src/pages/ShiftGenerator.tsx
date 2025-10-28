@@ -168,8 +168,14 @@ export default function ShiftGenerator() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [businessMasters, setBusinessMasters] = useState<BusinessMaster[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [generationResult, setGenerationResult] = useState<string>('');
