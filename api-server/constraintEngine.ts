@@ -18,7 +18,7 @@ export interface ConstraintViolation {
   constraint_name: string;
   violation_description: string;
   severity: string;
-  constraint?: string;
+  constraint?: any;
 }
 
 export interface ConstraintValidationResult {
