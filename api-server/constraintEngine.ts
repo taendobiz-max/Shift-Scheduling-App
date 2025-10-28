@@ -14,10 +14,10 @@ export interface EnhancedConstraint {
 
 export interface ConstraintViolation {
   id?: string;
-  constraint_id: string;
-  constraint_name: string;
-  violation_description: string;
-  severity: string;
+  constraint_id?: string;
+  constraint_name?: string;
+  violation_description?: string;
+  severity?: string;
   constraint?: any;
   [key: string]: any;
 }
