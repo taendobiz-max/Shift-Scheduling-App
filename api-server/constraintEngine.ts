@@ -1,7 +1,28 @@
 import { v4 as uuidv4 } from 'uuid';
-import { EnhancedConstraint, ConstraintViolation, ConstraintValidationResult } from '@/types/constraint';
 import { ConstraintManager } from './constraintManager';
-import { evaluateAllConstraintGroups } from './constraintGroupEvaluator';
+
+// Type definitions
+export interface EnhancedConstraint {
+  id: string;
+  constraint_name: string;
+  constraint_type: string;
+  priority_level: number;
+  enforcement_level: string;
+  is_active: boolean;
+  [key: string]: any;
+}
+
+export interface ConstraintViolation {
+  constraint_id: string;
+  constraint_name: string;
+  violation_description: string;
+  severity: string;
+}
+
+export interface ConstraintValidationResult {
+  canProceed: boolean;
+  violations: ConstraintViolation[];
+}
 
 interface Employee {
   id: string;
@@ -79,41 +100,12 @@ export class ConstraintEngine {
       }
     }
 
-    // 制約グループの評価を追加
-    try {
-      // 制約グループをキャッシュから取得（初回のみロード）
-      if (this.cachedConstraintGroups === null) {
-        const { getAllConstraintGroups } = await import('./constraintGroupEvaluator');
-        this.cachedConstraintGroups = await getAllConstraintGroups();
-        console.log(`💾 [CONSTRAINT] Cached ${this.cachedConstraintGroups.length} constraint groups`);
-      }
-      
-      const groupResult = await evaluateAllConstraintGroups(
-        employee,
-        proposedShift,
-        { existingShifts, proposedShift },
-        this,
-        this.cachedConstraintGroups
-      );
-      
-      // 制約グループの違反を追加
-      violations.push(...groupResult.violations);
-      
-      // 制約グループで配置不可の場合は全体も不可
-      if (!groupResult.canProceed) {
-        canProceed = false;
-      }
-      
-      console.log(`📊 [VALIDATE] Group evaluation: ${groupResult.isValid ? 'PASS' : 'FAIL'} (${groupResult.violations.length} violations)`);
-    } catch (error) {
-      console.error('❌ [VALIDATE] Error evaluating constraint groups:', error);
-      // エラー時は制約グループ評価をスキップして続行
-    }
+    // 制約グループの評価は現在無効化（constraintGroupEvaluatorが存在しないため）
+    // TODO: 制約グループ機能を実装する場合は、constraintGroupEvaluator.tsを作成してください
 
     return {
-      isValid: violations.length === 0,
-      violations,
-      canProceed
+      canProceed,
+      violations
     };
   }
 
