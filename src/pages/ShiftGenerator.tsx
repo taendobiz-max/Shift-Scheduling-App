@@ -474,11 +474,11 @@ export default function ShiftGenerator() {
           const businessMaster = businessMasters.find((bm: any) => 
             bm.id === shift.business_master_id || 
             bm.業務id === shift.business_master_id ||
-            bm.業務名 === shift.business_group
+            bm.業務名 === shift.business_name
           );
           
           if (employee) {
-            const businessName = businessMaster?.業務名 || businessMaster?.name || shift.business_group || 'Unknown Business';
+            const businessName = shift.business_name || businessMaster?.業務名 || businessMaster?.name || shift.business_group || 'Unknown Business';
             allShiftResults.push({
               id: `shift_${shift.shift_date}_${businessName}_${index}`,
               date: shift.shift_date || shift.date,
@@ -809,6 +809,7 @@ export default function ShiftGenerator() {
         return {
           employee_id: result.employeeId,
           business_master_id: businessMasterId,
+          business_name: result.businessMaster,
           date: result.date,
           location: selectedLocation,
           created_at: new Date().toISOString()

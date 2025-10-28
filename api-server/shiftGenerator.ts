@@ -94,6 +94,7 @@ export interface Shift {
   employee_id: string;
   employee_name?: string;
   business_group: string;
+  business_name?: string;
   shift_type: string;
   start_time: string;
   end_time: string;
@@ -514,6 +515,7 @@ export async function generateShifts(
           employee_id: empId,
           employee_name: empName,
           business_group: business.業務グループ || '点呼',
+          business_name: business.業務名 || business.業務グループ || '点呼',
           business_master_id: businessId,
           shift_type: 'regular',
           start_time: business.開始時間 || '05:00:00',
@@ -668,6 +670,7 @@ export async function generateShifts(
             employee_id: empId,
             employee_name: empName,
             business_group: business.業務グループ || 'default',
+            business_name: business.業務名 || business.業務グループ || 'default',
             business_master_id: businessId,
             shift_type: 'regular',
             start_time: business.開始時間 || '09:00:00',
@@ -799,6 +802,7 @@ export async function generateShifts(
           employee_id: empId,
           employee_name: empName,
           business_group: business.業務グループ || 'default',
+          business_name: business.業務名 || business.業務グループ || 'default',
           business_master_id: businessId,
           shift_type: 'regular',
           start_time: business.開始時間 || '09:00:00',
