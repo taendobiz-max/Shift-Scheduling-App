@@ -510,6 +510,7 @@ export default function ShiftGenerator() {
       setShiftResults(allShiftResults);
       setOriginalShiftResults([...allShiftResults]);
       setUnassignedBusinesses(allUnassignedBusinesses);
+      setHasChanges(true);
       
       // 休暇データを読み込み
       await loadVacationData(dateRange);
