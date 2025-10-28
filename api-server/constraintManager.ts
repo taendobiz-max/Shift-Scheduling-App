@@ -1,5 +1,16 @@
-import { supabase } from '@/lib/supabase';
-import { EnhancedConstraint, ConstraintFormData, ConstraintViolation } from '@/types/constraint';
+import { supabase } from './supabaseClient';
+import { EnhancedConstraint, ConstraintViolation } from './constraintEngine';
+
+// ConstraintFormData type definition
+export interface ConstraintFormData {
+  constraint_name: string;
+  constraint_type: string;
+  constraint_category?: string;
+  priority_level: number;
+  enforcement_level: string;
+  is_active: boolean;
+  [key: string]: any;
+}
 
 interface ConstraintStatistics {
   total: number;
