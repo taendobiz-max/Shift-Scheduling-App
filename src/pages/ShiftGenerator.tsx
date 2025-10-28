@@ -810,8 +810,10 @@ export default function ShiftGenerator() {
       }
     }
 
+    console.log('✅ No time conflicts, proceeding to save');
     setIsGenerating(true);
     try {
+      console.log('📝 Preparing shifts to save...');
       const shiftsToSave = shiftResults.map(result => {
         const business = businessMasters.find(bm => 
           (bm.業務名 || bm.name) === result.businessMaster
@@ -828,12 +830,17 @@ export default function ShiftGenerator() {
         };
       });
 
+      console.log('💾 Saving', shiftsToSave.length, 'shifts to database...');
       const { error } = await supabase
         .from('shifts')
         .insert(shiftsToSave);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
 
+      console.log('✅ Shifts saved successfully!');
       setGenerationResult('シフトがデータベースに保存されました。');
       setOriginalShiftResults([...shiftResults]);
       setHasChanges(false);
