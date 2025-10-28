@@ -13,6 +13,7 @@ export interface EnhancedConstraint {
 }
 
 export interface ConstraintViolation {
+  id?: string;
   constraint_id: string;
   constraint_name: string;
   violation_description: string;
