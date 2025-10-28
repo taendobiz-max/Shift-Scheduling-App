@@ -112,11 +112,13 @@ export interface GenerationResult {
   violations: string[];
   generation_time: number;
   unassigned_businesses?: string[];
+  unassigned_employees?: string[];
   assignment_summary?: {
     total_businesses: number;
     assigned_businesses: number;
     unassigned_businesses: number;
     total_employees: number;
+    unassigned_employees?: number;
   };
   assigned_count?: number;
   total_businesses?: number;
