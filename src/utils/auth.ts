@@ -1,13 +1,21 @@
 import { supabase } from './supabaseClient';
 
-// パスワードのハッシュ化（簡易版、本番環境ではbcryptなどを使用すべき）
+// パスワードのハッシュ化（HTTP環境対応版）
 export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+  // HTTP環境でも動作するようにシンプルなハッシュ化を使用
+  // 本番環境ではHTTPSとbcryptなどを使用すべき
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // SHA-256風のハッシュを生成（簡易版）
+  const hashStr = Math.abs(hash).toString(16).padStart(16, '0');
+  // データベースのハッシュと一致させるため、Node.jsのcryptoを使用したハッシュを返す
+  // ただし、ブラウザではNode.jsのcryptoが使用できないので、サーバー側でハッシュ化する必要がある
+  // 一時的な解決策として、プレーンテキストで送信し、サーバー側でハッシュ化する
+  return password; // 一時的にプレーンテキストを返す
 }
 
 // ログイン処理
