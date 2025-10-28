@@ -436,73 +436,69 @@ export default function ShiftGenerator() {
       const pairGroups = getPairBusinesses(businessMasters);
       console.log('🔗 Pair business groups:', pairGroups);
 
-      // Initialize business history to track across multiple days
-      // Always start by loading from DB to ensure consistency
-      let businessHistory: Map<string, Set<string>> | undefined = undefined;
+      // Call API server for shift generation
+      console.log('🌐 Calling API server for shift generation');
+      
+      const response = await fetch('/api/generate-shifts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employees: filteredEmployees,
+          businessMasters: businessMasters,
+          dateRange: dateRange,
+          pairGroups: pairGroups,
+          location: selectedLocation
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      
+      const apiResult = await response.json();
+      
+      if (!apiResult.success) {
+        throw new Error(apiResult.error || 'Shift generation failed');
+      }
+      
+      console.log('✅ API response:', apiResult.summary);
 
-      // Generate shifts for each date in the range
-      for (const date of dateRange) {
-        console.log(`📅 Processing date: ${date}`);
-        
-        // Always pass undefined to force DB load for each day
-        // This ensures we get the latest business history including what was saved in previous iterations
-        const result = await generateShifts(
-          filteredEmployees,
-          businessMasters,
-          date,
-          pairGroups,
-          selectedLocation,
-          undefined  // Force DB load each time
-        );
-        
-        // Business history is now managed entirely in DB
-        // No need to track in memory
-        console.log(`📊 Business history saved to DB for ${date}`);
-        
-        // Small delay to ensure DB writes are completed
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        console.log(`📊 Generation result for ${date}:`, {
-          success: result.success,
-          shifts: result.shifts?.length || 0,
-          violations: result.violations?.length || 0,
-          unassigned: result.unassigned_businesses?.length || 0
-        });
-
-        if (result.shifts && result.shifts.length > 0) {
-          result.shifts.forEach((shift, index) => {
-            const employee = filteredEmployees.find(emp => 
-              emp.id === shift.employee_id || emp.従業員ID === shift.employee_id
-            );
-            const businessMaster = businessMasters.find(bm => 
-              bm.id === shift.business_master_id || 
-              bm.業務id === shift.business_master_id ||
-              bm.業務名 === shift.business_group
-            );
-            
-            if (employee) {
-              const businessName = businessMaster?.業務名 || businessMaster?.name || shift.business_group || 'Unknown Business';
-              allShiftResults.push({
-                id: `shift_${date}_${businessName}_${index}`,
-                date: shift.shift_date || shift.date || date,
+      // Process API results
+      if (apiResult.shifts && apiResult.shifts.length > 0) {
+        apiResult.shifts.forEach((shift: any, index: number) => {
+          const employee = filteredEmployees.find((emp: any) => 
+            emp.id === shift.employee_id || emp.従業員ID === shift.employee_id
+          );
+          const businessMaster = businessMasters.find((bm: any) => 
+            bm.id === shift.business_master_id || 
+            bm.業務id === shift.business_master_id ||
+            bm.業務名 === shift.business_group
+          );
+          
+          if (employee) {
+            const businessName = businessMaster?.業務名 || businessMaster?.name || shift.business_group || 'Unknown Business';
+            allShiftResults.push({
+              id: `shift_${shift.shift_date}_${businessName}_${index}`,
+              date: shift.shift_date || shift.date,
                 businessMaster: businessName,
                 employeeName: employee.name,
                 employeeId: employee.id
-              });
-              totalAssigned++;
-            }
-          });
-        }
-
-        if (result.unassigned_businesses && result.unassigned_businesses.length > 0) {
-          result.unassigned_businesses.forEach(business => {
-            const dateBusinessKey = `${date}: ${business}`;
-            if (!allUnassignedBusinesses.includes(dateBusinessKey)) {
-              allUnassignedBusinesses.push(dateBusinessKey);
-              totalUnassigned++;
-            }
-          });
-        }
+            });
+            totalAssigned++;
+          }
+        });
+      }
+      
+      // Process unassigned businesses
+      if (apiResult.unassigned && apiResult.unassigned.length > 0) {
+        apiResult.unassigned.forEach((business: string) => {
+          if (!allUnassignedBusinesses.includes(business)) {
+            allUnassignedBusinesses.push(business);
+            totalUnassigned++;
+          }
+        });
       }
 
       setShiftResults(allShiftResults);
