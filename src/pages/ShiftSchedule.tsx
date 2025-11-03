@@ -5,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DndContext,
   DragEndEvent,
@@ -149,6 +151,19 @@ export default function ShiftSchedule() {
   const [unassignedEmployees, setUnassignedEmployees] = useState<EmployeeData[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // Excel export dialog state
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');  
+  // Period view state
+  const [periodStartDate, setPeriodStartDate] = useState('');
+  const [periodEndDate, setPeriodEndDate] = useState('');
+  const [periodShifts, setPeriodShifts] = useState<ShiftData[]>([]);
+  const [activeTab, setActiveTab] = useState('daily');
+  const [periodViewMode, setPeriodViewMode] = useState<'employee' | 'business'>('employee');
+  const [dailyViewMode, setDailyViewMode] = useState<'employee' | 'business'>('employee');
+
 
   const timeSlots = generateTimeSlots();
 
@@ -249,6 +264,114 @@ export default function ShiftSchedule() {
     }
   };
 
+  const openExportDialog = () => {
+    setExportStartDate(selectedDate);
+    setExportEndDate(selectedDate);
+    setShowExportDialog(true);
+  };
+
+  const exportToExcel = async () => {
+    try {
+      if (!exportStartDate || !exportEndDate) {
+        toast.error('開始日と終了日を入力してください');
+        return;
+      }
+
+      setIsLoading(true);
+      setShowExportDialog(false);
+      toast.info('Excelファイルを生成中...');
+
+      const response = await fetch('/api/export-shifts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startDate: exportStartDate,
+          endDate: exportEndDate,
+          location: selectedLocation === 'all' ? null : selectedLocation,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Excel生成に失敗しました');
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shift_${exportStartDate}_${exportEndDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Excelファイルをダウンロードしました');
+    } catch (error) {
+      console.error('❌ Error exporting to Excel:', error);
+      toast.error(error instanceof Error ? error.message : 'Excel出力に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  const loadPeriodShifts = async () => {
+    if (!periodStartDate || !periodEndDate) {
+      toast.error('開始日と終了日を入力してください');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log('🔄 Loading period shifts:', periodStartDate, 'to', periodEndDate);
+      
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from('shifts')
+        .select('*')
+        .gte('date', periodStartDate)
+        .lte('date', periodEndDate);
+
+      if (shiftsError) {
+        console.error('❌ Error loading period shifts:', shiftsError);
+        toast.error('シフトデータの読み込みに失敗しました');
+        setPeriodShifts([]);
+      } else {
+        console.log('✅ Loaded period shifts:', shiftsData?.length || 0);
+        
+        const enrichedShifts = (shiftsData || []).map(shift => {
+          const employee = allEmployees?.find(e => e.employee_id === shift.employee_id);
+          const business = businessMasters?.find(b => 
+            (b.業務id || b.id) === shift.business_master_id
+          );
+          
+          return {
+            ...shift,
+            employee_name: employee?.name || shift.employee_id,
+            business_name: business?.業務名 || shift.business_master_id,
+            start_time: business?.開始時間 || '09:00:00',
+            end_time: business?.終了時間 || '17:00:00',
+          };
+        });
+        
+        const filtered = selectedLocation === 'all' 
+          ? enrichedShifts 
+          : enrichedShifts.filter(s => s.location === selectedLocation);
+        
+        setPeriodShifts(filtered);
+        toast.success(`${filtered.length}件のシフトを読み込みました`);
+      }
+    } catch (error) {
+      console.error('💥 Error loading period shifts:', error);
+      toast.error('データの読み込み中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const filterShifts = () => {
     if (selectedLocation === 'all') {
       calculateUnassignedEmployees(shifts, allEmployees);
@@ -329,7 +452,7 @@ export default function ShiftSchedule() {
           const activeShift = shifts.find(s => s.id === activeData.shiftId);
           
           if (activeShift && activeShift.employee_id !== targetEmployeeId) {
-            // Swap with target employee's shift
+            // Swap shifts between two employees
             const targetShift = shifts.find(s => s.employee_id === targetEmployeeId);
             
             if (targetShift) {
@@ -341,7 +464,8 @@ export default function ShiftSchedule() {
                     employee_id: targetEmployeeId,
                     employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
                   };
-                } else if (s.id === targetShift.id) {
+                }
+                if (s.id === targetShift.id) {
                   return {
                     ...s,
                     employee_id: activeShift.employee_id,
@@ -353,9 +477,9 @@ export default function ShiftSchedule() {
               
               setShifts(updatedShifts);
               setHasChanges(true);
-              toast.success(`シフトを交換しました`);
+              toast.success('シフトを交換しました');
             } else {
-              // Move shift to target employee (no swap)
+              // Move shift to unassigned employee
               const updatedShifts = shifts.map(s => {
                 if (s.id === activeShift.id) {
                   return {
@@ -369,7 +493,7 @@ export default function ShiftSchedule() {
               
               setShifts(updatedShifts);
               setHasChanges(true);
-              toast.success(`シフトを移動しました`);
+              toast.success('シフトを移動しました');
             }
           }
         }
@@ -384,41 +508,41 @@ export default function ShiftSchedule() {
     try {
       console.log('💾 Saving shifts to database...');
       
-      // Delete all existing shifts for this date
+      // Delete existing shifts for the date and location
       const { error: deleteError } = await supabase
         .from('shifts')
         .delete()
         .eq('date', selectedDate)
         .eq('location', selectedLocation === 'all' ? undefined : selectedLocation);
-      
+
       if (deleteError) {
         console.error('❌ Error deleting old shifts:', deleteError);
         throw deleteError;
       }
-      
+
       // Insert updated shifts
-      const shiftsToSave = shifts.map(shift => ({
-        employee_id: shift.employee_id,
-        business_master_id: shift.business_master_id,
-        date: shift.date,
-        location: shift.location || selectedLocation,
+      const shiftsToInsert = shifts.map(s => ({
+        employee_id: s.employee_id,
+        business_master_id: s.business_master_id,
+        date: s.date,
+        location: s.location || selectedLocation,
         created_at: new Date().toISOString(),
       }));
-      
+
       const { error: insertError } = await supabase
         .from('shifts')
-        .insert(shiftsToSave);
-      
+        .insert(shiftsToInsert);
+
       if (insertError) {
         console.error('❌ Error inserting shifts:', insertError);
         throw insertError;
       }
-      
-      console.log('✅ Saved', shiftsToSave.length, 'shifts');
+
+      console.log('✅ Saved', shiftsToInsert.length, 'shifts');
       toast.success('変更を保存しました');
       setHasChanges(false);
       
-      // Reload data to get fresh IDs
+      // Reload data to refresh
       await loadData();
     } catch (error) {
       console.error('Error saving changes:', error);
@@ -428,31 +552,25 @@ export default function ShiftSchedule() {
     }
   };
 
-  // Calculate time bar position and width
   const getTimeBarStyle = (startTime: string, endTime: string) => {
-    const parseTime = (time: string) => {
+    const timeToHour = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number);
-      // Adjust for 5:00 start time
       let adjustedHours = hours - 5;
       if (adjustedHours < 0) adjustedHours += 24;
       return adjustedHours + minutes / 60;
     };
 
-    const start = parseTime(startTime);
-    const end = parseTime(endTime);
+    const startHour = timeToHour(startTime);
+    const endHour = timeToHour(endTime);
     
-    const left = (start / 24) * 100;
-    const width = ((end - start) / 24) * 100;
+    const left = (startHour / 24) * 100;
+    const width = ((endHour - startHour) / 24) * 100;
 
-    return {
-      left: `${left}%`,
-      width: `${width}%`,
-    };
+    return { left: `${left}%`, width: `${width}%` };
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link to="/">
@@ -471,62 +589,339 @@ export default function ShiftSchedule() {
         )}
       </div>
 
-      {/* Filters */}
+      {/* Location Filter */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            フィルター
+            拠点選択
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">日付</Label>
-              <Input
-                id="date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="location">拠点</Label>
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger id="location">
-                  <SelectValue placeholder="拠点を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべて</SelectItem>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc} value={loc}>
-                      {loc}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-end">
-              <Button onClick={loadData} disabled={isLoading} className="w-full">
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                再読み込み
-              </Button>
-            </div>
-          </div>
+          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+            <SelectTrigger>
+              <SelectValue placeholder="拠点を選択" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">すべて</SelectItem>
+              <SelectItem value="川越">川越</SelectItem>
+              <SelectItem value="東京">東京</SelectItem>
+              <SelectItem value="川口">川口</SelectItem>
+              {locations.filter(loc => !['川越', '東京', '川口'].includes(loc)).map((loc) => (
+                <SelectItem key={loc} value={loc}>
+                  {loc}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="period">期間勤務割確認</TabsTrigger>
+          <TabsTrigger value="daily">日付勤務割確認</TabsTrigger>
+        </TabsList>
+
+        {/* Period View Tab */}
+        <TabsContent value="period" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>期間指定</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="period-start-date">開始日</Label>
+                  <Input
+                    id="period-start-date"
+                    type="date"
+                    value={periodStartDate}
+                    onChange={(e) => setPeriodStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="period-end-date">終了日</Label>
+                  <Input
+                    id="period-end-date"
+                    type="date"
+                    value={periodEndDate}
+                    onChange={(e) => setPeriodEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={loadPeriodShifts} disabled={isLoading} className="w-full">
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                    実行
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Period Shifts Matrix */}
+          {periodShifts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>期間勤務割マトリクス</CardTitle>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant={periodViewMode === 'employee' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPeriodViewMode('employee')}
+                    >
+                      運転士ごと
+                    </Button>
+                    <Button 
+                      variant={periodViewMode === 'business' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPeriodViewMode('business')}
+                    >
+                      業務ごと
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {periodViewMode === 'employee' ? (
+                  /* Employee View: Employees x Dates */
+                  (() => {
+                    const dates = [...new Set(periodShifts.map(s => s.date))].sort();
+                    const employeeNames = [...new Set(periodShifts.map(s => s.employee_name))];
+                    const employees = employeeNames
+                      .map(name => {
+                        const shift = periodShifts.find(s => s.employee_name === name);
+                        const employee = allEmployees.find(e => e.employee_id === shift?.employee_id);
+                        return { name, display_order: employee?.display_order || 9999 };
+                      })
+                      .sort((a, b) => a.display_order - b.display_order)
+                      .map(e => e.name);
+                    
+                    const shiftMap = new Map();
+                    periodShifts.forEach(shift => {
+                      if (!shiftMap.has(shift.employee_name)) {
+                        shiftMap.set(shift.employee_name, new Map());
+                      }
+                      const employeeShifts = shiftMap.get(shift.employee_name);
+                      if (!employeeShifts.has(shift.date)) {
+                        employeeShifts.set(shift.date, []);
+                      }
+                      employeeShifts.get(shift.date).push(shift.business_name);
+                    });
+
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10">従業員名</th>
+                              {dates.map(date => (
+                                <th key={date} className="border p-2 text-center min-w-[120px]">{date}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {employees.map(employee => (
+                              <tr key={employee} className="hover:bg-gray-50">
+                                <td className="border p-2 font-medium sticky left-0 bg-white z-10">{employee}</td>
+                                {dates.map(date => {
+                                  const businesses = shiftMap.get(employee)?.get(date) || [];
+                                  return (
+                                    <td key={date} className="border p-2 text-center">
+                                      {businesses.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {businesses.map((business, idx) => (
+                                            <div key={idx} className="text-xs bg-blue-100 rounded px-1 py-0.5">
+                                              {business}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* Business View: Businesses x Dates */
+                  (() => {
+                    const dates = [...new Set(periodShifts.map(s => s.date))].sort();
+                    const businesses = [...new Set(periodShifts.map(s => s.business_name))].sort();
+                    
+                    const shiftMap = new Map();
+                    periodShifts.forEach(shift => {
+                      if (!shiftMap.has(shift.business_name)) {
+                        shiftMap.set(shift.business_name, new Map());
+                      }
+                      const businessShifts = shiftMap.get(shift.business_name);
+                      if (!businessShifts.has(shift.date)) {
+                        businessShifts.set(shift.date, []);
+                      }
+                      businessShifts.get(shift.date).push(shift.employee_name);
+                    });
+
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10">業務名</th>
+                              {dates.map(date => (
+                                <th key={date} className="border p-2 text-center min-w-[120px]">{date}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {businesses.map(business => (
+                              <tr key={business} className="hover:bg-gray-50">
+                                <td className="border p-2 font-medium sticky left-0 bg-white z-10">{business}</td>
+                                {dates.map(date => {
+                                  const employees = shiftMap.get(business)?.get(date) || [];
+                                  return (
+                                    <td key={date} className="border p-2 text-center">
+                                      {employees.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {employees.map((employee, idx) => (
+                                            <div key={idx} className="text-xs bg-green-100 rounded px-1 py-0.5">
+                                              {employee}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Daily View Tab */}
+        <TabsContent value="daily" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>日付選択</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date">日付</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={loadData} disabled={isLoading} className="w-full">
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                    再読み込み
+                  </Button>
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={openExportDialog} disabled={isLoading} className="w-full" variant="outline">
+                    <Save className="h-4 w-4 mr-2" />
+                    Excel出力
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+      {/* Excel Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excel出力</DialogTitle>
+            <DialogDescription>
+              シフトデータをExcelファイルとして出力します。出力する期間を指定してください。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="export-start-date" className="text-right">
+                開始日
+              </Label>
+              <Input
+                id="export-start-date"
+                type="date"
+                value={exportStartDate}
+                onChange={(e) => setExportStartDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="export-end-date" className="text-right">
+                終了日
+              </Label>
+              <Input
+                id="export-end-date"
+                type="date"
+                value={exportEndDate}
+                onChange={(e) => setExportEndDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+              キャンセル
+            </Button>
+            <Button onClick={exportToExcel}>
+              出力
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Matrix Display */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            シフトマトリクス - {selectedDate}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              シフトマトリクス - {selectedDate}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant={dailyViewMode === 'employee' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDailyViewMode('employee')}
+              >
+                運転士ごと
+              </Button>
+              <Button 
+                variant={dailyViewMode === 'business' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDailyViewMode('business')}
+              >
+                業務ごと
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
+          {dailyViewMode === 'employee' ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -648,6 +1043,97 @@ export default function ShiftSchedule() {
               )}
             </DragOverlay>
           </DndContext>
+          ) : (
+            /* Business View: Businesses x Time */
+            (() => {
+              const businesses = [...new Set(shifts.map(s => s.business_name))].sort();
+              
+              const shiftMap = new Map();
+              shifts.forEach(shift => {
+                if (!shiftMap.has(shift.business_name)) {
+                  shiftMap.set(shift.business_name, new Map());
+                }
+                const businessShifts = shiftMap.get(shift.business_name);
+                const slotKey = `${shift.start_time}-${shift.end_time}`;
+                if (!businessShifts.has(slotKey)) {
+                  businessShifts.set(slotKey, []);
+                }
+                businessShifts.get(slotKey).push(shift.employee_name);
+              });
+
+              return (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1200px]">
+                    {/* Time Header */}
+                    <div className="flex border-b-2 border-gray-300 bg-gray-100 sticky top-0 z-10">
+                      <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center">
+                        業務名
+                      </div>
+                      <div className="flex-1 relative">
+                        <div className="flex">
+                          {timeSlots.map((slot, index) => (
+                            <div
+                              key={index}
+                              className="flex-1 p-2 text-center text-xs border-r border-gray-300 font-medium"
+                            >
+                              {slot.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Business Rows */}
+                    {businesses.map((business) => (
+                      <div key={business} className="flex border-b border-gray-200 hover:bg-gray-50">
+                        <div className="w-40 p-2 border-r-2 border-gray-300 font-medium text-sm">
+                          {business}
+                        </div>
+                        <div className="flex-1 relative">
+                          <div className="flex">
+                            {timeSlots.map((slot, slotIndex) => {
+                              const businessShifts = shiftMap.get(business);
+                              const employees = [];
+                              if (businessShifts) {
+                                businessShifts.forEach((employeeList, slotKey) => {
+                                  const [start, end] = slotKey.split('-');
+                                  const startMinutes = parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]);
+                                  const endMinutes = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]);
+                                  const slotStartMinutes = slot.start * 60;
+                                  const slotEndMinutes = slotStartMinutes + 60;
+                                  
+                                  if (startMinutes < slotEndMinutes && endMinutes > slotStartMinutes) {
+                                    employees.push(...employeeList);
+                                  }
+                                });
+                              }
+                              
+                              return (
+                                <div
+                                  key={slotIndex}
+                                  className="flex-1 p-1 border-r border-gray-200 min-h-[60px]"
+                                >
+                                  {employees.length > 0 && (
+                                    <div className="space-y-1">
+                                      {employees.map((employee, idx) => (
+                                        <div key={idx} className="text-xs bg-green-100 rounded px-1 py-0.5">
+                                          {employee}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
+          )}
         </CardContent>
       </Card>
 
@@ -674,7 +1160,9 @@ export default function ShiftSchedule() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </TabsContent>
+  </Tabs>
+  </div>
   );
 }
 

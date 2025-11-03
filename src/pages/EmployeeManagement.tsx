@@ -9,6 +9,7 @@ import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, C
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { loadEmployeesFromExcel, reloadEmployeesFromExcel, EmployeeMaster, updateEmployeeInSupabase } from '@/utils/employeeExcelLoader';
+import { AddEmployeeModal } from '@/components/AddEmployeeModal';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
 
 export default function EmployeeManagement() {
@@ -17,11 +18,12 @@ export default function EmployeeManagement() {
   const [businessGroups, setBusinessGroups] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOffice, setSelectedOffice] = useState<string>('all');
-  const [rollCallFilter, setRollCallFilter] = useState<string>('all');
+
   const [isLoading, setIsLoading] = useState(true);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<EmployeeMaster>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Load data on component mount
   useEffect(() => {
@@ -31,7 +33,7 @@ export default function EmployeeManagement() {
   // Filter employees when search term, selected office, or roll call filter changes
   useEffect(() => {
     filterEmployees();
-  }, [employees, searchTerm, selectedOffice, rollCallFilter]);
+  }, [employees, searchTerm, selectedOffice]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -100,16 +102,7 @@ export default function EmployeeManagement() {
       filtered = filtered.filter(employee => employee.office === selectedOffice);
     }
     
-    // Filter by roll call capability
-    if (rollCallFilter === 'capable') {
-      filtered = filtered.filter(employee => 
-        employee.roll_call_capable === true || employee.roll_call_duty === '1'
-      );
-    } else if (rollCallFilter === 'not_capable') {
-      filtered = filtered.filter(employee => 
-        employee.roll_call_capable !== true && employee.roll_call_duty !== '1'
-      );
-    }
+
     
     setFilteredEmployees(filtered);
   };
@@ -121,14 +114,7 @@ export default function EmployeeManagement() {
     return [...new Set(offices)];
   };
 
-  const getStatusBadge = (employee: EmployeeMaster) => {
-    if (employee.roll_call_capable || employee.roll_call_duty === '1') {
-      return { variant: 'default' as const, text: '対応可能', icon: UserCheck };
-    } else if (employee.roll_call_duty === '0') {
-      return { variant: 'secondary' as const, text: '対応不可', icon: UserX };
-    }
-    return { variant: 'outline' as const, text: '未設定', icon: UserX };
-  };
+
 
   const handleStartEdit = (employee: EmployeeMaster) => {
     console.log('📝 Starting edit for employee:', employee);
@@ -156,6 +142,7 @@ export default function EmployeeManagement() {
       const updateData: EmployeeMaster = {
         name: editFormData.name,
         office: editFormData.office,
+        display_order: editFormData.display_order,
         roll_call_capable: editFormData.roll_call_capable || false,
         roll_call_duty: editFormData.roll_call_duty || '0'
       };
@@ -236,6 +223,10 @@ export default function EmployeeManagement() {
           <p className="text-gray-600 mt-2">従業員情報の確認・編集を行います</p>
         </div>
         <div className="flex space-x-2">
+          <Button onClick={() => setIsAddModalOpen(true)} disabled={isLoading}>
+            <Plus className="w-4 h-4 mr-2" />
+            新規登録
+          </Button>
           <Button variant="outline" onClick={handleForceReload} disabled={isLoading}>
             <RefreshCw className="w-4 h-4 mr-2" />
             再読み込み
@@ -316,18 +307,7 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="md:w-48">
-              <Select value={rollCallFilter} onValueChange={setRollCallFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="点呼対応" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべて</SelectItem>
-                  <SelectItem value="capable">対応可能</SelectItem>
-                  <SelectItem value="not_capable">対応不可</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
           </div>
         </CardContent>
       </Card>
@@ -355,8 +335,6 @@ export default function EmployeeManagement() {
           ) : (
             <div className="space-y-4">
               {filteredEmployees.map((employee, index) => {
-                const status = getStatusBadge(employee);
-                const StatusIcon = status.icon;
                 const isEditing = editingEmployeeId === employee.employee_id;
                 
                 return (
@@ -411,6 +389,16 @@ export default function EmployeeManagement() {
                               <span className="text-sm">対応可能</span>
                             </div>
                           </div>
+                          <div>
+                            <label className="text-sm font-medium">表示順</label>
+                            <Input
+                              type="number"
+                              value={editFormData.display_order || ''}
+                              onChange={(e) => handleEditFormChange('display_order', parseInt(e.target.value) || 0)}
+                              className="mt-1"
+                              placeholder="9999"
+                            />
+                          </div>
                         </div>
                         <div className="flex justify-end space-x-2">
                           <Button 
@@ -443,18 +431,16 @@ export default function EmployeeManagement() {
                           <div className="font-medium">{employee.office || '-'}</div>
                           <div className="text-sm text-muted-foreground">営業所</div>
                         </div>
-                        <div>
-                          <Badge variant={status.variant} className="flex items-center gap-1 w-fit">
-                            <StatusIcon className="h-3 w-3" />
-                            {status.text}
-                          </Badge>
-                        </div>
                         <div className="flex items-center space-x-2">
                           <Checkbox
                             checked={employee.roll_call_capable || employee.roll_call_duty === '1'}
                             onCheckedChange={() => handleQuickToggleRollCall(employee)}
                           />
                           <span className="text-sm">点呼対応</span>
+                        </div>
+                        <div>
+                          <div className="font-medium">{employee.display_order || 9999}</div>
+                          <div className="text-sm text-muted-foreground">表示順</div>
                         </div>
                         <div className="flex justify-end space-x-2">
                           <Button 
@@ -475,6 +461,13 @@ export default function EmployeeManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Employee Modal */}
+      <AddEmployeeModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onEmployeeAdded={loadData}
+      />
     </div>
   );
 }
