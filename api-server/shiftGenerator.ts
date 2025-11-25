@@ -232,7 +232,7 @@ function canAssignBusiness(employeeId: string, business: any, currentShifts: Shi
 }
 
 // Enhanced generateShifts function with multi-assignment support
-export async function generateShifts(
+async function generateShiftsForSingleDate(
   employees: any[],
   businessMasters: any[],
   targetDate: string,
@@ -997,3 +997,102 @@ export async function generateShifts(
 
 // ... (rest of the file remains the same)
 
+
+/**
+ * Multi-day shift generation wrapper
+ * This function handles multiple dates and maintains business history across days
+ */
+export async function generateShifts(
+  employees: any[],
+  businessMasters: any[],
+  dateRange: string | string[],
+  pairGroups?: { [key: string]: any[] },
+  location?: string
+): Promise<GenerationResult> {
+  console.log('🚀 Starting multi-day shift generation');
+  
+  // Convert single date to array for uniform processing
+  const dates = Array.isArray(dateRange) ? dateRange : [dateRange];
+  console.log(`📅 Processing ${dates.length} date(s):`, dates);
+  
+  // Load initial business history from DB
+  const cumulativeBusinessHistory = await loadBusinessHistoryFromDB();
+  console.log(`📚 Loaded initial business history for ${cumulativeBusinessHistory.size} employees`);
+  
+  // Accumulate results across all dates
+  const allShifts: Shift[] = [];
+  const allViolations: string[] = [];
+  const allUnassignedBusinesses: string[] = [];
+  const allUnassignedEmployees: string[] = [];
+  const allConstraintViolations: any[] = [];
+  let totalAssignedCount = 0;
+  let totalBusinessCount = 0;
+  
+  // Process each date sequentially
+  for (const targetDate of dates) {
+    console.log(`\n📅 Processing date: ${targetDate}`);
+    
+    const result = await generateShiftsForSingleDate(
+      employees,
+      businessMasters,
+      targetDate,
+      pairGroups,
+      location,
+      cumulativeBusinessHistory
+    );
+    
+    // Accumulate results
+    allShifts.push(...result.shifts);
+    allViolations.push(...result.violations);
+    if (result.unassigned_businesses) {
+      allUnassignedBusinesses.push(...result.unassigned_businesses);
+    }
+    if (result.unassigned_employees) {
+      allUnassignedEmployees.push(...result.unassigned_employees);
+    }
+    if (result.constraint_violations) {
+      allConstraintViolations.push(...result.constraint_violations);
+    }
+    totalAssignedCount += result.assigned_count || 0;
+    totalBusinessCount += result.total_businesses || 0;
+    
+    // Update cumulative business history with new assignments
+    if (result.business_history) {
+      result.business_history.forEach((businesses, empId) => {
+        const existing = cumulativeBusinessHistory.get(empId) || new Set<string>();
+        businesses.forEach(biz => existing.add(biz));
+        cumulativeBusinessHistory.set(empId, existing);
+      });
+    }
+    
+    console.log(`✅ ${targetDate}: Generated ${result.shifts.length} shifts`);
+  }
+  
+  console.log(`\n🎉 Multi-day generation complete: ${allShifts.length} total shifts across ${dates.length} day(s)`);
+  
+  // Return aggregated results
+  const isSuccessful = allShifts.length > 0;
+  const batchId = allShifts.length > 0 ? allShifts[0].generation_batch_id || uuidv4() : uuidv4();
+  
+  return {
+    success: isSuccessful,
+    batch_id: batchId,
+    shifts: allShifts,
+    violations: allViolations,
+    generation_time: 0.1,
+    unassigned_businesses: allUnassignedBusinesses,
+    unassigned_employees: Array.from(new Set(allUnassignedEmployees)),
+    assignment_summary: {
+      total_businesses: totalBusinessCount,
+      assigned_businesses: totalAssignedCount,
+      unassigned_businesses: allUnassignedBusinesses.length,
+      total_employees: employees.length,
+      unassigned_employees: Array.from(new Set(allUnassignedEmployees)).length
+    },
+    assigned_count: totalAssignedCount,
+    total_businesses: totalBusinessCount,
+    constraint_violations: allConstraintViolations,
+    constraint_report: null,
+    business_history: cumulativeBusinessHistory
+  };
+}
