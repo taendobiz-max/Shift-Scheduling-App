@@ -233,6 +233,35 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
             else if (vacationError) {
                 console.warn("⚠️ Failed to load vacation data:", vacationError.message);
             }
+            // Enrich employees data with roll_call information from DB
+            console.log('🔍 [DEBUG] Enriching employees data with roll_call information...');
+            const allEmployeeIds = employees.map(emp => emp.id || emp.従業員ID || emp.employee_id);
+            const { data: employeeDetails, error: empError } = yield supabaseClient_1.supabase
+                .from('employees')
+                .select('id, roll_call_capable, roll_call_duty')
+                .in('id', allEmployeeIds);
+            const rollCallMap = new Map();
+            if (!empError && employeeDetails) {
+                employeeDetails.forEach((emp) => {
+                    rollCallMap.set(emp.id, {
+                        roll_call_capable: emp.roll_call_capable,
+                        roll_call_duty: emp.roll_call_duty
+                    });
+                });
+                console.log('📊 Enriched roll_call data for', rollCallMap.size, 'employees');
+            }
+            else if (empError) {
+                console.warn('⚠️ Failed to load employee details:', empError.message);
+            }
+            // Enrich employees with roll_call information
+            employees.forEach(emp => {
+                const empId = emp.id || emp.従業員ID || emp.employee_id;
+                const rollCallInfo = rollCallMap.get(empId);
+                if (rollCallInfo) {
+                    emp.roll_call_capable = rollCallInfo.roll_call_capable;
+                    emp.roll_call_duty = rollCallInfo.roll_call_duty;
+                }
+            });
             // Filter out employees on vacation
             const availableEmployees = employees.filter(emp => {
                 const empId = emp.id || emp.従業員ID || emp.employee_id;
