@@ -349,7 +349,9 @@ async function generateShiftsForSingleDate(
       .in('id', allEmployeeIds);
     
     const rollCallMap = new Map<string, {roll_call_capable: boolean, roll_call_duty: string}>();
+    console.log('🔍 [DEBUG] Employee details query result:', { empError, count: employeeDetails?.length });
     if (!empError && employeeDetails) {
+      console.log('🔍 [DEBUG] Sample employee detail:', employeeDetails[0]);
       employeeDetails.forEach((emp: any) => {
         rollCallMap.set(emp.id, {
           roll_call_capable: emp.roll_call_capable,
@@ -357,8 +359,9 @@ async function generateShiftsForSingleDate(
         });
       });
       console.log('📊 Enriched roll_call data for', rollCallMap.size, 'employees');
+      console.log('🔍 [DEBUG] Roll call capable employees:', Array.from(rollCallMap.entries()).filter(([id, info]) => info.roll_call_capable).map(([id, info]) => id));
     } else if (empError) {
-      console.warn('⚠️ Failed to load employee details:', empError.message);
+      console.error('❌ Failed to load employee details:', empError);
     }
     
     // Enrich employees with roll_call information
