@@ -697,6 +697,35 @@ async function generateShiftsForSingleDate(
         // Skip if employee already has 3 assignments
         if (currentCount >= 3) continue;
         
+        // Check if this is a roll call business group
+        const isRollCallGroup = businessGroup.some(b => {
+          const bizName = b.業務名 || b.name || '';
+          const bizGroup = b.業務グループ || b.business_group || '';
+          return bizName.includes('点呼') || bizGroup.includes('点呼');
+        });
+        
+        // If this is a roll call business, check roll_call_capable
+        if (isRollCallGroup) {
+          if (emp.roll_call_capable !== true && emp.roll_call_duty !== '1') {
+            console.log(`⛔ ${emp.name || empId} does not have roll call capability`);
+            continue;
+          }
+        }
+        
+        // Check skill matrix for each business in the group
+        let hasAllSkills = true;
+        for (const business of businessGroup) {
+          const businessGroup = business.業務グループ || business.business_group || '';
+          const employeeSkills = employeeSkillMatrix.get(empId) || new Set<string>();
+          if (!employeeSkills.has(businessGroup)) {
+            console.log(`⛔ ${emp.name || empId} does not have skill for ${businessGroup}`);
+            hasAllSkills = false;
+            break;
+          }
+        }
+        
+        if (!hasAllSkills) continue;
+        
         // Check time conflicts with existing shifts
         let hasTimeConflict = false;
         for (const business of businessGroup) {
