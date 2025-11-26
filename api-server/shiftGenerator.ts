@@ -3,6 +3,50 @@ import { supabase } from './supabaseClient';
 import { ConstraintEngine } from './constraintEngine';
 import { ConstraintManager } from './constraintManager';
 
+// Load skill matrix from database
+async function loadSkillMatrixFromDB(employeeIds: string[]): Promise<Map<string, Set<string>>> {
+  console.log('🔍 [DEBUG] loadSkillMatrixFromDB called for', employeeIds.length, 'employees');
+  const skillMap = new Map<string, Set<string>>();
+  
+  if (employeeIds.length === 0) {
+    return skillMap;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('skill_matrix')
+      .select('employee_id, business_group, skill_level')
+      .in('employee_id', employeeIds);
+    
+    if (error) {
+      console.error('⚠️ Failed to load skill matrix from DB:', error);
+      return skillMap;
+    }
+    
+    if (data) {
+      data.forEach((record: any) => {
+        const empId = record.employee_id;
+        const bizGroup = record.business_group;
+        const skillLevel = record.skill_level;
+        
+        // Only include skills with valid levels
+        if (skillLevel === '経験あり' || skillLevel === '対応可能') {
+          if (!skillMap.has(empId)) {
+            skillMap.set(empId, new Set<string>());
+          }
+          skillMap.get(empId)!.add(bizGroup);
+        }
+      });
+    }
+    
+    console.log(`📊 Loaded skill matrix for ${skillMap.size} employees with skills`);
+  } catch (err) {
+    console.error('❌ Error loading skill matrix:', err);
+  }
+  
+  return skillMap;
+}
+
 // Load business history from database
 async function loadBusinessHistoryFromDB(): Promise<Map<string, Set<string>>> {
   console.log('🔍 [DEBUG] loadBusinessHistoryFromDB called');
@@ -293,6 +337,11 @@ async function generateShiftsForSingleDate(
     
     console.log('👥 Available employees (after vacation filter):', availableEmployees.length);
     
+    // Load skill matrix for available employees
+    const employeeIds = availableEmployees.map(emp => emp.id || emp.従業員ID || emp.employee_id).filter(id => id);
+    const employeeSkillMatrix = await loadSkillMatrixFromDB(employeeIds);
+    console.log('📊 Skill matrix loaded for', employeeSkillMatrix.size, 'employees');
+    
     if (availableEmployees.length === 0) {
       console.error('❌ No employees available after filtering vacations');
       return {
@@ -565,6 +614,14 @@ async function generateShiftsForSingleDate(
         // Skip if employee already has 3 assignments
         if (currentCount >= 3) continue;
         
+        // Check skill matrix - employee must have the required business group skill
+        const businessGroup = business.業務グループ || business.business_group || '';
+        const employeeSkills = employeeSkillMatrix.get(empId) || new Set<string>();
+        if (!employeeSkills.has(businessGroup)) {
+          console.log(`⛔ ${emp.name || empId} does not have skill for ${businessGroup}`);
+          continue;
+        }
+        
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
@@ -820,6 +877,14 @@ async function generateShiftsForSingleDate(
         
         // Skip if employee already has 3 assignments
         if (currentCount >= 3) continue;
+        
+        // Check skill matrix - employee must have the required business group skill
+        const businessGroup = business.業務グループ || business.business_group || '';
+        const employeeSkills = employeeSkillMatrix.get(empId) || new Set<string>();
+        if (!employeeSkills.has(businessGroup)) {
+          console.log(`⛔ ${emp.name || empId} does not have skill for ${businessGroup}`);
+          continue;
+        }
         
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
