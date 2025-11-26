@@ -289,6 +289,17 @@ async function generateShiftsForSingleDate(
   console.log('🏢 Business masters:', businessMasters.length);
   console.log('📍 Location:', location);
   
+  // Debug: Check employee data structure
+  if (employees.length > 0) {
+    const sampleEmp = employees[0];
+    console.log('🔍 [DEBUG] Sample employee keys:', Object.keys(sampleEmp));
+    console.log('🔍 [DEBUG] Sample roll_call fields:', {
+      roll_call_capable: sampleEmp.roll_call_capable,
+      roll_call_duty: sampleEmp.roll_call_duty,
+      name: sampleEmp.name || sampleEmp.名前
+    });
+  }
+  
   try {
     const batchId = uuidv4();
     const shifts: Shift[] = [];
