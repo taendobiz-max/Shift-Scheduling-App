@@ -410,11 +410,12 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                 });
                 console.log(`👥 Found ${rollCallCapableEmployees.length} roll call capable employees`);
                 if (rollCallCapableEmployees.length === 0) {
-                    console.warn('⚠️ No roll call capable employees found, using all available employees');
+                    unassigned_businesses.push(businessName);
+                    violations.push(`${businessName}: 点呼対応可能な従業員がいません`);
+                    console.error(`❌ No roll call capable employees available for ${businessName}`);
+                    continue;
                 }
-                const candidateEmployees = rollCallCapableEmployees.length > 0
-                    ? rollCallCapableEmployees
-                    : availableEmployees;
+                const candidateEmployees = rollCallCapableEmployees;
                 // Sort by diversity score (prioritize employees who haven't done this business)
                 const sortedEmployees = candidateEmployees.sort((a, b) => {
                     const aScore = calculateDiversityScore(a, businessId, employeeBusinessHistory, employeeAssignmentCounts);
