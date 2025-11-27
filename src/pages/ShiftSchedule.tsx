@@ -601,21 +601,21 @@ export default function ShiftSchedule() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <Button onClick={saveChanges} disabled={isLoading}>
+              <Save className="h-4 w-4 mr-2" />
+              変更を保存
+            </Button>
+          )}
           <Link to="/">
             <Button variant="outline" size="sm">
               <Home className="h-4 w-4 mr-2" />
               ホーム
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         </div>
-        {hasChanges && (
-          <Button onClick={saveChanges} disabled={isLoading}>
-            <Save className="h-4 w-4 mr-2" />
-            変更を保存
-          </Button>
-        )}
       </div>
 
       {/* Location Filter */}
