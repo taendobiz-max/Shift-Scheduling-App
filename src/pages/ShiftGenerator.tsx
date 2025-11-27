@@ -498,13 +498,18 @@ export default function ShiftGenerator() {
       }
       
       // Process unassigned businesses
-      if (apiResult.unassigned && apiResult.unassigned.length > 0) {
-        apiResult.unassigned.forEach((business: string) => {
+      if (apiResult.unassigned_businesses && apiResult.unassigned_businesses.length > 0) {
+        apiResult.unassigned_businesses.forEach((business: string) => {
           if (!allUnassignedBusinesses.includes(business)) {
             allUnassignedBusinesses.push(business);
             totalUnassigned++;
           }
         });
+      }
+      
+      // Also use assignment_summary if available
+      if (apiResult.assignment_summary && apiResult.assignment_summary.unassigned_businesses > 0) {
+        totalUnassigned = apiResult.assignment_summary.unassigned_businesses;
       }
 
       setShiftResults(allShiftResults);
