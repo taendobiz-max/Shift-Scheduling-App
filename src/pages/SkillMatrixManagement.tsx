@@ -253,13 +253,13 @@ export default function SkillMatrixManagement() {
             <Plus className="h-4 w-4" />
             新規登録
           </Button>
-          <Button onClick={() => window.location.href = '/'} variant="outline">
-            <Home className="h-4 w-4 mr-2" />
-            ホーム
-          </Button>
           <Button onClick={loadData} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             更新
+          </Button>
+          <Button onClick={() => window.location.href = '/'} variant="outline">
+            <Home className="h-4 w-4 mr-2" />
+            ホーム
           </Button>
         </div>
       </div>

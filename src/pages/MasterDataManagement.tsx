@@ -632,13 +632,13 @@ export default function MasterDataManagement() {
           <p className="text-muted-foreground mt-2">業務グループ・業務マスター・制約条件の管理</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => window.location.href = '/'} variant="outline">
-            <Home className="h-4 w-4 mr-2" />
-            ホーム
-          </Button>
           <Button onClick={loadAllData} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             更新
+          </Button>
+          <Button onClick={() => window.location.href = '/'} variant="outline">
+            <Home className="h-4 w-4 mr-2" />
+            ホーム
           </Button>
         </div>
       </div>
