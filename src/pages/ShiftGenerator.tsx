@@ -702,6 +702,70 @@ export default function ShiftGenerator() {
       }
     }
 
+    // Handle unassigned employee drag
+    if (activeId.startsWith('unassigned-')) {
+      // Parse unassigned employee ID: unassigned-{emp.id}-{date}-{idx}
+      const parts = activeId.split('-');
+      const empId = parts[1];
+      const sourceDate = parts[2];
+      
+      // Find the employee
+      const employee = employees.find(emp => 
+        emp.id === empId || emp.従業員ID === empId
+      );
+      
+      if (!employee) {
+        console.warn('⚠️ Employee not found:', empId);
+        return;
+      }
+      
+      console.log('📝 Unassigned employee drag:', { employee, targetBusiness, targetDate });
+      
+      // Handle dropping to non-working area
+      if (targetBusiness === 'non-working') {
+        const newNonWorkingMember: NonWorkingMember = {
+          id: `non-working-${Date.now()}`,
+          date: targetDate,
+          employeeName: employee.氏名 || employee.name,
+          employeeId: employee.従業員ID || employee.id,
+          reason: '希望休',
+          source: 'manual'
+        };
+        
+        setNonWorkingMembers(prev => [...prev, newNonWorkingMember]);
+        setHasChanges(true);
+        return;
+      }
+      
+      // Handle dropping to business cell
+      const targetShift = shiftResults.find(shift => 
+        shift.businessMaster === targetBusiness && shift.date === targetDate
+      );
+      
+      if (!targetShift) {
+        // Move to empty shift cell
+        const newShift: ShiftResult = {
+          id: `shift_${targetDate}_${targetBusiness}_${Date.now()}`,
+          date: targetDate,
+          businessMaster: targetBusiness,
+          employeeName: employee.氏名 || employee.name,
+          employeeId: employee.従業員ID || employee.id
+        };
+        
+        setShiftResults(prev => [...prev, newShift]);
+        setHasChanges(true);
+      } else {
+        // Swap: move existing shift to unassigned (no action needed, just replace)
+        setShiftResults(prev => prev.map(shift => 
+          shift.id === targetShift.id 
+            ? { ...shift, employeeName: employee.氏名 || employee.name, employeeId: employee.従業員ID || employee.id }
+            : shift
+        ));
+        setHasChanges(true);
+      }
+      return;
+    }
+    
     // Regular shift drag & drop logic
     const activeShift = shiftResults.find(shift => shift.id === activeId);
     if (!activeShift) {
