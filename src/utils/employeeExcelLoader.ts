@@ -163,72 +163,40 @@ const ensureRollCallCapableColumn = async (): Promise<void> => {
   }
 };
 
-// Force reload employees from Excel (overwrite database)
+// Force reload employees from Supabase database
 export const reloadEmployeesFromExcel = async (): Promise<EmployeeMaster[]> => {
   try {
-    console.log('🔄 Force reloading employees from Excel...');
+    console.log('🔄 Force reloading employees from Supabase...');
     
-    const response = await fetch('/uploads/従業員マスタ.xlsx');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Excel file: ${response.statusText}`);
+    // Load from Supabase using correct English column names
+    const { data: existingData, error: fetchError } = await supabase
+      .from('employees')
+      .select('*')
+      .order('employee_id');
+
+    if (fetchError) {
+      console.error('❌ Error fetching from Supabase:', fetchError);
+      throw fetchError;
     }
     
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    
-    // Convert to JSON with header row
-    const employees = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-    
-    if (employees.length < 2) {
-      throw new Error('Excel file appears to be empty or invalid');
+    if (!existingData || existingData.length === 0) {
+      console.warn('⚠️ No employees found in Supabase');
+      return [];
     }
     
-    // Get header row and data rows
-    const headers = employees[0] as string[];
-    const dataRows = employees.slice(1);
+    console.log(`✅ Loaded ${existingData.length} employees from Supabase`);
     
-    // Convert to objects using English column names
-    const employeeData: EmployeeMaster[] = dataRows.map((row: unknown[]) => {
-      const employee: EmployeeMaster = {};
-      headers.forEach((header, index) => {
-        if (header && row[index] !== undefined && row[index] !== null) {
-          const value = String(row[index]).trim();
-          // Map Excel headers to English database column names
-          switch (header) {
-            case '従業員ID':
-              employee['employee_id'] = value;
-              break;
-            case '氏名':
-              employee['name'] = value;
-              break;
-            case '営業所':
-              employee['office'] = value;
-              break;
-            case '点呼業務':
-              employee['roll_call_duty'] = value;
-              // Convert to boolean for roll_call_capable
-              employee['roll_call_capable'] = value === '1' || value === 'true' || value === '可';
-              break;
-            default:
-              employee[header] = value;
-          }
-        }
-      });
-      return employee;
-    }).filter(emp => emp['employee_id'] || emp['name']); // Filter out empty rows
+    // Normalize roll_call_duty values
+    const normalizedData = existingData.map(emp => ({
+      ...emp,
+      roll_call_duty: emp.roll_call_duty === 'true' || emp.roll_call_duty === '1' ? '1' : '0',
+      roll_call_capable: emp.roll_call_capable || emp.roll_call_duty === '1' || emp.roll_call_duty === 'true'
+    }));
     
-    console.log(`📊 Force loaded ${employeeData.length} employees from Excel`);
-    
-    if (employeeData.length > 0) {
-      await saveEmployeesToSupabase(employeeData);
-    }
-    
-    return employeeData;
+    return normalizedData;
   } catch (error) {
     console.error('💥 Error in reloadEmployeesFromExcel:', error);
-    return [];
+    throw error;
   }
 };
 
