@@ -1111,7 +1111,7 @@ export default function ShiftSchedule() {
                                   const [start, end] = slotKey.split('-');
                                   const startMinutes = parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]);
                                   const endMinutes = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]);
-                                  const slotStartMinutes = slot.start * 60;
+                                  const slotStartMinutes = slot.hour * 60;
                                   const slotEndMinutes = slotStartMinutes + 60;
                                   
                                   if (startMinutes < slotEndMinutes && endMinutes > slotStartMinutes) {
