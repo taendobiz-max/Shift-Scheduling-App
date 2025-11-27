@@ -1034,14 +1034,6 @@ export default function ShiftSchedule() {
                 )}
               </div>
             </div>
-            
-            <DragOverlay>
-              {activeId && (
-                <Badge variant="secondary" className="cursor-grabbing">
-                  ドラッグ中...
-                </Badge>
-              )}
-            </DragOverlay>
           ) : (
             /* Business View: Businesses x Time */
             (() => {
@@ -1133,6 +1125,14 @@ export default function ShiftSchedule() {
               );
             })()
           )}
+          
+          <DragOverlay>
+            {activeId && (
+              <Badge variant="secondary" className="cursor-grabbing">
+                ドラッグ中...
+              </Badge>
+            )}
+          </DragOverlay>
           </DndContext>
         </CardContent>
       </Card>
