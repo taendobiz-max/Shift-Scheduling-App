@@ -73,11 +73,19 @@ const generateTimeSlots = (): TimeSlot[] => {
 const DraggableEmployee = ({ 
   employeeId, 
   employeeName, 
-  shiftId 
+  shiftId,
+  businessName,
+  startTime,
+  endTime,
+  barStyle
 }: { 
   employeeId: string; 
   employeeName: string;
   shiftId?: string;
+  businessName?: string;
+  startTime?: string;
+  endTime?: string;
+  barStyle?: { left: string; width: string };
 }) => {
   const {
     attributes,
@@ -94,8 +102,29 @@ const DraggableEmployee = ({
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
     cursor: 'grab',
+    ...(barStyle ? { left: barStyle.left, width: barStyle.width } : {})
   };
 
+  // If barStyle is provided, render as a shift bar
+  if (barStyle && businessName) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        className="absolute top-2 bottom-2 bg-blue-500 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md hover:bg-blue-600 transition-colors z-20 cursor-grab active:cursor-grabbing"
+      >
+        <span className="font-semibold">{employeeName}</span>
+        <span className="ml-2 truncate">{businessName}</span>
+        <span className="ml-2 text-xs opacity-75">
+          {startTime?.substring(0, 5)} - {endTime?.substring(0, 5)}
+        </span>
+      </div>
+    );
+  }
+
+  // Otherwise, render as a badge
   return (
     <div
       ref={setNodeRef}
@@ -555,7 +584,7 @@ export default function ShiftSchedule() {
   const getTimeBarStyle = (startTime: string, endTime: string) => {
     const timeToHour = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number);
-      let adjustedHours = hours - 5;
+      let adjustedHours = hours - 4;
       if (adjustedHours < 0) adjustedHours += 24;
       return adjustedHours + minutes / 60;
     };
@@ -1002,24 +1031,16 @@ export default function ShiftSchedule() {
                             );
                             
                             return (
-                              <div
+                              <DraggableEmployee
                                 key={shift.id}
-                                className="absolute top-2 bottom-2 bg-blue-500 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md hover:bg-blue-600 transition-colors z-20"
-                                style={{
-                                  left: barStyle.left,
-                                  width: barStyle.width,
-                                }}
-                              >
-                                <DraggableEmployee
-                                  employeeId={shift.employee_id}
-                                  employeeName={shift.employee_name || employee.name}
-                                  shiftId={shift.id}
-                                />
-                                <span className="ml-2 truncate">{shift.business_name}</span>
-                                <span className="ml-2 text-xs opacity-75">
-                                  {shift.start_time?.substring(0, 5)} - {shift.end_time?.substring(0, 5)}
-                                </span>
-                              </div>
+                                employeeId={shift.employee_id}
+                                employeeName={shift.employee_name || employee.name}
+                                shiftId={shift.id}
+                                businessName={shift.business_name}
+                                startTime={shift.start_time}
+                                endTime={shift.end_time}
+                                barStyle={barStyle}
+                              />
                             );
                           })}
                         </div>
