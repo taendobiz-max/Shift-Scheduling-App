@@ -668,7 +668,9 @@ export default function MasterDataManagement() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{businessGroups.length}</div>
+            <div className="text-2xl font-bold">
+              {new Set(businessMasters.map(bm => bm.業務グループ).filter(Boolean)).size}
+            </div>
           </CardContent>
         </Card>
         <Card>
