@@ -238,14 +238,14 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
             const allEmployeeIds = employees.map(emp => emp.id || emp.従業員ID || emp.employee_id);
             const { data: employeeDetails, error: empError } = yield supabaseClient_1.supabase
                 .from('employees')
-                .select('id, roll_call_capable, roll_call_duty')
-                .in('id', allEmployeeIds);
+                .select('employee_id, roll_call_capable, roll_call_duty')
+                .in('employee_id', allEmployeeIds);
             const rollCallMap = new Map();
             console.log('🔍 [DEBUG] Employee details query result:', { empError, count: employeeDetails === null || employeeDetails === void 0 ? void 0 : employeeDetails.length });
             if (!empError && employeeDetails) {
                 console.log('🔍 [DEBUG] Sample employee detail:', employeeDetails[0]);
                 employeeDetails.forEach((emp) => {
-                    rollCallMap.set(emp.id, {
+                    rollCallMap.set(emp.employee_id, {
                         roll_call_capable: emp.roll_call_capable,
                         roll_call_duty: emp.roll_call_duty
                     });

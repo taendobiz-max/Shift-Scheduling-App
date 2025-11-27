@@ -345,15 +345,15 @@ async function generateShiftsForSingleDate(
     const allEmployeeIds = employees.map(emp => emp.id || emp.従業員ID || emp.employee_id);
     const { data: employeeDetails, error: empError } = await supabase
       .from('employees')
-      .select('id, roll_call_capable, roll_call_duty')
-      .in('id', allEmployeeIds);
+      .select('employee_id, roll_call_capable, roll_call_duty')
+      .in('employee_id', allEmployeeIds);
     
     const rollCallMap = new Map<string, {roll_call_capable: boolean, roll_call_duty: string}>();
     console.log('🔍 [DEBUG] Employee details query result:', { empError, count: employeeDetails?.length });
     if (!empError && employeeDetails) {
       console.log('🔍 [DEBUG] Sample employee detail:', employeeDetails[0]);
       employeeDetails.forEach((emp: any) => {
-        rollCallMap.set(emp.id, {
+        rollCallMap.set(emp.employee_id, {
           roll_call_capable: emp.roll_call_capable,
           roll_call_duty: emp.roll_call_duty
         });
