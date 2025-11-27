@@ -58,11 +58,11 @@ interface TimeSlot {
   label: string;
 }
 
-// Generate time slots from 5:00 to next day 4:59
+// Generate time slots from 4:00 to next day 3:59
 const generateTimeSlots = (): TimeSlot[] => {
   const slots: TimeSlot[] = [];
   for (let i = 0; i < 24; i++) {
-    const hour = (i + 5) % 24;
+    const hour = (i + 4) % 24;
     const label = `${hour.toString().padStart(2, '0')}:00`;
     slots.push({ hour, label });
   }
@@ -921,13 +921,13 @@ export default function ShiftSchedule() {
           </div>
         </CardHeader>
         <CardContent>
-          {dailyViewMode === 'employee' ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
+          {dailyViewMode === 'employee' ? (
             <div className="overflow-x-auto">
               <div className="min-w-[1200px]">
                 {/* Time Header */}
@@ -1042,7 +1042,6 @@ export default function ShiftSchedule() {
                 </Badge>
               )}
             </DragOverlay>
-          </DndContext>
           ) : (
             /* Business View: Businesses x Time */
             (() => {
@@ -1134,6 +1133,7 @@ export default function ShiftSchedule() {
               );
             })()
           )}
+          </DndContext>
         </CardContent>
       </Card>
 
