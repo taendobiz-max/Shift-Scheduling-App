@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut } from 'lucide-react';
+import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '@/utils/auth';
 
@@ -145,22 +145,24 @@ export default function Index() {
             </Card>
           </Link>
 
-          <Card className="bg-gray-50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-gray-500">
-                <Clock className="h-6 w-6 mr-2" />
-                レポート機能
-              </CardTitle>
-              <CardDescription>
-                各種統計・分析レポート（開発予定）
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                勤務時間統計、コスト分析、効率性レポートなど、経営判断に必要な情報を提供予定です。
-              </p>
-            </CardContent>
-          </Card>
+          <Link to="/reports">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="h-6 w-6 mr-2" />
+                  勤務レポート
+                </CardTitle>
+                <CardDescription>
+                  期間指定で勤務統計を集計
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  従業員ごとの勤務日数、勤務時間、休暇日数、手当回数を集計し、CSV出力ができます。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* クイックアクション */}

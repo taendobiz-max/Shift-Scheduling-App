@@ -10,6 +10,7 @@ import ShiftSchedule from './pages/ShiftSchedule';
 import SkillMatrixManagement from './pages/SkillMatrixManagement';
 import ShiftGenerator from './pages/ShiftGenerator';
 import VacationManagement from './pages/VacationManagement';
+import Reports from './pages/Reports';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -30,6 +31,7 @@ const App = () => {
             <Route path="/shift-generator" element={<ProtectedRoute><ShiftGenerator /></ProtectedRoute>} />
             <Route path="/skill-matrix" element={<ProtectedRoute><SkillMatrixManagement /></ProtectedRoute>} />
             <Route path="/vacation-management" element={<ProtectedRoute><VacationManagement /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
