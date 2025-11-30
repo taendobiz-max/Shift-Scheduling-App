@@ -79,7 +79,7 @@ const Reports: React.FC = () => {
 
       // Fetch shifts in the date range
       const { data: shifts, error: shiftError } = await supabase
-        .from('shift_assignments')
+        .from('shifts')
         .select('*')
         .gte('shift_date', startDate)
         .lte('shift_date', endDate);
