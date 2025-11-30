@@ -85,6 +85,19 @@ const Reports: React.FC = () => {
 
       if (empError) throw empError;
 
+
+      // Fetch business masters
+      const { data: businessMasters, error: bmError } = await supabase
+        .from('business_master')
+        .select('業務id, 業務名, 開始時間, 終了時間, 早朝手当, 深夜手当');
+
+      if (bmError) throw bmError;
+
+      // Create business master map
+      const businessMap = new Map<string, BusinessMaster>();
+      (businessMasters || []).forEach((bm: BusinessMaster) => {
+        businessMap.set(bm.業務id, bm);
+      });
       // Fetch shifts in the date range
       const { data: shifts, error: shiftError } = await supabase
         .from('shifts')
