@@ -114,6 +114,8 @@ const Reports: React.FC = () => {
 
         // Calculate total work hours
         const workHours = empShifts.reduce((total: number, shift: ShiftRecord) => {
+          const business = businessMap.get(shift.business_master_id);
+          if (!business) return total;
           const start = new Date(`2000-01-01T${business.開始時間}:00`);
           const end = new Date(`2000-01-01T${business.終了時間}:00`);
           let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
