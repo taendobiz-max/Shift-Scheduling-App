@@ -92,7 +92,7 @@ const Reports: React.FC = () => {
         .select('employee_id, vacation_date, reason')
         .gte('vacation_date', startDate)
         .lte('vacation_date', endDate)
-        .eq('status', 'approved');
+        ;
 
       if (leaveError) throw leaveError;
 
