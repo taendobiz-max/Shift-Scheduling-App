@@ -18,7 +18,7 @@ interface ShiftRecord {
   id: string;
   employee_id: string;
   employee_name: string;
-  shift_date: string;
+  date: string;
   start_time: string;
   end_time: string;
   business_name: string;
@@ -81,8 +81,8 @@ const Reports: React.FC = () => {
       const { data: shifts, error: shiftError } = await supabase
         .from('shifts')
         .select('*')
-        .gte('shift_date', startDate)
-        .lte('shift_date', endDate);
+        .gte('date', startDate)
+        .lte('date', endDate);
 
       if (shiftError) throw shiftError;
 
@@ -102,7 +102,7 @@ const Reports: React.FC = () => {
         const empLeaves = (leaves || []).filter((l: LeaveRecord) => l.employee_id === emp.employee_id);
 
         // Calculate work days (unique dates)
-        const workDays = new Set(empShifts.map((s: ShiftRecord) => s.shift_date)).size;
+        const workDays = new Set(empShifts.map((s: ShiftRecord) => s.date)).size;
 
         // Calculate total work hours
         const workHours = empShifts.reduce((total: number, shift: ShiftRecord) => {
