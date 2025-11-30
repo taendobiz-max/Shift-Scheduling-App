@@ -52,6 +52,7 @@ const Reports: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reports, setReports] = useState<EmployeeReport[]>([]);
+  const [selectedOffice, setSelectedOffice] = useState('すべて');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -78,10 +79,16 @@ const Reports: React.FC = () => {
     setIsLoading(true);
     try {
       // Fetch all employees
-      const { data: employees, error: empError } = await supabase
+      let employeeQuery = supabase
         .from('employees')
-        .select('employee_id, name, office')
-        .order('name');
+        .select('employee_id, name, office');
+      
+      // Filter by office if not "u3059u3079u3066"
+      if (selectedOffice !== 'u3059u3079u3066') {
+        employeeQuery = employeeQuery.eq('office', selectedOffice);
+      }
+      
+      const { data: employees, error: empError } = await employeeQuery.order('name');
 
       if (empError) throw empError;
 
@@ -228,6 +235,19 @@ const Reports: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">拠点</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={selectedOffice}
+                onChange={(e) => setSelectedOffice(e.target.value)}
+              >
+                <option value="すべて">すべて</option>
+                <option value="川越">川越</option>
+                <option value="川口">川口</option>
+                <option value="東京">東京</option>
+              </select>
+            </div>
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">開始日</label>
               <Input
