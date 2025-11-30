@@ -26,8 +26,8 @@ interface ShiftRecord {
 
 interface LeaveRecord {
   employee_id: string;
-  leave_date: string;
-  leave_type: string;
+  vacation_date: string;
+  reason: string;
 }
 
 interface EmployeeReport {
@@ -88,10 +88,10 @@ const Reports: React.FC = () => {
 
       // Fetch leave requests in the date range
       const { data: leaves, error: leaveError } = await supabase
-        .from('leave_requests')
-        .select('employee_id, leave_date, leave_type')
-        .gte('leave_date', startDate)
-        .lte('leave_date', endDate)
+        .from('vacation_masters')
+        .select('employee_id, vacation_date, reason')
+        .gte('vacation_date', startDate)
+        .lte('vacation_date', endDate)
         .eq('status', 'approved');
 
       if (leaveError) throw leaveError;
