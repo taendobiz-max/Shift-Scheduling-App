@@ -15,13 +15,21 @@ interface Employee {
 }
 
 interface ShiftRecord {
-  id: string;
+  id: number;
   employee_id: string;
-  employee_name: string;
+  business_master_id: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  location: string;
   business_name: string;
+}
+
+interface BusinessMaster {
+  業務id: string;
+  業務名: string;
+  開始時間: string;
+  終了時間: string;
+  早朝手当: string;
+  深夜手当: string;
 }
 
 interface LeaveRecord {
