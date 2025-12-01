@@ -151,12 +151,11 @@ const Reports: React.FC = () => {
         // Calculate leave days
         const leaveDays = empLeaves.length;
 
-        // Calculate allowance count (shifts with specific keywords)
+        // Calculate allowance count (shifts with allowances)
         const allowanceCount = empShifts.filter((s: ShiftRecord) => {
-          const businessName = s.business_name || '';
-          return businessName.includes('深夜') || 
-                 businessName.includes('早朝') || 
-                 businessName.includes('休日');
+          const business = businessMap.get(s.business_master_id);
+          if (!business) return false;
+          return business.早朝手当 === 'あり' || business.深夜手当 === 'あり';
         }).length;
 
         return {
