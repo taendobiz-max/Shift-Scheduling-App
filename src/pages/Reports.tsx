@@ -155,7 +155,7 @@ const Reports: React.FC = () => {
         const allowanceCount = empShifts.filter((s: ShiftRecord) => {
           const business = businessMap.get(s.business_master_id);
           if (!business) return false;
-          return business.早朝手当 === 'あり' || business.深夜手当 === 'あり';
+          return business.早朝手当 === 'true' || business.深夜手当 === 'true';
         }).length;
 
         return {
