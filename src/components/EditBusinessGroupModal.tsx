@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabaseClient';
@@ -10,6 +11,7 @@ import { supabase } from '@/utils/supabaseClient';
 interface BusinessGroup {
   id: string;
   name: string;
+  営業所?: string;
   description?: string;
 }
 
@@ -27,12 +29,14 @@ export const EditBusinessGroupModal: React.FC<EditBusinessGroupModalProps> = ({
   businessGroup,
 }) => {
   const [name, setName] = useState(businessGroup?.name || '');
+  const [office, setOffice] = useState(businessGroup?.営業所 || '川越');
   const [description, setDescription] = useState(businessGroup?.description || '');
   const [isLoading, setIsLoading] = useState(false);
 
   React.useEffect(() => {
     if (businessGroup) {
       setName(businessGroup.name);
+      setOffice(businessGroup.営業所 || '川越');
       setDescription(businessGroup.description || '');
     }
   }, [businessGroup]);
@@ -76,6 +80,7 @@ export const EditBusinessGroupModal: React.FC<EditBusinessGroupModalProps> = ({
         .update({
           name: name.trim(),
           description: description.trim() || null,
+          営業所: office
         })
         .eq('id', businessGroup.id);
 
@@ -125,6 +130,20 @@ export const EditBusinessGroupModal: React.FC<EditBusinessGroupModalProps> = ({
               placeholder="業務グループの説明（任意）"
               rows={3}
             />
+          </div>
+n          <div className="space-y-2">
+            <Label htmlFor="office">営業所 *</Label>
+            <Select value={office} onValueChange={setOffice}>
+              <SelectTrigger>
+                <SelectValue placeholder="営業所を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="川越">川越</SelectItem>
+                <SelectItem value="川口">川口</SelectItem>
+                <SelectItem value="東京">東京</SelectItem>
+                <SelectItem value="本社">本社</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">

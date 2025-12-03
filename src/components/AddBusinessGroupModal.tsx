@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus } from 'lucide-react';
@@ -15,6 +16,7 @@ interface AddBusinessGroupModalProps {
 export const AddBusinessGroupModal: React.FC<AddBusinessGroupModalProps> = ({ onGroupAdded }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
+  const [office, setOffice] = useState('川越');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,7 +30,7 @@ export const AddBusinessGroupModal: React.FC<AddBusinessGroupModalProps> = ({ on
 
     setIsLoading(true);
     try {
-      await addBusinessGroup(groupName, description);
+      await addBusinessGroup(groupName, description, office);
       toast.success(`業務グループ「${groupName}」を追加しました`);
       
       // Reset form and close modal
@@ -76,6 +78,26 @@ export const AddBusinessGroupModal: React.FC<AddBusinessGroupModalProps> = ({ on
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="業務グループの説明を入力してください"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="office">営業所 *</Label>
+            <Select value={office} onValueChange={setOffice}>
+              <SelectTrigger>
+                <SelectValue placeholder="営業所を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="川越">川越</SelectItem>
+                <SelectItem value="川口">川口</SelectItem>
+                <SelectItem value="東京">東京</SelectItem>
+                <SelectItem value="本社">本社</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="hidden">
+            <Textarea
               rows={3}
             />
           </div>

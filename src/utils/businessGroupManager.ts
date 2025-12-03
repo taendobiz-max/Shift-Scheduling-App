@@ -51,7 +51,7 @@ export const initializeBusinessGroupsTable = async (): Promise<void> => {
 };
 
 // Add a new business group
-export const addBusinessGroup = async (groupName: string, description?: string): Promise<boolean> => {
+export const addBusinessGroup = async (groupName: string, description?: string, office?: string): Promise<boolean> => {
   try {
     if (!groupName || !groupName.trim()) {
       throw new Error('Business group name is required');
@@ -62,10 +62,10 @@ export const addBusinessGroup = async (groupName: string, description?: string):
       .insert([
         {
           name: groupName.trim(),
-          description: description?.trim() || null
+          description: description?.trim() || null,
+          営業所: office || '川越'
         }
       ]);
-
     if (error) {
       if (error.code === '23505') { // Unique constraint violation
         throw new Error('この業務グループは既に存在します');

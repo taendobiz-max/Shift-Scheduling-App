@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { 
@@ -53,11 +54,13 @@ interface BusinessGroup {
   name: string;
   description: string;
   created_at: string;
+  営業所?: string;
 }
 
 interface BusinessGroupForm {
   name: string;
   description: string;
+  営業所: string;
 }
 
 // Business Master interfaces (using Japanese column names from actual data)
@@ -101,8 +104,9 @@ export default function MasterDataManagement() {
   const [isBusinessGroupEditing, setIsBusinessGroupEditing] = useState(false);
   const [editingBusinessGroupId, setEditingBusinessGroupId] = useState<string | null>(null);
   const [businessGroupForm, setBusinessGroupForm] = useState<BusinessGroupForm>({
-    name: '',
-    description: '',
+    name: "",
+    description: "",
+    営業所: "川越",
   });
 
   // Business Master state (using Japanese data structure)
@@ -263,6 +267,7 @@ export default function MasterDataManagement() {
       name: group.name,
       description: group.description,
     });
+      営業所: group.営業所 || '川越',
     setEditingBusinessGroupId(group.id);
     setIsBusinessGroupEditing(true);
   };
@@ -293,6 +298,7 @@ export default function MasterDataManagement() {
       name: '',
       description: '',
     });
+      営業所: '川越',
     setEditingBusinessGroupId(null);
     setIsBusinessGroupEditing(false);
   };
@@ -738,102 +744,98 @@ export default function MasterDataManagement() {
 
         {/* Business Groups Tab */}
         <TabsContent value="business-groups" className="space-y-6">
-          {/* Business Groups List with Business Masters */}
           <Card>
             <CardHeader>
-              <CardTitle>業務グループ一覧（業務マスター別表示）</CardTitle>
-              <CardDescription>
-                実際の業務データを業務グループ別に表示します
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                {isBusinessGroupEditing ? <Edit2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                {isBusinessGroupEditing ? '業務グループを編集' : '新しい業務グループを追加'}
+              </CardTitle>
+              <CardDescription>業務グループの情報を入力してください</CardDescription>
             </CardHeader>
             <CardContent>
-              {getGroupedBusinessMasters().length === 0 ? (
+              <form onSubmit={handleBusinessGroupSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="groupName">業務グループ名 *</Label>
+                    <Input id="groupName" value={businessGroupForm.name} onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, name: e.target.value })} placeholder="例: ロジスティード東日本A" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="office">営業所 *</Label>
+                    <Select value={businessGroupForm.営業所} onValueChange={(value) => setBusinessGroupForm({ ...businessGroupForm, 営業所: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="営業所を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="川越">川越</SelectItem>
+                        <SelectItem value="川口">川口</SelectItem>
+                        <SelectItem value="東京">東京</SelectItem>
+                        <SelectItem value="本社">本社</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="groupDescription">説明</Label>
+                  <Textarea id="groupDescription" value={businessGroupForm.description} onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, description: e.target.value })} placeholder="業務グループの説明（任意）" rows={3} />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit">{isBusinessGroupEditing ? '更新' : '追加'}</Button>
+                  {isBusinessGroupEditing && (<Button type="button" variant="outline" onClick={resetBusinessGroupForm}>キャンセル</Button>)}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>業務グループ一覧</CardTitle>
+              <CardDescription>登録されている業務グループの一覧</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isBusinessGroupLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">読み込み中...</p>
+                </div>
+              ) : businessGroups.length === 0 ? (
                 <div className="text-center py-8">
                   <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-muted-foreground">業務データが登録されていません</p>
+                  <p className="text-muted-foreground">業務グループが登録されていません</p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {getGroupedBusinessMasters().map(({ groupName, masters }) => (
-                    <div key={groupName} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-5 w-5 text-blue-600" />
-                          <h4 className="font-medium text-lg">{groupName}</h4>
-                          <Badge variant="outline">
-                            {masters.length}件の業務
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      {/* Business Masters in this group */}
-                      <div className="ml-6 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
-                          <ChevronRight className="h-4 w-4" />
-                          業務一覧
-                        </div>
-                        {masters.map((master) => (
-                          <div key={master.業務id} className="ml-4 p-3 bg-gray-50 rounded border-l-4 border-blue-200">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Briefcase className="h-4 w-4 text-purple-600" />
-                                <span className="font-medium">{master.業務名}</span>
-                                {master.開始時間 && master.終了時間 && (
-                                  <Badge variant="outline" className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {master.開始時間}～{master.終了時間}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleBusinessMasterEdit(master)}
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleBusinessMasterDelete(master.業務id || '')}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>業務グループ名</TableHead>
+                        <TableHead>営業所</TableHead>
+                        <TableHead>説明</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {businessGroups.map((group) => (
+                        <TableRow key={group.id}>
+                          <TableCell className="font-medium">{group.name}</TableCell>
+                          <TableCell>{group.営業所 || '−'}</TableCell>
+                          <TableCell>{group.description || '−'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleBusinessGroupEdit(group)}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleBusinessGroupDelete(group.id)}>
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
                             </div>
-                            <div className="text-xs text-gray-600 space-y-1 ml-6">
-                              {master.業務id && (
-                                <p><strong>業務ID:</strong> {master.業務id}</p>
-                              )}
-                              {master.開始時間 && master.終了時間 && (
-                                <p><strong>拘束時間:</strong> {calculateWorkDuration(master.開始時間, master.終了時間)}</p>
-                              )}
-                              {master.スキルマップ項目名 && (
-                                <p><strong>スキル:</strong> {master.スキルマップ項目名}</p>
-                              )}
-                              {master.早朝手当 && (
-                                <p><strong>早朝手当:</strong> {master.早朝手当}</p>
-                              )}
-                              {master.深夜手当 && (
-                                <p><strong>深夜手当:</strong> {master.深夜手当}</p>
-                              )}
-                              {master.ペア業務id && (
-                                <p><strong>ペア業務:</strong> {master.ペア業務id}</p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* Business Masters Tab */}
         <TabsContent value="business-masters" className="space-y-6">
           {/* Add/Edit Business Master Form */}
           <Card>
