@@ -172,8 +172,7 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }
                   <SelectValue placeholder="スキルレベル" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="◎">◎ (熟練)</SelectItem>
-                  <SelectItem value="○">○ (可能)</SelectItem>
+                  <SelectItem value="○">○ (対応可)</SelectItem>
                   <SelectItem value="△">△ (要支援)</SelectItem>
                 </SelectContent>
               </Select>
