@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { loadEmployeesFromExcel, reloadEmployeesFromExcel, EmployeeMaster, updateEmployeeInSupabase } from '@/utils/employeeExcelLoader';
 import { AddEmployeeModal } from '@/components/AddEmployeeModal';
+import { EmployeeSkillModal } from '@/components/EmployeeSkillModal';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
 
 export default function EmployeeManagement() {
@@ -24,6 +25,8 @@ export default function EmployeeManagement() {
   const [editFormData, setEditFormData] = useState<EmployeeMaster>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
+  const [selectedEmployeeForSkill, setSelectedEmployeeForSkill] = useState<{ id: string; name: string } | null>(null);
 
   // Load data on component mount
   useEffect(() => {
@@ -422,7 +425,7 @@ export default function EmployeeManagement() {
                       </div>
                     ) : (
                       // View Mode
-                      <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center">
                         <div>
                           <div className="font-medium">{employee.name}</div>
                           <div className="text-sm text-muted-foreground">ID: {employee.employee_id}</div>
@@ -441,6 +444,19 @@ export default function EmployeeManagement() {
                         <div>
                           <div className="font-medium">{employee.display_order || 9999}</div>
                           <div className="text-sm text-muted-foreground">表示順</div>
+                        </div>
+                        <div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedEmployeeForSkill({ id: employee.employee_id || '', name: employee.name || '' });
+                              setIsSkillModalOpen(true);
+                            }}
+                          >
+                            <Award className="h-4 w-4 mr-1" />
+                            スキル
+                          </Button>
                         </div>
                         <div className="flex justify-end space-x-2">
                           <Button 
@@ -468,6 +484,19 @@ export default function EmployeeManagement() {
         onClose={() => setIsAddModalOpen(false)}
         onEmployeeAdded={loadData}
       />
+
+      {/* Employee Skill Modal */}
+      {selectedEmployeeForSkill && (
+        <EmployeeSkillModal
+          isOpen={isSkillModalOpen}
+          onClose={() => {
+            setIsSkillModalOpen(false);
+            setSelectedEmployeeForSkill(null);
+          }}
+          employeeId={selectedEmployeeForSkill.id}
+          employeeName={selectedEmployeeForSkill.name}
+        />
+      )}
     </div>
   );
 }
