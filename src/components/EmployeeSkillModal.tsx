@@ -217,10 +217,10 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }
                           <TableCell>
                             {skill ? (
                               <Badge className={getSkillLevelBadgeColor(skill.skill_level)}>
-                                {skill.skill_level}
+                                {skill.skill_level === '○' ? '○ (対応可)' : skill.skill_level === '△' ? '△ (要支援)' : skill.skill_level}
                               </Badge>
                             ) : (
-                              <Badge className="bg-gray-400">対応不可</Badge>
+                              <Badge className="bg-gray-400">✕ (対応不可)</Badge>
                             )}
                           </TableCell>
                           <TableCell>{skill?.skill_name || '−'}</TableCell>
