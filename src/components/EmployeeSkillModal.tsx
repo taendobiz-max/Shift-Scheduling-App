@@ -60,12 +60,13 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }
   const loadBusinessGroups = async () => {
     try {
       const { data, error } = await supabase
-        .from('business_groups')
-        .select('name')
-        .order('name');
+        .from('business_master')
+        .select('業務グループ')
+        .order('業務グループ');
 
       if (error) throw error;
-      setBusinessGroups(data?.map(bg => bg.name) || []);
+      const uniqueGroups = [...new Set(data?.map(bg => bg.業務グループ).filter(Boolean))];
+      setBusinessGroups(uniqueGroups);
     } catch (error) {
       console.error('Error loading business groups:', error);
     }
@@ -191,11 +192,11 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }
           </div>
 
           <div>
-            <h3 className="font-medium mb-3">保有スキル一覧 ({skills.length}件)</h3>
-            {skills.length === 0 ? (
+            <h3 className="font-medium mb-3">業務スキル一覧 (全業務)</h3>
+            {businessGroups.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Award className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>スキルが登録されていません</p>
+                <p>業務グループが見つかりません</p>
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
@@ -209,27 +210,36 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {skills.map((skill) => (
-                      <TableRow key={skill.id}>
-                        <TableCell className="font-medium">{skill.business_group}</TableCell>
-                        <TableCell>
-                          <Badge className={getSkillLevelBadgeColor(skill.skill_level)}>
-                            {skill.skill_level}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{skill.skill_name || '-'}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSkill(skill.id!)}
-                            disabled={isLoading}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {businessGroups.map((group) => {
+                      const skill = skills.find(s => s.business_group === group);
+                      return (
+                        <TableRow key={group}>
+                          <TableCell className="font-medium">{group}</TableCell>
+                          <TableCell>
+                            {skill ? (
+                              <Badge className={getSkillLevelBadgeColor(skill.skill_level)}>
+                                {skill.skill_level}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-gray-400">対応不可</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{skill?.skill_name || '−'}</TableCell>
+                          <TableCell>
+                            {skill && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteSkill(skill.id!)}
+                                disabled={isLoading}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
