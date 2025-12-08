@@ -29,8 +29,8 @@ async function loadSkillMatrixFromDB(employeeIds: string[]): Promise<Map<string,
         const bizGroup = record.business_group;
         const skillLevel = record.skill_level;
         
-        // Only include skills with valid levels
-        if (skillLevel === '経験あり' || skillLevel === '対応可能') {
+        // Only include skills with valid levels (○ or △)
+        if (skillLevel === '○' || skillLevel === '△' || skillLevel === '経験あり' || skillLevel === '対応可能') {
           if (!skillMap.has(empId)) {
             skillMap.set(empId, new Set<string>());
           }

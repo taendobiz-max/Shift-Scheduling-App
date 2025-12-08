@@ -326,13 +326,13 @@ export default function MasterDataManagement() {
       setConnectionError(null);
       
       if (data && data.length > 0) {
-        toast.success(`${data.length}件の業務マスターを読み込みました`);
+        toast.success(`${data.length}件の業務マスタを読み込みました`);
       }
     } catch (error) {
       console.error('💥 Error in loadBusinessMasters:', error);
       const errorMessage = (error as Error).message || '不明なエラー';
-      setConnectionError(`業務マスター読み込みエラー: ${errorMessage}`);
-      toast.error(`業務マスターの読み込みに失敗しました: ${errorMessage}`);
+      setConnectionError(`業務マスタ読み込みエラー: ${errorMessage}`);
+      toast.error(`業務マスタの読み込みに失敗しました: ${errorMessage}`);
       setBusinessMasters([]); // Set empty array as fallback
     } finally {
       setIsBusinessMasterLoading(false);
@@ -356,7 +356,7 @@ export default function MasterDataManagement() {
           .eq('業務id', editingBusinessMasterId);
 
         if (error) throw error;
-        toast.success('業務マスターを更新しました');
+        toast.success('業務マスタを更新しました');
       } else {
         // Create new business master
         // Generate a unique business ID
@@ -374,14 +374,14 @@ export default function MasterDataManagement() {
           .insert([newBusinessMaster]);
 
         if (error) throw error;
-        toast.success('業務マスターを作成しました');
+        toast.success('業務マスタを作成しました');
       }
 
       resetBusinessMasterForm();
       await loadBusinessMasters();
     } catch (error) {
       console.error('Error saving business master:', error);
-      toast.error(`業務マスターの保存に失敗しました: ${(error as Error).message}`);
+      toast.error(`業務マスタの保存に失敗しました: ${(error as Error).message}`);
     }
   };
 
@@ -401,7 +401,7 @@ export default function MasterDataManagement() {
   };
 
   const handleBusinessMasterDelete = async (id: string) => {
-    if (!confirm('この業務マスターを削除しますか？')) {
+    if (!confirm('この業務マスタを削除しますか？')) {
       return;
     }
 
@@ -413,11 +413,11 @@ export default function MasterDataManagement() {
 
       if (error) throw error;
 
-      toast.success('業務マスターを削除しました');
+      toast.success('業務マスタを削除しました');
       await loadBusinessMasters();
     } catch (error) {
       console.error('Error deleting business master:', error);
-      toast.error(`業務マスターの削除に失敗しました: ${(error as Error).message}`);
+      toast.error(`業務マスタの削除に失敗しました: ${(error as Error).message}`);
     }
   };
 
@@ -635,7 +635,7 @@ export default function MasterDataManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">マスタデータ管理</h1>
-          <p className="text-muted-foreground mt-2">業務グループ・業務マスター・制約条件の管理</p>
+          <p className="text-muted-foreground mt-2">業務グループ・業務マスタ・制約条件の管理</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={loadAllData} variant="outline">
@@ -683,7 +683,7 @@ export default function MasterDataManagement() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center">
               <Briefcase className="h-4 w-4 mr-2" />
-              業務マスター数
+              業務マスタ数
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -730,7 +730,7 @@ export default function MasterDataManagement() {
           </TabsTrigger>
           <TabsTrigger value="business-masters" className="flex items-center gap-2">
             <Briefcase className="h-4 w-4" />
-            業務マスター
+            業務マスタ
           </TabsTrigger>
           <TabsTrigger value="constraints" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -842,7 +842,7 @@ export default function MasterDataManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {isBusinessMasterEditing ? <Edit2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                {isBusinessMasterEditing ? '業務マスターを編集' : '新しい業務マスターを追加'}
+                {isBusinessMasterEditing ? '業務マスタを編集' : '新しい業務マスタを追加'}
               </CardTitle>
               <CardDescription>
                 業務の詳細情報（拘束時間等）を入力してください
@@ -950,11 +950,11 @@ export default function MasterDataManagement() {
           {/* Business Masters List */}
           <Card>
             <CardHeader>
-              <CardTitle>業務マスター一覧</CardTitle>
+              <CardTitle>業務マスタ一覧</CardTitle>
               <CardDescription>
                 {businessMasters.length > 0 
-                  ? `${businessMasters.length}件の業務マスターが登録されています`
-                  : '業務マスターが登録されていません'
+                  ? `${businessMasters.length}件の業務マスタが登録されています`
+                  : '業務マスタが登録されていません'
                 }
               </CardDescription>
             </CardHeader>
@@ -962,9 +962,9 @@ export default function MasterDataManagement() {
               {businessMasters.length === 0 ? (
                 <div className="text-center py-8">
                   <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-muted-foreground">業務マスターが登録されていません</p>
+                  <p className="text-muted-foreground">業務マスタが登録されていません</p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    上記のフォームから業務マスターを追加してください
+                    上記のフォームから業務マスタを追加してください
                   </p>
                 </div>
               ) : (
