@@ -39,7 +39,7 @@ export function SkillMatrixGrid({ isLoading, onDataChange, onEmployeeClick, sele
       
       const [employeesData, groups] = await Promise.all([
         getEmployeesWithSkills(),
-        getSkillMatrixBusinessGroups()
+        getSkillMatrixBusinessGroups(selectedOffice)
       ]);
       
       // Filter by selected office if specified

@@ -222,17 +222,30 @@ export const getEmployeeSkillSummary = async (): Promise<EmployeeSkillSummary[]>
   }
 };
 
-// Get all unique business groups from skill matrix
-export const getSkillMatrixBusinessGroups = async (): Promise<string[]> => {
+// Get all unique business groups from skill matrix, optionally filtered by office
+export const getSkillMatrixBusinessGroups = async (office?: string): Promise<string[]> => {
   try {
-    const skillMatrixData = await loadSkillMatrixData();
-    const businessGroups = skillMatrixData
-      .map(record => record.business_group)
-      .filter(Boolean)
-      .filter((value, index, self) => self.indexOf(value) === index)
-      .sort();
+    // Get business groups from business_groups table with office information
+    let query = supabase
+      .from('business_groups')
+      .select('name, 営業所')
+      .order('name');
     
-    console.log(`✅ Found ${businessGroups.length} unique business groups in skill matrix`);
+    // Apply office filter if specified
+    if (office && office !== 'all') {
+      query = query.eq('営業所', office);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('❌ Error loading business groups:', error);
+      throw error;
+    }
+    
+    const businessGroups = data.map(bg => bg.name).filter(Boolean);
+    
+    console.log(`✅ Found ${businessGroups.length} business groups${office && office !== 'all' ? ` for office: ${office}` : ''}`);
     return businessGroups;
   } catch (error) {
     console.error('💥 Error in getSkillMatrixBusinessGroups:', error);
