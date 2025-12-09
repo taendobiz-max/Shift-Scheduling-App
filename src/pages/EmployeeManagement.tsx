@@ -28,7 +28,7 @@ export default function EmployeeManagement() {
   const [isSaving, setIsSaving] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-  const [selectedEmployeeForSkill, setSelectedEmployeeForSkill] = useState<{ id: string; name: string } | null>(null);
+  const [selectedEmployeeForSkill, setSelectedEmployeeForSkill] = useState<{ id: string; name: string; office?: string } | null>(null);
   const [activeTab, setActiveTab] = useState('employees');
 
   // Load data on component mount
@@ -467,7 +467,7 @@ export default function EmployeeManagement() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              setSelectedEmployeeForSkill({ id: employee.employee_id || '', name: employee.name || '' });
+                              setSelectedEmployeeForSkill({ id: employee.employee_id || '', name: employee.name || '', office: employee.office });
                               setIsSkillModalOpen(true);
                             }}
                           >
@@ -501,7 +501,7 @@ export default function EmployeeManagement() {
             isLoading={isLoading} 
             onDataChange={loadData}
             onEmployeeClick={(employee) => {
-              setSelectedEmployeeForSkill({ id: employee.employee_id, name: employee.name });
+              setSelectedEmployeeForSkill({ id: employee.employee_id, name: employee.name, office: employee.office });
               setIsSkillModalOpen(true);
             }}
             selectedOffice={selectedOffice}
@@ -526,6 +526,7 @@ export default function EmployeeManagement() {
           }}
           employeeId={selectedEmployeeForSkill.id}
           employeeName={selectedEmployeeForSkill.name}
+          employeeOffice={selectedEmployeeForSkill.office}
         />
       )}
     </div>

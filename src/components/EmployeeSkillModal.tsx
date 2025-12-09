@@ -22,9 +22,10 @@ interface EmployeeSkillModalProps {
   onClose: () => void;
   employeeId: string;
   employeeName: string;
+  employeeOffice?: string;
 }
 
-export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }: EmployeeSkillModalProps) {
+export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, employeeOffice }: EmployeeSkillModalProps) {
   const [skills, setSkills] = useState<EmployeeSkill[]>([]);
   const [businessGroups, setBusinessGroups] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,14 +60,23 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName }
 
   const loadBusinessGroups = async () => {
     try {
-      const { data, error } = await supabase
-        .from('business_master')
-        .select('業務グループ')
-        .order('業務グループ');
+      // Get business groups from business_groups table, filtered by employee's office
+      let query = supabase
+        .from('business_groups')
+        .select('name')
+        .order('name');
+      
+      // Apply office filter if employee office is specified
+      if (employeeOffice) {
+        query = query.eq('営業所', employeeOffice);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
-      const uniqueGroups = [...new Set(data?.map(bg => bg.業務グループ).filter(Boolean))];
-      setBusinessGroups(uniqueGroups);
+      const groups = data?.map(bg => bg.name).filter(Boolean) || [];
+      setBusinessGroups(groups);
+      console.log(`✅ Loaded ${groups.length} business groups for office: ${employeeOffice || 'all'}`);
     } catch (error) {
       console.error('Error loading business groups:', error);
     }
