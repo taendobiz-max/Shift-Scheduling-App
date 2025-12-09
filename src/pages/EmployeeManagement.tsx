@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { loadEmployeesFromExcel, reloadEmployeesFromExcel, EmployeeMaster, updat
 import { AddEmployeeModal } from '@/components/AddEmployeeModal';
 import { EmployeeSkillModal } from '@/components/EmployeeSkillModal';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
+import { SkillMatrixGrid } from '@/components/SkillMatrixGrid';
 
 export default function EmployeeManagement() {
   const [employees, setEmployees] = useState<EmployeeMaster[]>([]);
@@ -27,6 +29,7 @@ export default function EmployeeManagement() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [selectedEmployeeForSkill, setSelectedEmployeeForSkill] = useState<{ id: string; name: string } | null>(null);
+  const [activeTab, setActiveTab] = useState('employees');
 
   // Load data on component mount
   useEffect(() => {
@@ -315,8 +318,22 @@ export default function EmployeeManagement() {
         </CardContent>
       </Card>
 
-      {/* Employee List */}
-      <Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="employees">
+            <Users className="h-4 w-4 mr-2" />
+            従業員一覧
+          </TabsTrigger>
+          <TabsTrigger value="skills">
+            <Award className="h-4 w-4 mr-2" />
+            スキル一覧
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="employees" className="space-y-6">
+          {/* Employee List */}
+          <Card>
         <CardHeader>
           <CardTitle>従業員一覧</CardTitle>
           <CardDescription>
@@ -435,11 +452,11 @@ export default function EmployeeManagement() {
                           <div className="text-sm text-muted-foreground">営業所</div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <Checkbox
-                            checked={employee.roll_call_capable || employee.roll_call_duty === '1'}
-                            onCheckedChange={() => handleQuickToggleRollCall(employee)}
-                          />
-                          <span className="text-sm">点呼対応</span>
+                          {employee.roll_call_capable || employee.roll_call_duty === '1' ? (
+                            <Badge className="bg-green-500">点呼対応可</Badge>
+                          ) : (
+                            <Badge className="bg-gray-400">点呼対応不可</Badge>
+                          )}
                         </div>
                         <div>
                           <div className="font-medium">{employee.display_order || 9999}</div>
@@ -477,6 +494,20 @@ export default function EmployeeManagement() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="skills" className="space-y-6">
+          <SkillMatrixGrid 
+            isLoading={isLoading} 
+            onDataChange={loadData}
+            onEmployeeClick={(employee) => {
+              setSelectedEmployeeForSkill({ id: employee.employee_id, name: employee.name });
+              setIsSkillModalOpen(true);
+            }}
+            selectedOffice={selectedOffice}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Add Employee Modal */}
       <AddEmployeeModal

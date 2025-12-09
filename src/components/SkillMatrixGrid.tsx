@@ -14,9 +14,11 @@ import {
 interface SkillMatrixGridProps {
   isLoading: boolean;
   onDataChange?: () => void;
+  onEmployeeClick?: (employee: EmployeeWithSkills) => void;
+  selectedOffice?: string;
 }
 
-export function SkillMatrixGrid({ isLoading, onDataChange }: SkillMatrixGridProps) {
+export function SkillMatrixGrid({ isLoading, onDataChange, onEmployeeClick, selectedOffice }: SkillMatrixGridProps) {
   const [employeesWithSkills, setEmployeesWithSkills] = useState<EmployeeWithSkills[]>([]);
   const [businessGroups, setBusinessGroups] = useState<string[]>([]);
   const [isLoadingMatrix, setIsLoadingMatrix] = useState(true);
@@ -25,6 +27,10 @@ export function SkillMatrixGrid({ isLoading, onDataChange }: SkillMatrixGridProp
   useEffect(() => {
     loadMatrixData();
   }, []);
+
+  useEffect(() => {
+    loadMatrixData();
+  }, [selectedOffice]);
 
   const loadMatrixData = async () => {
     setIsLoadingMatrix(true);
@@ -36,7 +42,12 @@ export function SkillMatrixGrid({ isLoading, onDataChange }: SkillMatrixGridProp
         getSkillMatrixBusinessGroups()
       ]);
       
-      setEmployeesWithSkills(employeesData);
+      // Filter by selected office if specified
+      const filteredEmployees = selectedOffice && selectedOffice !== 'all'
+        ? employeesData.filter(emp => emp.office === selectedOffice)
+        : employeesData;
+      
+      setEmployeesWithSkills(filteredEmployees);
       setBusinessGroups(groups);
       
       console.log(`✅ Matrix loaded: ${employeesData.length} employees (sorted by ID), ${groups.length} business groups`);
