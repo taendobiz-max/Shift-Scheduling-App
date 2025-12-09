@@ -24,6 +24,7 @@ export interface EmployeeSkillSummary {
 export interface EmployeeWithSkills {
   employee_id: string;
   employee_name: string;
+  office: string;
   skills: Set<string>;
   skillCount: number;
 }
@@ -35,7 +36,8 @@ export const loadEmployeeData = async () => {
     const employees = await loadEmployeesFromExcel();
     return employees.map(emp => ({
       employee_id: emp.employee_id || '',
-      employee_name: emp.name || emp.employee_id || ''
+      employee_name: emp.name || emp.employee_id || '',
+      office: emp.office || ''
     })).filter(emp => emp.employee_id); // Filter out entries without employee_id
   } catch (error) {
     console.error('Error loading employee data:', error);
@@ -80,7 +82,10 @@ export const getEmployeesWithSkills = async (): Promise<EmployeeWithSkills[]> =>
     const employeeMap = new Map();
     employeeData.forEach(emp => {
       if (emp.employee_id) {
-        employeeMap.set(emp.employee_id, emp.employee_name || emp.employee_id);
+        employeeMap.set(emp.employee_id, {
+          name: emp.employee_name || emp.employee_id,
+          office: emp.office || ''
+        });
       }
     });
     
@@ -101,10 +106,11 @@ export const getEmployeesWithSkills = async (): Promise<EmployeeWithSkills[]> =>
     
     // First, add employees who have skills
     employeeSkillsMap.forEach((skills, employeeId) => {
-      const employeeName = employeeMap.get(employeeId) || employeeId;
+      const employeeInfo = employeeMap.get(employeeId) || { name: employeeId, office: '' };
       result.push({
         employee_id: employeeId,
-        employee_name: employeeName,
+        employee_name: employeeInfo.name,
+        office: employeeInfo.office,
         skills: skills,
         skillCount: skills.size
       });
@@ -116,6 +122,7 @@ export const getEmployeesWithSkills = async (): Promise<EmployeeWithSkills[]> =>
         result.push({
           employee_id: emp.employee_id,
           employee_name: emp.employee_name,
+          office: emp.office || '',
           skills: new Set(),
           skillCount: 0
         });
