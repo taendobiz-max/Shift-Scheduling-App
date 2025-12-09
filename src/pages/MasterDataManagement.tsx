@@ -67,6 +67,7 @@ interface BusinessGroupForm {
 interface BusinessMaster {
   業務id?: string;
   業務名?: string;           // 例: "ちふれ①朝の送迎業務"
+  営業所?: string;           // 例: "川越"
   開始時間?: string;         // 例: "08:00"
   終了時間?: string;         // 例: "17:00"
   業務グループ?: string;     // 業務の分類
@@ -80,6 +81,7 @@ interface BusinessMaster {
 
 interface BusinessMasterForm {
   業務名: string;
+  営業所: string;
   業務グループ: string;
   開始時間: string;
   終了時間: string;
@@ -116,6 +118,7 @@ export default function MasterDataManagement() {
   const [editingBusinessMasterId, setEditingBusinessMasterId] = useState<string | null>(null);
   const [businessMasterForm, setBusinessMasterForm] = useState<BusinessMasterForm>({
     業務名: '',
+    営業所: '',
     業務グループ: '',
     開始時間: '',
     終了時間: '',
@@ -388,6 +391,7 @@ export default function MasterDataManagement() {
   const handleBusinessMasterEdit = (master: BusinessMaster) => {
     setBusinessMasterForm({
       業務名: master.業務名 || '',
+      営業所: master.営業所 || '',
       業務グループ: master.業務グループ || '',
       開始時間: master.開始時間 || '',
       終了時間: master.終了時間 || '',
@@ -424,6 +428,7 @@ export default function MasterDataManagement() {
   const resetBusinessMasterForm = () => {
     setBusinessMasterForm({
       業務名: '',
+      営業所: '',
       業務グループ: '',
       開始時間: '',
       終了時間: '',
@@ -862,13 +867,46 @@ export default function MasterDataManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="業務グループ">業務グループ</Label>
-                    <Input
-                      id="業務グループ"
+                    <Label htmlFor="営業所">営業所 *</Label>
+                    <Select
+                      value={businessMasterForm.営業所}
+                      onValueChange={(value) => {
+                        setBusinessMasterForm({ ...businessMasterForm, 営業所: value, 業務グループ: '' });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="営業所を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="川越">川越</SelectItem>
+                        <SelectItem value="川口">川口</SelectItem>
+                        <SelectItem value="東京">東京</SelectItem>
+                        <SelectItem value="本社">本社</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="業務グループ">業務グループ *</Label>
+                    <Select
                       value={businessMasterForm.業務グループ}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 業務グループ: e.target.value })}
-                      placeholder="例: 送迎業務"
-                    />
+                      onValueChange={(value) => setBusinessMasterForm({ ...businessMasterForm, 業務グループ: value })}
+                      disabled={!businessMasterForm.営業所}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          businessMasterForm.営業所 
+                            ? "業務グループを選択" 
+                            : "まず営業所を選択してください"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {businessGroups
+                          .filter(bg => bg.営業所 === businessMasterForm.営業所)
+                          .map(bg => (
+                            <SelectItem key={bg.id} value={bg.name}>{bg.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
