@@ -18,6 +18,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
     employee_id: '',
     name: '',
     office: '',
+    班: '',
     roll_call_duty: '',
     display_order: 9999
   });
@@ -63,6 +64,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
       employee_id: '',
       name: '',
       office: '',
+      班: '',
       roll_call_duty: '',
       display_order: 9999
     });
@@ -101,22 +103,51 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="office">営業所</Label>
-            <Select
-              value={formData.office}
-              onValueChange={(value) => handleInputChange('office', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="営業所を選択" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="川越">川越</SelectItem>
-                <SelectItem value="東京">東京</SelectItem>
-                <SelectItem value="川口">川口</SelectItem>
-                <SelectItem value="その他">その他</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="office">営業所</Label>
+              <Select
+                value={formData.office}
+                onValueChange={(value) => {
+                  handleInputChange('office', value);
+                  // 営業所が東京以外の場合は班をクリア
+                  if (value !== '東京') {
+                    handleInputChange('班', '');
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="営業所を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="川越">川越</SelectItem>
+                  <SelectItem value="東京">東京</SelectItem>
+                  <SelectItem value="川口">川口</SelectItem>
+                  <SelectItem value="その他">その他</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="班">班（東京のみ）</Label>
+              <Select
+                value={formData.班}
+                onValueChange={(value) => handleInputChange('班', value)}
+                disabled={formData.office !== '東京'}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    formData.office === '東京' 
+                      ? "班を選択" 
+                      : "東京営業所のみ"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Galaxy">Galaxy</SelectItem>
+                  <SelectItem value="Aube">Aube</SelectItem>
+                  <SelectItem value="無し">無し</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4">

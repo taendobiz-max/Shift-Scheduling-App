@@ -5,6 +5,7 @@ export interface EmployeeMaster {
   employee_id?: string;
   name?: string;
   office?: string;
+  班?: string; // 東京営業所のみ：Galaxy、Aube、無し
   roll_call_duty?: string;
   roll_call_capable?: boolean; // New field for roll call capability
   [key: string]: unknown;
