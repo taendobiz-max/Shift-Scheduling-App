@@ -383,7 +383,13 @@ export default function EmployeeManagement() {
                             <label className="text-sm font-medium">営業所</label>
                             <Select
                               value={editFormData.office || ''}
-                              onValueChange={(value) => handleEditFormChange('office', value)}
+                              onValueChange={(value) => {
+                                handleEditFormChange('office', value);
+                                // 営業所が東京以外の場合は班をクリア
+                                if (value !== '東京') {
+                                  handleEditFormChange('班', '');
+                                }
+                              }}
                             >
                               <SelectTrigger className="mt-1">
                                 <SelectValue placeholder="営業所を選択" />
@@ -393,6 +399,27 @@ export default function EmployeeManagement() {
                                 <SelectItem value="東京">東京</SelectItem>
                                 <SelectItem value="川口">川口</SelectItem>
                                 <SelectItem value="その他">その他</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">班（東京のみ）</label>
+                            <Select
+                              value={editFormData.班 || ''}
+                              onValueChange={(value) => handleEditFormChange('班', value)}
+                              disabled={editFormData.office !== '東京'}
+                            >
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder={
+                                  editFormData.office === '東京' 
+                                    ? "班を選択" 
+                                    : "東京営業所のみ"
+                                } />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Galaxy">Galaxy</SelectItem>
+                                <SelectItem value="Aube">Aube</SelectItem>
+                                <SelectItem value="無し">無し</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
