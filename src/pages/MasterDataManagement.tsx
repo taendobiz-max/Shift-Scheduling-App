@@ -81,6 +81,7 @@ interface BusinessMaster {
 }
 
 interface BusinessMasterForm {
+  業務id: string;
   業務名: string;
   営業所: string;
   業務グループ: string;
@@ -118,7 +119,9 @@ export default function MasterDataManagement() {
   const [isBusinessMasterLoading, setIsBusinessMasterLoading] = useState(true);
   const [isBusinessMasterEditing, setIsBusinessMasterEditing] = useState(false);
   const [editingBusinessMasterId, setEditingBusinessMasterId] = useState<string | null>(null);
+  const [isBusinessMasterModalOpen, setIsBusinessMasterModalOpen] = useState(false);
   const [businessMasterForm, setBusinessMasterForm] = useState<BusinessMasterForm>({
+    業務id: '',
     業務名: '',
     営業所: '',
     業務グループ: '',
@@ -377,10 +380,8 @@ export default function MasterDataManagement() {
         toast.success('業務マスタを更新しました');
       } else {
         // Create new business master
-        // Generate a unique business ID
-        const timestamp = Date.now();
-        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-        const newBusinessId = `BIZ${timestamp}${randomSuffix}`;
+        // Use provided ID or generate a unique business ID
+        const newBusinessId = businessMasterForm.業務id || `BIZ${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
         
         const newBusinessMaster = {
           ...businessMasterForm,
@@ -397,6 +398,7 @@ export default function MasterDataManagement() {
 
       resetBusinessMasterForm();
       await loadBusinessMasters();
+      setIsBusinessMasterModalOpen(false);
     } catch (error) {
       console.error('Error saving business master:', error);
       toast.error(`業務マスタの保存に失敗しました: ${(error as Error).message}`);
@@ -405,6 +407,7 @@ export default function MasterDataManagement() {
 
   const handleBusinessMasterEdit = (master: BusinessMaster) => {
     setBusinessMasterForm({
+      業務id: master.業務id || '',
       業務名: master.業務名 || '',
       営業所: master.営業所 || '',
       業務グループ: master.業務グループ || '',
@@ -417,6 +420,25 @@ export default function MasterDataManagement() {
     });
     setEditingBusinessMasterId(master.業務id || null);
     setIsBusinessMasterEditing(true);
+    setIsBusinessMasterModalOpen(true);
+  };
+
+  const handleBusinessMasterAdd = () => {
+    setBusinessMasterForm({
+      業務id: '',
+      業務名: '',
+      営業所: '',
+      業務グループ: '',
+      開始時間: '',
+      終了時間: '',
+      早朝手当: '',
+      深夜手当: '',
+      スキルマップ項目名: '',
+      ペア業務id: '',
+    });
+    setEditingBusinessMasterId(null);
+    setIsBusinessMasterEditing(false);
+    setIsBusinessMasterModalOpen(true);
   };
 
   const handleBusinessMasterDelete = async (id: string) => {
@@ -824,159 +846,24 @@ export default function MasterDataManagement() {
           </Card>
         </TabsContent>
         <TabsContent value="business-masters" className="space-y-6">
-          {/* Add/Edit Business Master Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {isBusinessMasterEditing ? <Edit2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                {isBusinessMasterEditing ? '業務マスタを編集' : '新しい業務マスタを追加'}
-              </CardTitle>
-              <CardDescription>
-                業務の詳細情報（拘束時間等）を入力してください
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleBusinessMasterSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="業務名">業務名 *</Label>
-                    <Input
-                      id="業務名"
-                      value={businessMasterForm.業務名}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 業務名: e.target.value })}
-                      placeholder="例: ちふれ①朝の送迎業務"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="営業所">営業所 *</Label>
-                    <Select
-                      value={businessMasterForm.営業所}
-                      onValueChange={(value) => {
-                        setBusinessMasterForm({ ...businessMasterForm, 営業所: value, 業務グループ: '' });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="営業所を選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="川越">川越</SelectItem>
-                        <SelectItem value="川口">川口</SelectItem>
-                        <SelectItem value="東京">東京</SelectItem>
-                        <SelectItem value="本社">本社</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="業務グループ">業務グループ *</Label>
-                    <Select
-                      value={businessMasterForm.業務グループ}
-                      onValueChange={(value) => setBusinessMasterForm({ ...businessMasterForm, 業務グループ: value })}
-                      disabled={!businessMasterForm.営業所}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          businessMasterForm.営業所 
-                            ? "業務グループを選択" 
-                            : "まず営業所を選択してください"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {businessGroups
-                          .filter(bg => bg.営業所 === businessMasterForm.営業所)
-                          .map(bg => (
-                            <SelectItem key={bg.id} value={bg.name}>{bg.name}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="開始時間">開始時間</Label>
-                    <Input
-                      id="開始時間"
-                      type="time"
-                      value={businessMasterForm.開始時間}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 開始時間: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="終了時間">終了時間</Label>
-                    <Input
-                      id="終了時間"
-                      type="time"
-                      value={businessMasterForm.終了時間}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 終了時間: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="早朝手当">早朝手当</Label>
-                    <Input
-                      id="早朝手当"
-                      value={businessMasterForm.早朝手当}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 早朝手当: e.target.value })}
-                      placeholder="例: 500円"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="深夜手当">深夜手当</Label>
-                    <Input
-                      id="深夜手当"
-                      value={businessMasterForm.深夜手当}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 深夜手当: e.target.value })}
-                      placeholder="例: 1000円"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="スキルマップ項目名">スキルマップ項目名</Label>
-                    <Input
-                      id="スキルマップ項目名"
-                      value={businessMasterForm.スキルマップ項目名}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, スキルマップ項目名: e.target.value })}
-                      placeholder="例: 運転技能"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ペア業務id">ペア業務ID</Label>
-                    <Input
-                      id="ペア業務id"
-                      value={businessMasterForm.ペア業務id}
-                      onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
-                      placeholder="例: B002"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="submit">
-                    <Save className="h-4 w-4 mr-2" />
-                    {isBusinessMasterEditing ? '更新' : '作成'}
-                  </Button>
-                  {isBusinessMasterEditing && (
-                    <Button type="button" variant="outline" onClick={resetBusinessMasterForm}>
-                      <X className="h-4 w-4 mr-2" />
-                      キャンセル
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
           {/* Business Masters List */}
           <Card>
             <CardHeader>
-              <CardTitle>業務マスタ一覧</CardTitle>
-              <CardDescription>
-                {businessMasters.length > 0 
-                  ? `${businessMasters.length}件の業務マスタが登録されています`
-                  : '業務マスタが登録されていません'
-                }
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>業務マスタ一覧</CardTitle>
+                  <CardDescription>
+                    {businessMasters.length > 0 
+                      ? `${businessMasters.length}件の業務マスタが登録されています`
+                      : '業務マスタが登録されていません'
+                    }
+                  </CardDescription>
+                </div>
+                <Button onClick={handleBusinessMasterAdd}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  新規作成
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {businessMasters.length === 0 ? (
@@ -1424,6 +1311,157 @@ export default function MasterDataManagement() {
                 キャンセル
               </Button>
               <Button type="submit">{isBusinessGroupEditing ? '更新' : '追加'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Business Master Modal */}
+      <Dialog open={isBusinessMasterModalOpen} onOpenChange={setIsBusinessMasterModalOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {isBusinessMasterEditing ? '業務マスタを編集' : '新しい業務マスタを追加'}
+            </DialogTitle>
+            <DialogDescription>
+              業務の詳細情報（拘束時間等）を入力してください
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleBusinessMasterSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="業務id">業務ID</Label>
+                <Input
+                  id="業務id"
+                  value={businessMasterForm.業務id}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 業務id: e.target.value })}
+                  placeholder="例: B001（空欄の場合は自動生成）"
+                  disabled={isBusinessMasterEditing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="業務名">業務名 *</Label>
+                <Input
+                  id="業務名"
+                  value={businessMasterForm.業務名}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 業務名: e.target.value })}
+                  placeholder="例: ちふれ①朝の送迎業務"
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="営業所">営業所 *</Label>
+                <Select
+                  value={businessMasterForm.営業所}
+                  onValueChange={(value) => {
+                    setBusinessMasterForm({ ...businessMasterForm, 営業所: value, 業務グループ: '' });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="営業所を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="川越">川越</SelectItem>
+                    <SelectItem value="川口">川口</SelectItem>
+                    <SelectItem value="東京">東京</SelectItem>
+                    <SelectItem value="本社">本社</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="業務グループ">業務グループ *</Label>
+                <Select
+                  value={businessMasterForm.業務グループ}
+                  onValueChange={(value) => setBusinessMasterForm({ ...businessMasterForm, 業務グループ: value })}
+                  disabled={!businessMasterForm.営業所}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      businessMasterForm.営業所 
+                        ? "業務グループを選択" 
+                        : "まず営業所を選択してください"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {businessGroups
+                      .filter(bg => bg.営業所 === businessMasterForm.営業所)
+                      .map(bg => (
+                        <SelectItem key={bg.id} value={bg.name}>{bg.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="開始時間">開始時間</Label>
+                <Input
+                  id="開始時間"
+                  type="time"
+                  value={businessMasterForm.開始時間}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 開始時間: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="終了時間">終了時間</Label>
+                <Input
+                  id="終了時間"
+                  type="time"
+                  value={businessMasterForm.終了時間}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 終了時間: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="早朝手当">早朝手当</Label>
+                <Input
+                  id="早朝手当"
+                  value={businessMasterForm.早朝手当}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 早朝手当: e.target.value })}
+                  placeholder="例: 500円"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="深夜手当">深夜手当</Label>
+                <Input
+                  id="深夜手当"
+                  value={businessMasterForm.深夜手当}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 深夜手当: e.target.value })}
+                  placeholder="例: 1000円"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="スキルマップ項目名">スキルマップ項目名</Label>
+                <Input
+                  id="スキルマップ項目名"
+                  value={businessMasterForm.スキルマップ項目名}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, スキルマップ項目名: e.target.value })}
+                  placeholder="例: 運転技能"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ペア業務id">ペア業務ID</Label>
+                <Input
+                  id="ペア業務id"
+                  value={businessMasterForm.ペア業務id}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
+                  placeholder="例: B002"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsBusinessMasterModalOpen(false)}>
+                キャンセル
+              </Button>
+              <Button type="submit">
+                <Save className="h-4 w-4 mr-2" />
+                {isBusinessMasterEditing ? '更新' : '作成'}
+              </Button>
             </div>
           </form>
         </DialogContent>
