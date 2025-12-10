@@ -148,6 +148,7 @@ export default function EmployeeManagement() {
       const updateData: EmployeeMaster = {
         name: editFormData.name,
         office: editFormData.office,
+        班: editFormData.班,
         display_order: editFormData.display_order,
         roll_call_capable: editFormData.roll_call_capable || false,
         roll_call_duty: editFormData.roll_call_duty || '0'
