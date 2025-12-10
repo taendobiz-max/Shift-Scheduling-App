@@ -47,6 +47,7 @@ import {
 } from '@/types/constraint';
 import { loadEmployeesFromExcel } from '@/utils/employeeExcelLoader';
 import ConstraintGroupManagement from './ConstraintGroupManagement';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // Business Group interfaces
 interface BusinessGroup {
@@ -105,6 +106,7 @@ export default function MasterDataManagement() {
   const [isBusinessGroupLoading, setIsBusinessGroupLoading] = useState(true);
   const [isBusinessGroupEditing, setIsBusinessGroupEditing] = useState(false);
   const [editingBusinessGroupId, setEditingBusinessGroupId] = useState<string | null>(null);
+  const [isBusinessGroupModalOpen, setIsBusinessGroupModalOpen] = useState(false);
   const [businessGroupForm, setBusinessGroupForm] = useState<BusinessGroupForm>({
     name: "",
     description: "",
@@ -259,6 +261,7 @@ export default function MasterDataManagement() {
 
       resetBusinessGroupForm();
       await loadBusinessGroups();
+      setIsBusinessGroupModalOpen(false);
     } catch (error) {
       console.error('Error saving business group:', error);
       toast.error(`業務グループの保存に失敗しました: ${(error as Error).message}`);
@@ -269,10 +272,22 @@ export default function MasterDataManagement() {
     setBusinessGroupForm({
       name: group.name,
       description: group.description,
-    });
       営業所: group.営業所 || '川越',
+    });
     setEditingBusinessGroupId(group.id);
     setIsBusinessGroupEditing(true);
+    setIsBusinessGroupModalOpen(true);
+  };
+
+  const handleBusinessGroupAdd = () => {
+    setBusinessGroupForm({
+      name: '',
+      description: '',
+      営業所: '川越',
+    });
+    setEditingBusinessGroupId(null);
+    setIsBusinessGroupEditing(false);
+    setIsBusinessGroupModalOpen(true);
   };
 
   const handleBusinessGroupDelete = async (id: string) => {
@@ -751,49 +766,16 @@ export default function MasterDataManagement() {
         <TabsContent value="business-groups" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {isBusinessGroupEditing ? <Edit2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                {isBusinessGroupEditing ? '業務グループを編集' : '新しい業務グループを追加'}
-              </CardTitle>
-              <CardDescription>業務グループの情報を入力してください</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleBusinessGroupSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="groupName">業務グループ名 *</Label>
-                    <Input id="groupName" value={businessGroupForm.name} onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, name: e.target.value })} placeholder="例: ロジスティード東日本A" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="office">営業所 *</Label>
-                    <Select value={businessGroupForm.営業所} onValueChange={(value) => setBusinessGroupForm({ ...businessGroupForm, 営業所: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="営業所を選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="川越">川越</SelectItem>
-                        <SelectItem value="川口">川口</SelectItem>
-                        <SelectItem value="東京">東京</SelectItem>
-                        <SelectItem value="本社">本社</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>業務グループ一覧</CardTitle>
+                  <CardDescription>登録されている業務グループの一覧</CardDescription>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="groupDescription">説明</Label>
-                  <Textarea id="groupDescription" value={businessGroupForm.description} onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, description: e.target.value })} placeholder="業務グループの説明（任意）" rows={3} />
-                </div>
-                <div className="flex gap-2">
-                  <Button type="submit">{isBusinessGroupEditing ? '更新' : '追加'}</Button>
-                  {isBusinessGroupEditing && (<Button type="button" variant="outline" onClick={resetBusinessGroupForm}>キャンセル</Button>)}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>業務グループ一覧</CardTitle>
-              <CardDescription>登録されている業務グループの一覧</CardDescription>
+                <Button onClick={handleBusinessGroupAdd}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  新規作成
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {isBusinessGroupLoading ? (
@@ -1385,6 +1367,67 @@ export default function MasterDataManagement() {
           <ConstraintGroupManagement />
         </TabsContent>
       </Tabs>
+
+      {/* Business Group Modal */}
+      <Dialog open={isBusinessGroupModalOpen} onOpenChange={setIsBusinessGroupModalOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              {isBusinessGroupEditing ? '業務グループを編集' : '新しい業務グループを追加'}
+            </DialogTitle>
+            <DialogDescription>
+              業務グループの情報を入力してください
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleBusinessGroupSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="groupName">業務グループ名 *</Label>
+                <Input
+                  id="groupName"
+                  value={businessGroupForm.name}
+                  onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, name: e.target.value })}
+                  placeholder="例: ロジスティード東日本A"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="office">営業所 *</Label>
+                <Select
+                  value={businessGroupForm.営業所}
+                  onValueChange={(value) => setBusinessGroupForm({ ...businessGroupForm, 営業所: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="営業所を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="川越">川越</SelectItem>
+                    <SelectItem value="川口">川口</SelectItem>
+                    <SelectItem value="東京">東京</SelectItem>
+                    <SelectItem value="本社">本社</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="groupDescription">説明</Label>
+              <Textarea
+                id="groupDescription"
+                value={businessGroupForm.description}
+                onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, description: e.target.value })}
+                placeholder="業務グループの説明（任意）"
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsBusinessGroupModalOpen(false)}>
+                キャンセル
+              </Button>
+              <Button type="submit">{isBusinessGroupEditing ? '更新' : '追加'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
