@@ -152,6 +152,7 @@ export default function MasterDataManagement() {
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
   const [constraintStats, setConstraintStats] = useState<ConstraintStatistics | null>(null);
   const [activeTab, setActiveTab] = useState('business-groups');
+  const [officeFilter, setOfficeFilter] = useState<string>('すべて');
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -765,7 +766,8 @@ export default function MasterDataManagement() {
 
       {/* Tabs for Business Groups, Business Masters and Enhanced Constraints */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-4xl">
+        <div className="flex items-center gap-4 mb-6">
+          <TabsList className="grid grid-cols-4 flex-1 max-w-4xl">
           <TabsTrigger value="business-groups" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             業務グループ
@@ -783,6 +785,20 @@ export default function MasterDataManagement() {
             制約グループ
           </TabsTrigger>
         </TabsList>
+        <div className="w-48">
+          <Select value={officeFilter} onValueChange={setOfficeFilter}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="すべて">すべて</SelectItem>
+              <SelectItem value="川越">川越</SelectItem>
+              <SelectItem value="東京">東京</SelectItem>
+              <SelectItem value="川口">川口</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
         {/* Business Groups Tab */}
         <TabsContent value="business-groups" className="space-y-6">
@@ -821,7 +837,9 @@ export default function MasterDataManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {businessGroups.map((group) => (
+                      {businessGroups
+                        .filter(group => officeFilter === 'すべて' || group.営業所 === officeFilter)
+                        .map((group) => (
                         <TableRow key={group.id}>
                           <TableCell className="font-medium">{group.name}</TableCell>
                           <TableCell>{group.営業所 || '−'}</TableCell>
@@ -876,7 +894,7 @@ export default function MasterDataManagement() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {businessMasters.map((master) => (
+                  {businessMasters.filter(master => officeFilter === "すべて" || master.営業所 === officeFilter).map((master) => (
                     <div key={master.業務id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
@@ -1336,7 +1354,6 @@ export default function MasterDataManagement() {
                   value={businessMasterForm.業務id}
                   onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 業務id: e.target.value })}
                   placeholder="例: B001（空欄の場合は自動生成）"
-                  disabled={isBusinessMasterEditing}
                 />
               </div>
               <div className="space-y-2">
