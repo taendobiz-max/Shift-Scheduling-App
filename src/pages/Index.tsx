@@ -126,24 +126,6 @@ export default function Index() {
             </Card>
           </Link>
 
-          <Link to="/skill-matrix">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BarChart3 className="h-6 w-6 mr-2" />
-                  スキル管理
-                </CardTitle>
-                <CardDescription>
-                  従業員のスキル・資格管理
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  運転免許、路線資格、特殊技能などを管理。適切な人員配置とスキル向上をサポートします。
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
 
           <Link to="/reports">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">

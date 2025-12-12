@@ -5,15 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon, Award } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { loadEmployeesFromExcel, reloadEmployeesFromExcel, EmployeeMaster, updateEmployeeInSupabase } from '@/utils/employeeExcelLoader';
 import { AddEmployeeModal } from '@/components/AddEmployeeModal';
-import { EmployeeSkillModal } from '@/components/EmployeeSkillModal';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
-
 
 export default function EmployeeManagement() {
   const [employees, setEmployees] = useState<EmployeeMaster[]>([]);
@@ -27,9 +24,6 @@ export default function EmployeeManagement() {
   const [editFormData, setEditFormData] = useState<EmployeeMaster>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-  const [selectedEmployeeForSkill, setSelectedEmployeeForSkill] = useState<{ id: string; name: string; office?: string } | null>(null);
-  const [activeTab, setActiveTab] = useState('employees');
 
   // Load data on component mount
   useEffect(() => {
@@ -148,7 +142,6 @@ export default function EmployeeManagement() {
       const updateData: EmployeeMaster = {
         name: editFormData.name,
         office: editFormData.office,
-        班: editFormData.班,
         display_order: editFormData.display_order,
         roll_call_capable: editFormData.roll_call_capable || false,
         roll_call_duty: editFormData.roll_call_duty || '0'
@@ -319,18 +312,8 @@ export default function EmployeeManagement() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-1">
-          <TabsTrigger value="employees">
-            <Users className="h-4 w-4 mr-2" />
-            従業員一覧
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="employees" className="space-y-6">
-          {/* Employee List */}
-          <Card>
+      {/* Employee List */}
+      <Card>
         <CardHeader>
           <CardTitle>従業員一覧</CardTitle>
           <CardDescription>
@@ -380,13 +363,7 @@ export default function EmployeeManagement() {
                             <label className="text-sm font-medium">営業所</label>
                             <Select
                               value={editFormData.office || ''}
-                              onValueChange={(value) => {
-                                handleEditFormChange('office', value);
-                                // 営業所が東京以外の場合は班をクリア
-                                if (value !== '東京') {
-                                  handleEditFormChange('班', '');
-                                }
-                              }}
+                              onValueChange={(value) => handleEditFormChange('office', value)}
                             >
                               <SelectTrigger className="mt-1">
                                 <SelectValue placeholder="営業所を選択" />
@@ -396,27 +373,6 @@ export default function EmployeeManagement() {
                                 <SelectItem value="東京">東京</SelectItem>
                                 <SelectItem value="川口">川口</SelectItem>
                                 <SelectItem value="その他">その他</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">班（東京のみ）</label>
-                            <Select
-                              value={editFormData.班 || ''}
-                              onValueChange={(value) => handleEditFormChange('班', value)}
-                              disabled={editFormData.office !== '東京'}
-                            >
-                              <SelectTrigger className="mt-1">
-                                <SelectValue placeholder={
-                                  editFormData.office === '東京' 
-                                    ? "班を選択" 
-                                    : "東京営業所のみ"
-                                } />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Galaxy">Galaxy</SelectItem>
-                                <SelectItem value="Aube">Aube</SelectItem>
-                                <SelectItem value="無し">無し</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -466,7 +422,7 @@ export default function EmployeeManagement() {
                       </div>
                     ) : (
                       // View Mode
-                      <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
                         <div>
                           <div className="font-medium">{employee.name}</div>
                           <div className="text-sm text-muted-foreground">ID: {employee.employee_id}</div>
@@ -476,28 +432,15 @@ export default function EmployeeManagement() {
                           <div className="text-sm text-muted-foreground">営業所</div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          {employee.roll_call_capable || employee.roll_call_duty === '1' ? (
-                            <Badge className="bg-green-500">点呼対応可</Badge>
-                          ) : (
-                            <Badge className="bg-gray-400">点呼対応不可</Badge>
-                          )}
+                          <Checkbox
+                            checked={employee.roll_call_capable || employee.roll_call_duty === '1'}
+                            onCheckedChange={() => handleQuickToggleRollCall(employee)}
+                          />
+                          <span className="text-sm">点呼対応</span>
                         </div>
                         <div>
                           <div className="font-medium">{employee.display_order || 9999}</div>
                           <div className="text-sm text-muted-foreground">表示順</div>
-                        </div>
-                        <div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEmployeeForSkill({ id: employee.employee_id || '', name: employee.name || '', office: employee.office });
-                              setIsSkillModalOpen(true);
-                            }}
-                          >
-                            <Award className="h-4 w-4 mr-1" />
-                            スキル
-                          </Button>
                         </div>
                         <div className="flex justify-end space-x-2">
                           <Button 
@@ -518,10 +461,6 @@ export default function EmployeeManagement() {
           )}
         </CardContent>
       </Card>
-        </TabsContent>
-
-
-      </Tabs>
 
       {/* Add Employee Modal */}
       <AddEmployeeModal
@@ -529,20 +468,6 @@ export default function EmployeeManagement() {
         onClose={() => setIsAddModalOpen(false)}
         onEmployeeAdded={loadData}
       />
-
-      {/* Employee Skill Modal */}
-      {selectedEmployeeForSkill && (
-        <EmployeeSkillModal
-          isOpen={isSkillModalOpen}
-          onClose={() => {
-            setIsSkillModalOpen(false);
-            setSelectedEmployeeForSkill(null);
-          }}
-          employeeId={selectedEmployeeForSkill.id}
-          employeeName={selectedEmployeeForSkill.name}
-          employeeOffice={selectedEmployeeForSkill.office}
-        />
-      )}
     </div>
   );
 }
