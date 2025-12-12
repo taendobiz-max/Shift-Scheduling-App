@@ -429,17 +429,22 @@ export default function ShiftGenerator() {
         return;
       }
 
+      // Filter business masters by location
+      const filteredBusinessMasters = selectedLocation === '全拠点' 
+        ? businessMasters 
+        : businessMasters.filter(bm => bm.営業所 === selectedLocation);
+
       // Validate business masters data
-      if (!businessMasters || businessMasters.length === 0) {
-        setGenerationResult('業務マスタデータが見つかりません。マスターデータ管理画面で業務マスタを登録してください。');
+      if (!filteredBusinessMasters || filteredBusinessMasters.length === 0) {
+        setGenerationResult(`選択された拠点「${selectedLocation}」に業務マスタが見つかりません。マスターデータ管理画面で業務マスタを登録してください。`);
         setIsGenerating(false);
         return;
       }
 
-      console.log(`📊 Starting shift generation: ${filteredEmployees.length} employees, ${businessMasters.length} businesses, ${dateRange.length} days`);
+      console.log(`📊 Starting shift generation: ${filteredEmployees.length} employees, ${filteredBusinessMasters.length} businesses, ${dateRange.length} days`);
 
       // Get pair business groups
-      const pairGroups = getPairBusinesses(businessMasters);
+      const pairGroups = getPairBusinesses(filteredBusinessMasters);
       console.log('🔗 Pair business groups:', pairGroups);
 
       // Call API server for shift generation
@@ -452,7 +457,7 @@ export default function ShiftGenerator() {
         },
         body: JSON.stringify({
           employees: filteredEmployees,
-          businessMasters: businessMasters,
+          businessMasters: filteredBusinessMasters,
           dateRange: dateRange,
           pairGroups: pairGroups,
           location: selectedLocation
@@ -477,7 +482,7 @@ export default function ShiftGenerator() {
           const employee = filteredEmployees.find((emp: any) => 
             emp.id === shift.employee_id || emp.従業員ID === shift.employee_id
           );
-          const businessMaster = businessMasters.find((bm: any) => 
+          const businessMaster = filteredBusinessMasters.find((bm: any) => 
             bm.id === shift.business_master_id || 
             bm.業務id === shift.business_master_id ||
             bm.業務名 === shift.business_name
@@ -1091,15 +1096,8 @@ export default function ShiftGenerator() {
     if (shiftResults.length === 0) return null;
 
     const dates = [...new Set(shiftResults.map(r => r.date))].sort();
+    // Only show business masters that are in the shift results (filtered by location)
     const businessMasterNames = [...new Set(shiftResults.map(r => r.businessMaster))].sort();
-
-    businessMasters.forEach(bm => {
-      const businessName = bm.業務名 || bm.name || 'Unknown Business';
-      if (!businessMasterNames.includes(businessName)) {
-        businessMasterNames.push(businessName);
-      }
-    });
-    businessMasterNames.sort();
 
     const matrix: { [key: string]: { [key: string]: { employeeName: string; shift?: ShiftResult } } } = {};
     businessMasterNames.forEach(bm => {
