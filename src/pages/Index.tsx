@@ -147,36 +147,6 @@ export default function Index() {
           </Link>
         </div>
 
-        {/* クイックアクション */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4">クイックアクション</h2>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/shift-generator">
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Zap className="h-4 w-4 mr-2" />
-                今すぐシフト生成
-              </Button>
-            </Link>
-            <Link to="/vacation-management">
-              <Button className="bg-red-600 hover:bg-red-700">
-                <UserX className="h-4 w-4 mr-2" />
-                休暇登録
-              </Button>
-            </Link>
-            <Link to="/employees">
-              <Button variant="outline">
-                <Users className="h-4 w-4 mr-2" />
-                従業員登録
-              </Button>
-            </Link>
-            <Link to="/shift-schedule">
-              <Button variant="outline">
-                <Calendar className="h-4 w-4 mr-2" />
-                シフト確認
-              </Button>
-            </Link>
-          </div>
-        </div>
       </div>
     </div>
   );
