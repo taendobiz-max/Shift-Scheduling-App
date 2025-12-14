@@ -139,8 +139,8 @@ export default function MasterDataManagement() {
     業務タイプ: 'normal',
     運行日数: 1,
     班ローテーション: false,
-    班指定: '',
-    方向: '',
+    班指定: 'none',
+    方向: 'none',
   });
 
   // Enhanced Constraints state
@@ -431,8 +431,8 @@ export default function MasterDataManagement() {
       業務タイプ: (master as any).業務タイプ || 'normal',
       運行日数: (master as any).運行日数 || 1,
       班ローテーション: (master as any).班ローテーション || false,
-      班指定: (master as any).班指定 || '',
-      方向: (master as any).方向 || '',
+      班指定: (master as any).班指定 || 'none',
+      方向: (master as any).方向 || 'none',
     });
     setEditingBusinessMasterId(master.業務id || null);
     setIsBusinessMasterEditing(true);
@@ -1505,7 +1505,7 @@ export default function MasterDataManagement() {
                       if (value === 'normal') {
                         updates.運行日数 = 1;
                         updates.班ローテーション = false;
-                        updates.方向 = '';
+                        updates.方向 = 'none';
                       } else {
                         updates.運行日数 = 2;
                         updates.班ローテーション = true;
@@ -1545,7 +1545,7 @@ export default function MasterDataManagement() {
                       <SelectValue placeholder="方向を選択" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">指定なし</SelectItem>
+                      <SelectItem value="none">指定なし</SelectItem>
                       <SelectItem value="outbound">往路（東京発）</SelectItem>
                       <SelectItem value="return">復路（現地発）</SelectItem>
                     </SelectContent>
@@ -1563,7 +1563,7 @@ export default function MasterDataManagement() {
                       <SelectValue placeholder="班を選択" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">指定なし</SelectItem>
+                      <SelectItem value="none">指定なし</SelectItem>
                       <SelectItem value="Galaxy">Galaxy班</SelectItem>
                       <SelectItem value="Aube">Aube班</SelectItem>
                     </SelectContent>
