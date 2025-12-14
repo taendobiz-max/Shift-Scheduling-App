@@ -91,6 +91,11 @@ interface BusinessMasterForm {
   深夜手当: string;
   スキルマップ項目名: string;
   ペア業務id: string;
+  業務タイプ: string;
+  運行日数: number;
+  班ローテーション: boolean;
+  班指定: string;
+  方向: string;
 }
 
 interface ConstraintStatistics {
@@ -131,6 +136,11 @@ export default function MasterDataManagement() {
     深夜手当: '',
     スキルマップ項目名: '',
     ペア業務id: '',
+    業務タイプ: 'normal',
+    運行日数: 1,
+    班ローテーション: false,
+    班指定: '',
+    方向: '',
   });
 
   // Enhanced Constraints state
@@ -418,6 +428,11 @@ export default function MasterDataManagement() {
       深夜手当: master.深夜手当 || '',
       スキルマップ項目名: master.スキルマップ項目名 || '',
       ペア業務id: master.ペア業務id || '',
+      業務タイプ: (master as any).業務タイプ || 'normal',
+      運行日数: (master as any).運行日数 || 1,
+      班ローテーション: (master as any).班ローテーション || false,
+      班指定: (master as any).班指定 || '',
+      方向: (master as any).方向 || '',
     });
     setEditingBusinessMasterId(master.業務id || null);
     setIsBusinessMasterEditing(true);
@@ -436,6 +451,11 @@ export default function MasterDataManagement() {
       深夜手当: '',
       スキルマップ項目名: '',
       ペア業務id: '',
+      業務タイプ: 'normal',
+      運行日数: 1,
+      班ローテーション: false,
+      班指定: '',
+      方向: '',
     });
     setEditingBusinessMasterId(null);
     setIsBusinessMasterEditing(false);
@@ -1467,8 +1487,100 @@ export default function MasterDataManagement() {
                   id="ペア業務id"
                   value={businessMasterForm.ペア業務id}
                   onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
-                  placeholder="例: B002"
+                  placeholder="例: TKS_PAIR"
                 />
+              </div>
+            </div>
+            
+            {/* 夜行バス関連フィールド */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-semibold mb-3">夜行バス設定（該当する場合のみ）</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="業務タイプ">業務タイプ</Label>
+                  <Select
+                    value={businessMasterForm.業務タイプ}
+                    onValueChange={(value) => {
+                      const updates: Partial<BusinessMasterForm> = { 業務タイプ: value };
+                      if (value === 'normal') {
+                        updates.運行日数 = 1;
+                        updates.班ローテーション = false;
+                        updates.方向 = '';
+                      } else {
+                        updates.運行日数 = 2;
+                        updates.班ローテーション = true;
+                      }
+                      setBusinessMasterForm({ ...businessMasterForm, ...updates });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">通常業務</SelectItem>
+                      <SelectItem value="overnight_outbound">夜行バス（往路）</SelectItem>
+                      <SelectItem value="overnight_return">夜行バス（復路）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="運行日数">運行日数</Label>
+                  <Input
+                    id="運行日数"
+                    type="number"
+                    min="1"
+                    value={businessMasterForm.運行日数}
+                    onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 運行日数: parseInt(e.target.value) || 1 })}
+                    disabled={businessMasterForm.業務タイプ !== 'normal'}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="方向">方向</Label>
+                  <Select
+                    value={businessMasterForm.方向}
+                    onValueChange={(value) => setBusinessMasterForm({ ...businessMasterForm, 方向: value })}
+                    disabled={businessMasterForm.業務タイプ === 'normal'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="方向を選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">指定なし</SelectItem>
+                      <SelectItem value="outbound">往路（東京発）</SelectItem>
+                      <SelectItem value="return">復路（現地発）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="班指定">班指定</Label>
+                  <Select
+                    value={businessMasterForm.班指定}
+                    onValueChange={(value) => setBusinessMasterForm({ ...businessMasterForm, 班指定: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="班を選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">指定なし</SelectItem>
+                      <SelectItem value="Galaxy">Galaxy班</SelectItem>
+                      <SelectItem value="Aube">Aube班</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-2 pt-8">
+                  <input
+                    type="checkbox"
+                    id="班ローテーション"
+                    checked={businessMasterForm.班ローテーション}
+                    onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 班ローテーション: e.target.checked })}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="班ローテーション" className="cursor-pointer">
+                    班ローテーションあり（毎日班が交替）
+                  </Label>
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2">
