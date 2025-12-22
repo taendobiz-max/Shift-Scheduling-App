@@ -7,11 +7,13 @@ import NotFound from './pages/NotFound';
 import MasterDataManagement from './pages/MasterDataManagement';
 import EmployeeManagement from './pages/EmployeeManagement';
 import ShiftSchedule from './pages/ShiftSchedule';
-
 import ShiftGenerator from './pages/ShiftGenerator';
 import VacationManagement from './pages/VacationManagement';
 import Reports from './pages/Reports';
 import Login from './pages/Login';
+import BusinessRuleManagement from './pages/BusinessRuleManagement';
+import UnifiedRuleManagement from './pages/UnifiedRuleManagement';
+import UserManagement from './pages/UserManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const queryClient = new QueryClient();
@@ -24,14 +26,22 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/master-data" element={<ProtectedRoute><MasterDataManagement /></ProtectedRoute>} />
-            <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
-            <Route path="/shift-schedule" element={<ProtectedRoute><ShiftSchedule /></ProtectedRoute>} />
-            <Route path="/shift-generator" element={<ProtectedRoute><ShiftGenerator /></ProtectedRoute>} />
-
-            <Route path="/vacation-management" element={<ProtectedRoute><VacationManagement /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            
+            {/* 一般ユーザー（権限レベル1）がアクセス可能 */}
+            <Route path="/" element={<ProtectedRoute requiredRole={1}><Index /></ProtectedRoute>} />
+            <Route path="/shift-schedule" element={<ProtectedRoute requiredRole={1}><ShiftSchedule /></ProtectedRoute>} />
+            
+            {/* 営業所長以上（権限レベル2）がアクセス可能 */}
+            <Route path="/shift-generator" element={<ProtectedRoute requiredRole={2}><ShiftGenerator /></ProtectedRoute>} />
+            <Route path="/vacation-management" element={<ProtectedRoute requiredRole={2}><VacationManagement /></ProtectedRoute>} />
+            <Route path="/employees" element={<ProtectedRoute requiredRole={2}><EmployeeManagement /></ProtectedRoute>} />
+            <Route path="/business-rules" element={<ProtectedRoute requiredRole={2}><BusinessRuleManagement /></ProtectedRoute>} />
+            <Route path="/unified-rules" element={<ProtectedRoute requiredRole={2}><UnifiedRuleManagement /></ProtectedRoute>} />
+            <Route path="/master-data" element={<ProtectedRoute requiredRole={2}><MasterDataManagement /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute requiredRole={2}><Reports /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute requiredRole={2}><UserManagement /></ProtectedRoute>} />
+            
+            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

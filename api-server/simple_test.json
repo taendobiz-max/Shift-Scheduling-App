@@ -1,0 +1,7 @@
+{
+  "employees": [],
+  "businessMasters": [{"業務id": "TEST", "業務名": "テスト", "運行日数": 2, "業務タイプ": "overnight_outbound"}],
+  "dateRange": {"start": "2025-12-01", "end": "2025-12-02"},
+  "pairGroups": [],
+  "location": "東京"
+}

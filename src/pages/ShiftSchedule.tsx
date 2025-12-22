@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,12 @@ interface ShiftData {
   end_time?: string;
   location?: string;
   created_at?: string;
+  multi_day_set_id?: string;
+  multi_day_info?: {
+    day: number;
+    total_days: number;
+    direction?: string;
+  };
 }
 
 interface EmployeeData {
@@ -77,7 +83,9 @@ const DraggableEmployee = ({
   businessName,
   startTime,
   endTime,
-  barStyle
+  barStyle,
+  isSelected,
+  onClick
 }: { 
   employeeId: string; 
   employeeName: string;
@@ -86,6 +94,8 @@ const DraggableEmployee = ({
   startTime?: string;
   endTime?: string;
   barStyle?: { left: string; width: string };
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }) => {
   const {
     attributes,
@@ -95,7 +105,12 @@ const DraggableEmployee = ({
     isDragging,
   } = useDraggable({
     id: shiftId || `employee-${employeeId}`,
-    data: { employeeId, employeeName, type: 'employee' }
+    data: { 
+      employeeId, 
+      employeeName, 
+      type: 'employee',
+      shiftId: shiftId || null
+    }
   });
 
   const style = {
@@ -113,7 +128,12 @@ const DraggableEmployee = ({
         style={style}
         {...listeners}
         {...attributes}
-        className="absolute top-2 bottom-2 bg-blue-500 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md hover:bg-blue-600 transition-colors z-20 cursor-grab active:cursor-grabbing"
+        onClick={onClick}
+        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-20 cursor-grab active:cursor-grabbing ${
+          isSelected 
+            ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
+            : 'bg-blue-500 hover:bg-blue-600'
+        }`}
       >
         <span className="font-semibold">{employeeName}</span>
         <span className="ml-2 truncate">{businessName}</span>
@@ -171,6 +191,8 @@ const DroppableCell = ({
 
 export default function ShiftSchedule() {
   const [shifts, setShifts] = useState<ShiftData[]>([]);
+  const shiftsRef = useRef<ShiftData[]>([]);
+  
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
@@ -180,6 +202,7 @@ export default function ShiftSchedule() {
   const [unassignedEmployees, setUnassignedEmployees] = useState<EmployeeData[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [selectedShiftIds, setSelectedShiftIds] = useState<Set<string>>(new Set());
   
   // Excel export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -189,12 +212,22 @@ export default function ShiftSchedule() {
   const [periodStartDate, setPeriodStartDate] = useState('');
   const [periodEndDate, setPeriodEndDate] = useState('');
   const [periodShifts, setPeriodShifts] = useState<ShiftData[]>([]);
+  const periodShiftsRef = useRef<ShiftData[]>([]);
   const [activeTab, setActiveTab] = useState('daily');
   const [periodViewMode, setPeriodViewMode] = useState<'employee' | 'business'>('employee');
   const [dailyViewMode, setDailyViewMode] = useState<'employee' | 'business'>('employee');
 
 
   const timeSlots = generateTimeSlots();
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    shiftsRef.current = shifts;
+  }, [shifts]);
+  
+  useEffect(() => {
+    periodShiftsRef.current = periodShifts;
+  }, [periodShifts]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -219,6 +252,72 @@ export default function ShiftSchedule() {
   useEffect(() => {
     filterShifts();
   }, [shifts, selectedLocation]);
+
+  // Handle keyboard events for delete
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      console.log('⌨️ Key pressed:', e.key);
+      console.log('⌨️ selectedShiftIds.size:', selectedShiftIds.size);
+      if (e.key === 'Delete' && selectedShiftIds.size > 0) {
+        console.log('❌ Delete key detected with selected shifts');
+        console.log('❌ activeTab:', activeTab);
+        const currentShifts = activeTab === 'period' ? periodShiftsRef.current : shiftsRef.current;
+        console.log('❌ shifts array:', currentShifts);
+        console.log('❌ shifts[0]?.id type:', typeof currentShifts[0]?.id);
+        console.log('❌ selectedShiftIds:', Array.from(selectedShiftIds));
+        const shiftsToDelete = currentShifts.filter(s => {
+          const shiftId = String(s.id);
+          const hasMatch = Array.from(selectedShiftIds).some(id => String(id) === shiftId);
+          console.log(`❌ Checking shift ${s.id} (${typeof s.id}):`, hasMatch);
+          return hasMatch;
+        });
+        console.log('❌ shiftsToDelete:', shiftsToDelete);
+        const shiftNames = shiftsToDelete.map(s => s.business_name || '不明').join(', ');
+        console.log('❌ shiftNames:', shiftNames);
+
+        if (!confirm(`選択した${selectedShiftIds.size}件のシフトを削除しますか？\n${shiftNames}`)) {
+          console.log('❌ User cancelled delete');
+          return;
+        }
+
+        console.log('❌ User confirmed delete, proceeding...');
+        try {
+          console.log('❌ Deleting shift IDs:', Array.from(selectedShiftIds));
+          const { error } = await supabase
+            .from('shifts')
+            .delete()
+            .in('id', Array.from(selectedShiftIds));
+
+          console.log('❌ Delete query completed, error:', error);
+          if (error) throw error;
+
+          console.log('❌ Updating local state...');
+          if (activeTab === 'period') {
+            const currentShifts = periodShiftsRef.current;
+            const updatedShifts = currentShifts.filter(s => !selectedShiftIds.has(s.id));
+            setPeriodShifts(updatedShifts);
+          } else {
+            const currentShifts = shiftsRef.current;
+            const updatedShifts = currentShifts.filter(s => !selectedShiftIds.has(s.id));
+            setShifts(updatedShifts);
+          }
+          setSelectedShiftIds(new Set());
+          setHasChanges(false);
+          
+          console.log('✅ Delete successful!');
+          toast.success(`${shiftsToDelete.length}件のシフトを削除しました`);
+        } catch (error) {
+          console.error('❌ Error deleting shifts:', error);
+          toast.error('シフトの削除に失敗しました');
+        }
+      } else if (e.key === 'Delete') {
+        console.log('❌ Delete key pressed but no shifts selected');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedShiftIds, activeTab]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -391,7 +490,16 @@ export default function ShiftSchedule() {
           : enrichedShifts.filter(s => s.location === selectedLocation);
         
         setPeriodShifts(filtered);
-        toast.success(`${filtered.length}件のシフトを読み込みました`);
+        
+        // Debug: Check multi-day shifts
+        const multiDayCount = filtered.filter(s => s.multi_day_set_id).length;
+        console.log('🔍 [DEBUG] Loaded shifts:', filtered.length);
+        console.log('🔍 [DEBUG] Multi-day shifts:', multiDayCount);
+        if (multiDayCount > 0) {
+          console.log('🔍 [DEBUG] Sample multi-day shift:', filtered.find(s => s.multi_day_set_id));
+        }
+        
+        toast.success(`${filtered.length}件のシフトを読み込みました（複数日: ${multiDayCount}）`);
       }
     } catch (error) {
       console.error('💥 Error loading period shifts:', error);
@@ -529,6 +637,69 @@ export default function ShiftSchedule() {
       }
     }
   };
+
+  // Handle shift selection
+  const handleShiftClick = (shiftId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('🖱️ Shift clicked:', shiftId);
+    console.log('🖱️ Current selectedShiftIds:', Array.from(selectedShiftIds));
+    
+    const newSelected = new Set(selectedShiftIds);
+    
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd+Click: toggle selection
+      if (newSelected.has(shiftId)) {
+        newSelected.delete(shiftId);
+      } else {
+        newSelected.add(shiftId);
+      }
+    } else {
+      // Regular click: select only this shift
+      newSelected.clear();
+      newSelected.add(shiftId);
+    }
+    
+    console.log('🖱️ New selectedShiftIds:', Array.from(newSelected));
+    setSelectedShiftIds(newSelected);
+  };
+
+  // Handle delete selected shifts
+  const handleDeleteSelectedShifts = useCallback(async () => {
+    console.log('❌ Delete triggered, selectedShiftIds:', Array.from(selectedShiftIds));
+    console.log('❌ selectedShiftIds.size:', selectedShiftIds.size);
+    if (selectedShiftIds.size === 0) {
+      console.log('❌ No shifts selected, aborting delete');
+      return;
+    }
+
+    const shiftsToDelete = shifts.filter(s => selectedShiftIds.has(s.id));
+    const shiftNames = shiftsToDelete.map(s => s.business_name || '不明').join(', ');
+
+    if (!confirm(`選択した${selectedShiftIds.size}件のシフトを削除しますか？\n${shiftNames}`)) {
+      return;
+    }
+
+    try {
+      // Delete from database
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .in('id', Array.from(selectedShiftIds));
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedShifts = shifts.filter(s => !selectedShiftIds.has(s.id));
+      setShifts(updatedShifts);
+      setSelectedShiftIds(new Set());
+      setHasChanges(false);
+      
+      toast.success(`${shiftsToDelete.length}件のシフトを削除しました`);
+    } catch (error) {
+      console.error('❌ Error deleting shifts:', error);
+      toast.error('シフトの削除に失敗しました');
+    }
+  }, [selectedShiftIds, shifts]);
 
   const saveChanges = async () => {
     if (!hasChanges) return;
@@ -715,7 +886,7 @@ export default function ShiftSchedule() {
               </CardHeader>
               <CardContent>
                 {periodViewMode === 'employee' ? (
-                  /* Employee View: Employees x Dates */
+                  /* Employee View: Employees x Dates (Multi-day support) */
                   (() => {
                     const dates = [...new Set(periodShifts.map(s => s.date))].sort();
                     const employeeNames = [...new Set(periodShifts.map(s => s.employee_name))];
@@ -728,8 +899,43 @@ export default function ShiftSchedule() {
                       .sort((a, b) => a.display_order - b.display_order)
                       .map(e => e.name);
                     
+                    // 複数日業務セットを構築
+                    const multiDaySets = new Map<string, any>();
+                    periodShifts.forEach(shift => {
+                      if (shift.multi_day_set_id && shift.multi_day_info) {
+                        if (!multiDaySets.has(shift.multi_day_set_id)) {
+                          multiDaySets.set(shift.multi_day_set_id, {
+                            setId: shift.multi_day_set_id,
+                            employeeName: shift.employee_name || '',
+                            dates: [],
+                            businessName: shift.business_name || '',
+                            startDate: shift.date,
+                            totalDays: shift.multi_day_info.total_days
+                          });
+                        }
+                        const set = multiDaySets.get(shift.multi_day_set_id)!;
+                        set.dates.push(shift.date);
+                        if (shift.date < set.startDate) {
+                          set.startDate = shift.date;
+                        }
+                      }
+                    });
+                    
+                    // 従業員ごとの複数日業務セットマップ
+                    const employeeMultiDaySets = new Map<string, Map<string, any>>();
+                    multiDaySets.forEach(set => {
+                      if (!employeeMultiDaySets.has(set.employeeName)) {
+                        employeeMultiDaySets.set(set.employeeName, new Map());
+                      }
+                      employeeMultiDaySets.get(set.employeeName)!.set(set.startDate, set);
+                    });
+                    
+                    // 通常のシフトマップ（複数日業務の2日目以降を除外）
                     const shiftMap = new Map();
                     periodShifts.forEach(shift => {
+                      if (shift.multi_day_set_id && shift.multi_day_info && shift.multi_day_info.day > 1) {
+                        return;
+                      }
                       if (!shiftMap.has(shift.employee_name)) {
                         shiftMap.set(shift.employee_name, new Map());
                       }
@@ -737,7 +943,25 @@ export default function ShiftSchedule() {
                       if (!employeeShifts.has(shift.date)) {
                         employeeShifts.set(shift.date, []);
                       }
-                      employeeShifts.get(shift.date).push(shift.business_name);
+                      if (shift.multi_day_set_id) {
+                        const set = multiDaySets.get(shift.multi_day_set_id);
+                        if (set) {
+                          // Remove direction suffix from business name for multi-day shifts
+                          const baseName = (shift.business_name || '').replace(/[（(]往路[）)]/, '').replace(/[（(]復路[）)]/, '').trim();
+                          employeeShifts.get(shift.date).push({
+                            name: baseName,
+                            isMultiDay: true,
+                            colspan: set.totalDays,
+                            setId: shift.multi_day_set_id
+                          });
+                        }
+                      } else {
+                        employeeShifts.get(shift.date).push({
+                          name: shift.business_name,
+                          isMultiDay: false,
+                          colspan: 1
+                        });
+                      }
                     });
 
                     return (
@@ -752,29 +976,80 @@ export default function ShiftSchedule() {
                             </tr>
                           </thead>
                           <tbody>
-                            {employees.map(employee => (
-                              <tr key={employee} className="hover:bg-gray-50">
-                                <td className="border p-2 font-medium sticky left-0 bg-white z-10">{employee}</td>
-                                {dates.map(date => {
-                                  const businesses = shiftMap.get(employee)?.get(date) || [];
-                                  return (
-                                    <td key={date} className="border p-2 text-center">
-                                      {businesses.length > 0 ? (
-                                        <div className="space-y-1">
-                                          {businesses.map((business, idx) => (
-                                            <div key={idx} className="text-xs bg-blue-100 rounded px-1 py-0.5">
-                                              {business}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <span className="text-gray-400">-</span>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
+                            {employees.map(employee => {
+                              const employeeSets = employeeMultiDaySets.get(employee) || new Map();
+                              return (
+                                <tr key={employee} className="hover:bg-gray-50">
+                                  <td className="border p-2 font-medium sticky left-0 bg-white z-10">{employee}</td>
+                                  {dates.map((date, dateIdx) => {
+                                    let skipCell = false;
+                                    employeeSets.forEach((set: any) => {
+                                      const startIdx = dates.indexOf(set.startDate);
+                                      const endIdx = startIdx + set.totalDays - 1;
+                                      if (dateIdx > startIdx && dateIdx <= endIdx) {
+                                        skipCell = true;
+                                      }
+                                    });
+                                    if (skipCell) return null;
+                                    
+                                    const businesses = shiftMap.get(employee)?.get(date) || [];
+                                    let colspan = 1;
+                                    const multiDayBusiness = businesses.find((b: any) => b.isMultiDay);
+                                    if (multiDayBusiness) {
+                                      colspan = multiDayBusiness.colspan;
+                                    }
+                                    
+                                    return (
+                                      <td 
+                                        key={date} 
+                                        colSpan={colspan}
+                                        className={`border p-2 text-center ${
+                                          multiDayBusiness ? 'bg-purple-50' : ''
+                                        }`}
+                                      >
+                                        {businesses.length > 0 ? (
+                                          <div className="space-y-1">
+                                            {businesses.map((business: any, idx: number) => {
+                                              // Find the actual shift object for this business
+                                              const actualShift = periodShifts.find(s => 
+                                                s.employee_name === employee && 
+                                                s.date === date && 
+                                                (s.business_name === business.name || 
+                                                 s.business_name?.replace(/[（(]往路[）)]/, '').replace(/[（(]復路[）)]/, '').trim() === business.name)
+                                              );
+                                              const isSelected = actualShift && selectedShiftIds.has(actualShift.id);
+                                              
+                                              return (
+                                                <div 
+                                                  key={idx} 
+                                                  onClick={(e) => actualShift && handleShiftClick(actualShift.id, e)}
+                                                  className={`text-xs rounded px-1 py-0.5 cursor-pointer transition-colors ${
+                                                    isSelected
+                                                      ? 'bg-orange-300 font-bold border-2 border-orange-500'
+                                                      : business.isMultiDay 
+                                                        ? 'bg-purple-200 font-semibold border-2 border-purple-400 hover:bg-purple-300' 
+                                                        : 'bg-blue-100 hover:bg-blue-200'
+                                                  }`}
+                                                >
+                                                  {business.name}
+                                                  {business.isMultiDay && (
+                                                    <span className="ml-1 text-[10px] text-purple-600">
+                                                      ({business.colspan}日間)
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <span className="text-gray-400">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1040,6 +1315,8 @@ export default function ShiftSchedule() {
                                 startTime={shift.start_time}
                                 endTime={shift.end_time}
                                 barStyle={barStyle}
+                                isSelected={selectedShiftIds.has(shift.id)}
+                                onClick={(e) => handleShiftClick(shift.id, e)}
                               />
                             );
                           })}

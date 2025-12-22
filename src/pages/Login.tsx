@@ -10,7 +10,7 @@ import { login } from '@/utils/auth';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [userId, setUserId] = useState('');
+  const [userIdOrEmail, setUserIdOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +21,12 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const result = await login(userId, password);
+      // @が含まれていない場合は、自動的にドメインを追加
+      const email = userIdOrEmail.includes('@') 
+        ? userIdOrEmail 
+        : `${userIdOrEmail}@fkk-g.co.jp`;
+      
+      const result = await login(email, password);
       
       if (result.success) {
         // ログイン成功、ホームページにリダイレクト
@@ -59,16 +64,19 @@ export default function Login() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="userId">ユーザーID</Label>
+              <Label htmlFor="userIdOrEmail">ユーザーID</Label>
               <Input
-                id="userId"
+                id="userIdOrEmail"
                 type="text"
-                placeholder="ユーザーIDを入力"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
+                placeholder="ユーザーIDを入力（例: t-endo）"
+                value={userIdOrEmail}
+                onChange={(e) => setUserIdOrEmail(e.target.value)}
                 required
                 autoFocus
               />
+              <p className="text-xs text-gray-500">
+                ※ メールアドレス全体（例: t-endo@fkk-g.co.jp）でも入力可能です
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -96,4 +104,3 @@ export default function Login() {
     </div>
   );
 }
-

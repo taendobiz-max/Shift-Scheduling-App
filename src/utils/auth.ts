@@ -1,62 +1,54 @@
 import { supabase } from './supabaseClient';
 
-// パスワードのハッシュ化（HTTP環境対応版）
-export async function hashPassword(password: string): Promise<string> {
-  // HTTP環境でも動作するようにシンプルなハッシュ化を使用
-  // 本番環境ではHTTPSとbcryptなどを使用すべき
-  let hash = 0;
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  // SHA-256風のハッシュを生成（簡易版）
-  const hashStr = Math.abs(hash).toString(16).padStart(16, '0');
-  // データベースのハッシュと一致させるため、Node.jsのcryptoを使用したハッシュを返す
-  // ただし、ブラウザではNode.jsのcryptoが使用できないので、サーバー側でハッシュ化する必要がある
-  // 一時的な解決策として、プレーンテキストで送信し、サーバー側でハッシュ化する
-  return password; // 一時的にプレーンテキストを返す
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: number;
+  office?: string;
 }
 
 // ログイン処理
-export async function login(userId: string, password: string): Promise<{ success: boolean; user?: any; error?: string }> {
+export async function login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    // パスワードをハッシュ化
-    const passwordHash = await hashPassword(password);
-    
-    // ユーザーを検索
-    const { data: users, error } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('password_hash', passwordHash)
-      .limit(1);
-    
-    if (error) {
-      console.error('Login error:', error);
+    // Supabase Authenticationでログイン
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (authError) {
+      console.error('Login error:', authError);
+      return { success: false, error: 'メールアドレスまたはパスワードが正しくありません' };
+    }
+
+    if (!authData.user) {
       return { success: false, error: 'ログインに失敗しました' };
     }
-    
-    if (!users || users.length === 0) {
-      return { success: false, error: 'ユーザーIDまたはパスワードが正しくありません' };
+
+    // public.usersテーブルからユーザー情報を取得
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (userError || !userData) {
+      console.error('User data error:', userError);
+      return { success: false, error: 'ユーザー情報の取得に失敗しました' };
     }
-    
-    const user = users[0];
-    
-    // 最終ログイン日時を更新
-    await supabase
-      .from('employees')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', user.id);
-    
+
+    const user: User = {
+      id: userData.id,
+      email: userData.email,
+      name: userData.name,
+      role: userData.role,
+      office: userData.office
+    };
+
     // セッションに保存
-    sessionStorage.setItem('currentUser', JSON.stringify({
-      id: user.id,
-      user_id: user.user_id,
-      name: user.氏名 || user.name,
-      is_admin: user.is_admin || false
-    }));
-    
+    sessionStorage.setItem('currentUser', JSON.stringify(user));
+
     return { success: true, user };
   } catch (err) {
     console.error('Login exception:', err);
@@ -65,13 +57,18 @@ export async function login(userId: string, password: string): Promise<{ success
 }
 
 // ログアウト処理
-export function logout(): void {
+export async function logout(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.error('Logout error:', err);
+  }
   sessionStorage.removeItem('currentUser');
   window.location.href = '/login';
 }
 
 // 現在のユーザーを取得
-export function getCurrentUser(): any | null {
+export function getCurrentUser(): User | null {
   const userJson = sessionStorage.getItem('currentUser');
   if (!userJson) return null;
   try {
@@ -89,6 +86,58 @@ export function isAuthenticated(): boolean {
 // 管理者かどうかを確認
 export function isAdmin(): boolean {
   const user = getCurrentUser();
-  return user?.is_admin === true;
+  return user?.role === 3;
 }
 
+// 営業所長以上かどうかを確認
+export function isManager(): boolean {
+  const user = getCurrentUser();
+  return user?.role !== undefined && user.role >= 2;
+}
+
+// 権限レベルを取得
+export function getUserRole(): number {
+  const user = getCurrentUser();
+  return user?.role || 1;
+}
+
+// 権限チェック
+export function hasPermission(requiredRole: number): boolean {
+  const userRole = getUserRole();
+  return userRole >= requiredRole;
+}
+
+// パスワード変更
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = getCurrentUser();
+    if (!user) {
+      return { success: false, error: 'ログインしていません' };
+    }
+
+    // 現在のパスワードで再認証
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword
+    });
+
+    if (signInError) {
+      return { success: false, error: '現在のパスワードが正しくありません' };
+    }
+
+    // パスワードを更新
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (updateError) {
+      console.error('Password update error:', updateError);
+      return { success: false, error: 'パスワードの変更に失敗しました' };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Change password exception:', err);
+    return { success: false, error: 'パスワード変更中にエラーが発生しました' };
+  }
+}

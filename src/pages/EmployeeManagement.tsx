@@ -6,19 +6,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon, Award } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, RefreshCw, Home, Upload, Edit, Plus, CheckCircle, XCircle, Save, X as XIcon, Award, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { loadEmployeesFromExcel, reloadEmployeesFromExcel, EmployeeMaster, updateEmployeeInSupabase } from '@/utils/employeeExcelLoader';
 import { AddEmployeeModal } from '@/components/AddEmployeeModal';
 import { EmployeeSkillModal } from '@/components/EmployeeSkillModal';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
+import { supabase } from '@/utils/supabaseClient';
 
 
 export default function EmployeeManagement() {
   const [employees, setEmployees] = useState<EmployeeMaster[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<EmployeeMaster[]>([]);
   const [businessGroups, setBusinessGroups] = useState<string[]>([]);
+  const [filteredBusinessGroups, setFilteredBusinessGroups] = useState<string[]>([]);
+  const [employeeSkills, setEmployeeSkills] = useState<Record<string, Set<string>>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOffice, setSelectedOffice] = useState<string>('all');
 
@@ -39,7 +42,8 @@ export default function EmployeeManagement() {
   // Filter employees when search term, selected office, or roll call filter changes
   useEffect(() => {
     filterEmployees();
-  }, [employees, searchTerm, selectedOffice]);
+    filterBusinessGroups();
+  }, [employees, searchTerm, selectedOffice, businessGroups]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -58,6 +62,9 @@ export default function EmployeeManagement() {
       setEmployees(employeeData);
       setBusinessGroups(groupData);
       
+      // Load employee skills from employee_skills table
+      await loadEmployeeSkills(employeeData);
+      
       if (employeeData.length === 0) {
         toast.error('従業員データが見つかりません。Excelファイルからデータをインポートしてください。');
       } else {
@@ -68,6 +75,32 @@ export default function EmployeeManagement() {
       toast.error('データの読み込みに失敗しました');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadEmployeeSkills = async (employeeData: EmployeeMaster[]) => {
+    try {
+      const { data: skillsData, error } = await supabase
+        .from('skill_matrix')
+        .select('employee_id, business_group');
+
+      if (error) {
+        console.error('❌ Error loading employee skills:', error);
+        return;
+      }
+
+      const skillsMap: Record<string, Set<string>> = {};
+      skillsData?.forEach(skill => {
+        if (!skillsMap[skill.employee_id]) {
+          skillsMap[skill.employee_id] = new Set();
+        }
+        skillsMap[skill.employee_id].add(skill.business_group);
+      });
+
+      setEmployeeSkills(skillsMap);
+      console.log('✅ Loaded employee skills:', skillsMap);
+    } catch (error) {
+      console.error('💥 Error loading employee skills:', error);
     }
   };
 
@@ -111,6 +144,34 @@ export default function EmployeeManagement() {
 
     
     setFilteredEmployees(filtered);
+  };
+
+  const filterBusinessGroups = async () => {
+    if (selectedOffice === 'all') {
+      setFilteredBusinessGroups(businessGroups);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('business_groups')
+        .select('name')
+        .eq('営業所', selectedOffice)
+        .order('name');
+
+      if (error) {
+        console.error('❌ Error filtering business groups:', error);
+        setFilteredBusinessGroups(businessGroups);
+        return;
+      }
+
+      const filtered = data?.map(bg => bg.name).filter(Boolean) || [];
+      setFilteredBusinessGroups(filtered);
+      console.log(`✅ Filtered ${filtered.length} business groups for office: ${selectedOffice}`);
+    } catch (error) {
+      console.error('💥 Error filtering business groups:', error);
+      setFilteredBusinessGroups(businessGroups);
+    }
   };
 
   const getUniqueOffices = () => {
@@ -201,6 +262,58 @@ export default function EmployeeManagement() {
     }
   };
 
+
+
+  const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
+    if (!employeeId) {
+      toast.error('従業員IDが見つかりません');
+      return;
+    }
+
+    // 確認ダイアログ
+    if (!window.confirm(`${employeeName}を削除してもよろしいですか？\nこの操作は取り消せません。`)) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log('🗑️ Deleting employee:', employeeId, employeeName);
+      
+      // まず、削除対象のレコードを確認
+      const { data: checkData, error: checkError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employee_id', employeeId);
+      
+      console.log('🔍 Records to delete:', checkData);
+      console.log('🔍 Check error:', checkError);
+      
+      // Supabaseから従業員を削除
+      const { data, error, count } = await supabase
+        .from('employees')
+        .delete({ count: 'exact' })
+        .eq('employee_id', employeeId);
+
+      console.log('🔍 Delete result - data:', data);
+      console.log('🔍 Delete result - error:', error);
+      console.log('🔍 Delete result - count:', count);
+
+      if (error) {
+        console.error('❌ Error deleting employee:', error);
+        toast.error(`従業員の削除に失敗しました: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ Employee deleted successfully');
+      toast.success(`${employeeName}を削除しました`);
+      await loadData(); // データを再読み込み
+    } catch (error) {
+      console.error('❌ Error deleting employee:', error);
+      toast.error('従業員の削除中にエラーが発生しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   const handleEditFormChange = (field: string, value: any) => {
     setEditFormData(prev => ({
       ...prev,
@@ -321,10 +434,14 @@ export default function EmployeeManagement() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-1">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="employees">
             <Users className="h-4 w-4 mr-2" />
             従業員一覧
+          </TabsTrigger>
+          <TabsTrigger value="matrix">
+            <Award className="h-4 w-4 mr-2" />
+            スキルマトリクス
           </TabsTrigger>
         </TabsList>
 
@@ -508,6 +625,15 @@ export default function EmployeeManagement() {
                             <Edit className="h-4 w-4 mr-1" />
                             編集
                           </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDeleteEmployee(employee.employee_id || '', employee.name || '不明')}
+                            disabled={isSaving}
+                            title="削除"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -520,6 +646,55 @@ export default function EmployeeManagement() {
       </Card>
         </TabsContent>
 
+        {/* スキルマトリクスタブ */}
+        <TabsContent value="matrix" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>スキルマトリクス</CardTitle>
+              <CardDescription>
+                従業員のスキル保有状況をマトリクス形式で表示します
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="border p-2 text-left font-medium sticky left-0 bg-muted z-10">従業員名</th>
+                      <th className="border p-2 text-left font-medium">営業所</th>
+                      {filteredBusinessGroups.map(group => (
+                        <th key={group} className="border p-2 text-center font-medium text-sm whitespace-nowrap">
+                          {group}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEmployees.map((emp, index) => (
+                      <tr key={emp.employee_id || index} className="hover:bg-muted/50">
+                        <td className="border p-2 font-medium sticky left-0 bg-background">{emp.name}</td>
+                        <td className="border p-2">{emp.office || '-'}</td>
+                        {filteredBusinessGroups.map(group => {
+                          const empSkills = employeeSkills[emp.employee_id || ''] || new Set();
+                          const hasSkill = empSkills.has(group);
+                          return (
+                            <td key={group} className="border p-2 text-center">
+                              {hasSkill ? (
+                                <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
+                              ) : (
+                                <XCircle className="h-5 w-5 text-gray-300 mx-auto" />
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       </Tabs>
 

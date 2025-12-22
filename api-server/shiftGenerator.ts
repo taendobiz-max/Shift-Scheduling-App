@@ -4,11 +4,25 @@ import { ConstraintEngine } from './constraintEngine';
 import { ConstraintManager } from './constraintManager';
 
 // Load skill matrix from database
-async function loadSkillMatrixFromDB(employeeIds: string[]): Promise<Map<string, Set<string>>> {
-  console.log('🔍 [DEBUG] loadSkillMatrixFromDB called for', employeeIds.length, 'employees');
+// Load skill matrix from database
+// Now accepts employee objects and uses employee_id (numeric) for querying
+async function loadSkillMatrixFromDB(employees: any[]): Promise<Map<string, Set<string>>> {
+  console.log('🔍 [DEBUG] loadSkillMatrixFromDB called for', employees.length, 'employees');
   const skillMap = new Map<string, Set<string>>();
   
-  if (employeeIds.length === 0) {
+  if (employees.length === 0) {
+    return skillMap;
+  }
+  
+  // Extract numeric employee_ids for querying skill_matrix
+  const numericEmployeeIds = employees
+    .map(emp => emp.employee_id || emp.従業員ID)
+    .filter(id => id);
+  
+  console.log('🔍 [DEBUG] Numeric employee IDs for skill query:', numericEmployeeIds);
+  
+  if (numericEmployeeIds.length === 0) {
+    console.warn('⚠️ No numeric employee_ids found');
     return skillMap;
   }
   
@@ -16,7 +30,12 @@ async function loadSkillMatrixFromDB(employeeIds: string[]): Promise<Map<string,
     const { data, error } = await supabase
       .from('skill_matrix')
       .select('employee_id, business_group, skill_level')
-      .in('employee_id', employeeIds);
+      .in('employee_id', numericEmployeeIds);
+      
+    console.log('🔍 [DEBUG] skill_matrix query result - error:', error, 'data length:', data ? data.length : 'null');
+    if (data && data.length > 0) {
+      console.log('🔍 [DEBUG] skill_matrix first 3 records:', JSON.stringify(data.slice(0, 3), null, 2));
+    }
     
     if (error) {
       console.error('⚠️ Failed to load skill matrix from DB:', error);
@@ -24,17 +43,36 @@ async function loadSkillMatrixFromDB(employeeIds: string[]): Promise<Map<string,
     }
     
     if (data) {
+      // Create a map from numeric employee_id to UUID
+      const idMap = new Map<string, string>();
+      employees.forEach(emp => {
+        const numericId = emp.employee_id || emp.従業員ID;
+        const uuid = emp.id || emp.従業員ID || emp.employee_id;
+        if (numericId && uuid) {
+          idMap.set(numericId, uuid);
+        }
+      });
+      
+      console.log('🔍 [DEBUG] ID mapping created:', idMap.size, 'mappings');
+      
       data.forEach((record: any) => {
-        const empId = record.employee_id;
+        const numericEmpId = record.employee_id;
+        const uuid = idMap.get(numericEmpId);
         const bizGroup = record.business_group;
         const skillLevel = record.skill_level;
         
+        if (!uuid) {
+          console.warn('⚠️ No UUID found for numeric employee_id:', numericEmpId);
+          return;
+        }
+        
         // Only include skills with valid levels (○ or △)
         if (skillLevel === '○' || skillLevel === '△' || skillLevel === '経験あり' || skillLevel === '対応可能') {
-          if (!skillMap.has(empId)) {
-            skillMap.set(empId, new Set<string>());
+          if (!skillMap.has(uuid)) {
+            skillMap.set(uuid, new Set<string>());
           }
-          skillMap.get(empId)!.add(bizGroup);
+          skillMap.get(uuid)!.add(bizGroup);
+          console.log('✅ Added skill for', uuid, ':', bizGroup);
         }
       });
     }
@@ -46,6 +84,7 @@ async function loadSkillMatrixFromDB(employeeIds: string[]): Promise<Map<string,
   
   return skillMap;
 }
+
 
 // Load business history from database
 async function loadBusinessHistoryFromDB(): Promise<Map<string, Set<string>>> {
@@ -147,6 +186,8 @@ export interface Shift {
   business_master_id?: string;
   date?: string;
   location?: string;
+  multi_day_set_id?: string;
+  multi_day_info?: any;
 }
 
 export interface GenerationResult {
@@ -289,6 +330,13 @@ async function generateShiftsForSingleDate(
   console.log('🏢 Business masters:', businessMasters.length);
   console.log('📍 Location:', location);
   
+  // Normalize targetDate to handle both string and object formats
+  const normalizedTargetDate = targetDate && typeof targetDate === 'object' && targetDate !== null && targetDate && 'start' in targetDate
+    ? (targetDate as any).start
+    : targetDate;
+  
+  console.log('🔍 [DEBUG] targetDate:', targetDate, '-> normalized:', normalizedTargetDate);
+  
   // Debug: Check employee data structure
   if (employees.length > 0) {
     const sampleEmp = employees[0];
@@ -330,7 +378,7 @@ async function generateShiftsForSingleDate(
     const { data: vacationData, error: vacationError } = await supabase
       .from("vacation_masters")
       .select("employee_id")
-      .eq("vacation_date", targetDate);
+      .eq("vacation_date", normalizedTargetDate);
     
     const vacationEmployeeIds = new Set<string>();
     if (!vacationError && vacationData) {
@@ -383,8 +431,7 @@ async function generateShiftsForSingleDate(
     console.log('👥 Available employees (after vacation filter):', availableEmployees.length);
     
     // Load skill matrix for available employees
-    const employeeIds = availableEmployees.map(emp => emp.id || emp.従業員ID || emp.employee_id).filter(id => id);
-    const employeeSkillMatrix = await loadSkillMatrixFromDB(employeeIds);
+    const employeeSkillMatrix = await loadSkillMatrixFromDB(availableEmployees);
     console.log('📊 Skill matrix loaded for', employeeSkillMatrix.size, 'employees');
     
     if (availableEmployees.length === 0) {
@@ -691,7 +738,9 @@ async function generateShiftsForSingleDate(
           end_time: business.終了時間 || '05:30:00',
           status: 'scheduled',
           generation_batch_id: batchId,
-          location: location
+          location: location,
+          multi_day_set_id: undefined,
+          multi_day_info: undefined
         };
         
         shifts.push(shift);
@@ -876,7 +925,9 @@ async function generateShiftsForSingleDate(
             end_time: business.終了時間 || '17:00:00',
             status: 'scheduled',
             generation_batch_id: batchId,
-            location: location
+            location: location,
+            multi_day_set_id: undefined,
+            multi_day_info: undefined
           };
           
           shifts.push(shift);
@@ -1016,7 +1067,9 @@ async function generateShiftsForSingleDate(
           end_time: business.終了時間 || '17:00:00',
           status: 'scheduled',
           generation_batch_id: batchId,
-          location: location
+          location: location,
+          multi_day_set_id: undefined,
+          multi_day_info: undefined
         };
         
         shifts.push(shift);
@@ -1159,22 +1212,59 @@ export async function generateShifts(
   const cumulativeBusinessHistory = await loadBusinessHistoryFromDB();
   console.log(`📚 Loaded initial business history for ${cumulativeBusinessHistory.size} employees`);
   
+  // === MULTI-DAY BUSINESS PREPROCESSING ===
+  const batchId = uuidv4();
+  
+  // Load skill matrix for multi-day business assignment
+  const employeeSkillMatrix = await loadSkillMatrixFromDB(employees);
+  
+  // Import multi-day business functions
+  const { preprocessMultiDayBusinesses, filterOutMultiDayBusinesses } = require('./multi-day-integration-patch');
+  
+  // Preprocess multi-day businesses
+  const multiDayResult = await preprocessMultiDayBusinesses(
+    businessMasters,
+    dates,
+    employees,
+    batchId,
+    employeeSkillMatrix,
+    location
+  );
+  
+  // Filter out processed multi-day businesses from the regular flow
+  const regularBusinessMasters = filterOutMultiDayBusinesses(
+    businessMasters,
+    multiDayResult.processedBusinessIds
+  );
+  
+  console.log(`\n📊 Business split: ${multiDayResult.processedBusinessIds.size} multi-day, ${regularBusinessMasters.length} regular`);
+  // === END MULTI-DAY PREPROCESSING ===
+  
   // Accumulate results across all dates
-  const allShifts: Shift[] = [];
+  const allShifts: Shift[] = [...multiDayResult.multiDayShifts];
   const allViolations: string[] = [];
   const allUnassignedBusinesses: string[] = [];
   const allUnassignedEmployees: string[] = [];
   const allConstraintViolations: any[] = [];
-  let totalAssignedCount = 0;
-  let totalBusinessCount = 0;
+  let totalAssignedCount = multiDayResult.multiDayShifts.length;
+  let totalBusinessCount = multiDayResult.processedBusinessIds.size;
   
   // Process each date sequentially
   for (const targetDate of dates) {
     console.log(`\n📅 Processing date: ${targetDate}`);
     
+    // Filter out employees assigned to multi-day businesses on this date
+    const assignedEmployeesOnThisDate = multiDayResult.assignedEmployeesByDate.get(targetDate) || new Set();
+    const availableEmployeesForThisDate = employees.filter(emp => {
+      const empId = emp.id || emp.従業員ID || emp.employee_id;
+      return !assignedEmployeesOnThisDate.has(empId);
+    });
+    
+    console.log(`  Available employees: ${availableEmployeesForThisDate.length} (${assignedEmployeesOnThisDate.size} assigned to multi-day)`);
+    
     const result = await generateShiftsForSingleDate(
-      employees,
-      businessMasters,
+      availableEmployeesForThisDate,
+      regularBusinessMasters,
       targetDate,
       pairGroups,
       location,
@@ -1212,7 +1302,7 @@ export async function generateShifts(
   
   // Return aggregated results
   const isSuccessful = allShifts.length > 0;
-  const batchId = allShifts.length > 0 ? allShifts[0].generation_batch_id || uuidv4() : uuidv4();
+  // batchId already defined at the top of the function
   
   return {
     success: isSuccessful,
@@ -1236,3 +1326,4 @@ export async function generateShifts(
     business_history: cumulativeBusinessHistory
   };
 }
+

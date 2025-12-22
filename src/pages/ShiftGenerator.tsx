@@ -449,6 +449,8 @@ export default function ShiftGenerator() {
 
       // Call API server for shift generation
       console.log('🌐 Calling API server for shift generation');
+      console.log('📋 businessMasters being sent:', filteredBusinessMasters);
+      console.log('📋 Multi-day businesses:', filteredBusinessMasters.filter((b: any) => (b.運行日数 || b.duration) === 2));
       
       const response = await fetch('/api/generate-shifts', {
         method: 'POST',
@@ -474,7 +476,9 @@ export default function ShiftGenerator() {
         throw new Error(apiResult.error || 'Shift generation failed');
       }
       
-      console.log('✅ API response:', apiResult.summary);
+      console.log('✅ API response:', apiResult);
+      console.log('✅ API response.success:', apiResult.success);
+      console.log('✅ API response.shifts length:', apiResult.shifts?.length);
 
       // Process API results
       if (apiResult.shifts && apiResult.shifts.length > 0) {
@@ -488,16 +492,37 @@ export default function ShiftGenerator() {
             bm.業務名 === shift.business_name
           );
           
+          // Include shifts even if employee is not assigned (for multi-day shifts)
+          const businessName = shift.business_name || businessMaster?.業務名 || businessMaster?.name || shift.business_group || 'Unknown Business';
+          
+          // Normalize date to YYYY-MM-DD format
+          const rawDate = shift.shift_date || shift.date;
+          const normalizedDate = typeof rawDate === 'string' && rawDate.includes('T') 
+            ? rawDate.split('T')[0] 
+            : rawDate;
+          
           if (employee) {
-            const businessName = shift.business_name || businessMaster?.業務名 || businessMaster?.name || shift.business_group || 'Unknown Business';
             allShiftResults.push({
-              id: `shift_${shift.shift_date}_${businessName}_${index}`,
-              date: shift.shift_date || shift.date,
-                businessMaster: businessName,
-                employeeName: employee.name,
-                employeeId: employee.id
+              id: `shift_${normalizedDate}_${businessName}_${index}`,
+              date: normalizedDate,
+              businessMaster: businessName,
+              employeeName: employee.name,
+              employeeId: employee.id,
+              multi_day_set_id: shift.multi_day_set_id,
+              multi_day_info: shift.multi_day_info
             });
             totalAssigned++;
+          } else {
+            // Add unassigned shift (e.g., multi-day shifts waiting for assignment)
+            allShiftResults.push({
+              id: `shift_${normalizedDate}_${businessName}_${index}`,
+              date: normalizedDate,
+              businessMaster: businessName,
+              employeeName: '未割り当て',
+              employeeId: '',
+              multi_day_set_id: shift.multi_day_set_id,
+              multi_day_info: shift.multi_day_info
+            });
           }
         });
       }
@@ -517,6 +542,11 @@ export default function ShiftGenerator() {
         totalUnassigned = apiResult.assignment_summary.unassigned_businesses;
       }
 
+      console.log('📊 Total shifts to display:', allShiftResults.length);
+      console.log('📊 Sample shifts:', allShiftResults.slice(0, 5));
+      console.log('📊 Multi-day shifts:', allShiftResults.filter(s => s.multi_day_set_id).length);
+      console.log('📊 Unassigned shifts:', allShiftResults.filter(s => s.employeeName === '未割り当て').length);
+      
       setShiftResults(allShiftResults);
       setOriginalShiftResults([...allShiftResults]);
       setUnassignedBusinesses(allUnassignedBusinesses);
@@ -900,7 +930,9 @@ export default function ShiftGenerator() {
           business_name: result.businessMaster,
           date: result.date,
           location: selectedLocation,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          multi_day_set_id: result.multi_day_set_id || null,
+          multi_day_info: result.multi_day_info || null
         };
       });
 

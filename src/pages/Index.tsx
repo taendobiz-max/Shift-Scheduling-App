@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp } from 'lucide-react';
+import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, Workflow } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '@/utils/auth';
 
@@ -141,6 +141,25 @@ export default function Index() {
               <CardContent>
                 <p className="text-sm text-gray-600">
                   従業員ごとの勤務日数、勤務時間、休暇日数、手当回数を集計し、CSV出力ができます。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/business-rules">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-green-200 hover:border-green-400">
+              <CardHeader>
+                <CardTitle className="flex items-center text-green-700">
+                  <Workflow className="h-6 w-6 mr-2" />
+                  ビジネスルール管理
+                </CardTitle>
+                <CardDescription>
+                  シフト生成ルールの設定・管理
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  従業員フィルタ、ペア業務、制約チェックなどのビジネスルールを管理し、シフト生成を最適化できます。
                 </p>
               </CardContent>
             </Card>

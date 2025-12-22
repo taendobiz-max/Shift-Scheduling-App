@@ -1,44 +1,51 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://vipsfjdsspkczumuqnoi.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpcHNmamRzc3BrY3p1bXVxbm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NjM3MzEsImV4cCI6MjA3MjUzOTczMX0.kgAMk7sS_ZCHjkMSQxhQulPs0xmA8B9vhNRlDV5jhU8';
-
+const supabaseUrl = process.env.SUPABASE_URL || 'https://oazeiobncwkgbjrfqswu.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hemVpb2JuY3drZ2JqcmZxc3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE0NzQxMDIsImV4cCI6MjA0NzA1MDEwMn0.XeZPYHwQhcJdpjUwLDxhMkq7EYxDhLHFVcPVcPCWTqY';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkSkillMatrix() {
-  console.log('Checking skill_matrix table...\n');
+  console.log('🔍 Checking skill_matrix table...');
   
-  const { data, error, count } = await supabase
+  // Check for employee 00001001
+  const { data, error } = await supabase
     .from('skill_matrix')
-    .select('*', { count: 'exact' })
-    .limit(10);
+    .select('*')
+    .eq('employee_id', '00001001');
   
   if (error) {
-    console.error('Error:', error);
+    console.error('❌ Error:', error);
     return;
   }
   
-  console.log(`Total records: ${count}`);
-  console.log(`Sample records (first 10):`);
+  console.log('📊 Skill matrix for employee 00001001:');
   console.log(JSON.stringify(data, null, 2));
   
-  // Count by skill level
-  const { data: skillLevels } = await supabase
+  // Check all records
+  const { data: allData, error: allError } = await supabase
     .from('skill_matrix')
-    .select('skill_level');
+    .select('employee_id, business_group, skill_level')
+    .limit(10);
   
-  if (skillLevels) {
-    const levelCounts = {};
-    skillLevels.forEach(item => {
-      const level = item.skill_level || 'null';
-      levelCounts[level] = (levelCounts[level] || 0) + 1;
-    });
-    
-    console.log('\nSkill level distribution:');
-    Object.entries(levelCounts).forEach(([level, count]) => {
-      console.log(`  ${level}: ${count}`);
-    });
+  if (allError) {
+    console.error('❌ Error:', allError);
+    return;
   }
+  
+  console.log('\n📊 All skill_matrix records (first 10):');
+  console.log(JSON.stringify(allData, null, 2));
+  
+  // Count total records
+  const { count, error: countError } = await supabase
+    .from('skill_matrix')
+    .select('*', { count: 'exact', head: true });
+  
+  if (countError) {
+    console.error('❌ Error:', countError);
+    return;
+  }
+  
+  console.log('\n📊 Total records in skill_matrix:', count);
 }
 
-checkSkillMatrix().catch(console.error);
+checkSkillMatrix();

@@ -46,21 +46,40 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateShifts = generateShifts;
 var uuid_1 = require("uuid");
 var supabaseClient_1 = require("./supabaseClient");
 var constraintEngine_1 = require("./constraintEngine");
 // Load skill matrix from database
-function loadSkillMatrixFromDB(employeeIds) {
+// Load skill matrix from database
+// Now accepts employee objects and uses employee_id (numeric) for querying
+function loadSkillMatrixFromDB(employees) {
     return __awaiter(this, void 0, void 0, function () {
-        var skillMap, _a, data, error, err_1;
+        var skillMap, numericEmployeeIds, _a, data, error, idMap_1, err_1;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
-                    console.log('🔍 [DEBUG] loadSkillMatrixFromDB called for', employeeIds.length, 'employees');
+                    console.log('🔍 [DEBUG] loadSkillMatrixFromDB called for', employees.length, 'employees');
                     skillMap = new Map();
-                    if (employeeIds.length === 0) {
+                    if (employees.length === 0) {
+                        return [2 /*return*/, skillMap];
+                    }
+                    numericEmployeeIds = employees
+                        .map(function (emp) { return emp.employee_id || emp.従業員ID; })
+                        .filter(function (id) { return id; });
+                    console.log('🔍 [DEBUG] Numeric employee IDs for skill query:', numericEmployeeIds);
+                    if (numericEmployeeIds.length === 0) {
+                        console.warn('⚠️ No numeric employee_ids found');
                         return [2 /*return*/, skillMap];
                     }
                     _b.label = 1;
@@ -69,24 +88,43 @@ function loadSkillMatrixFromDB(employeeIds) {
                     return [4 /*yield*/, supabaseClient_1.supabase
                             .from('skill_matrix')
                             .select('employee_id, business_group, skill_level')
-                            .in('employee_id', employeeIds)];
+                            .in('employee_id', numericEmployeeIds)];
                 case 2:
                     _a = _b.sent(), data = _a.data, error = _a.error;
+                    console.log('🔍 [DEBUG] skill_matrix query result - error:', error, 'data length:', data ? data.length : 'null');
+                    if (data && data.length > 0) {
+                        console.log('🔍 [DEBUG] skill_matrix first 3 records:', JSON.stringify(data.slice(0, 3), null, 2));
+                    }
                     if (error) {
                         console.error('⚠️ Failed to load skill matrix from DB:', error);
                         return [2 /*return*/, skillMap];
                     }
                     if (data) {
+                        idMap_1 = new Map();
+                        employees.forEach(function (emp) {
+                            var numericId = emp.employee_id || emp.従業員ID;
+                            var uuid = emp.id || emp.従業員ID || emp.employee_id;
+                            if (numericId && uuid) {
+                                idMap_1.set(numericId, uuid);
+                            }
+                        });
+                        console.log('🔍 [DEBUG] ID mapping created:', idMap_1.size, 'mappings');
                         data.forEach(function (record) {
-                            var empId = record.employee_id;
+                            var numericEmpId = record.employee_id;
+                            var uuid = idMap_1.get(numericEmpId);
                             var bizGroup = record.business_group;
                             var skillLevel = record.skill_level;
+                            if (!uuid) {
+                                console.warn('⚠️ No UUID found for numeric employee_id:', numericEmpId);
+                                return;
+                            }
                             // Only include skills with valid levels (○ or △)
                             if (skillLevel === '○' || skillLevel === '△' || skillLevel === '経験あり' || skillLevel === '対応可能') {
-                                if (!skillMap.has(empId)) {
-                                    skillMap.set(empId, new Set());
+                                if (!skillMap.has(uuid)) {
+                                    skillMap.set(uuid, new Set());
                                 }
-                                skillMap.get(empId).add(bizGroup);
+                                skillMap.get(uuid).add(bizGroup);
+                                console.log('✅ Added skill for', uuid, ':', bizGroup);
                             }
                         });
                     }
@@ -254,7 +292,7 @@ function canAssignBusiness(employeeId, business, currentShifts, allBusinessMaste
 // Enhanced generateShifts function with multi-assignment support
 function generateShiftsForSingleDate(employees, businessMasters, targetDate, pairGroups, location, existingBusinessHistory) {
     return __awaiter(this, void 0, void 0, function () {
-        var sampleEmp, batchId, shifts, violations_1, unassigned_businesses_1, constraintViolations, constraintEngine, employeeBusinessHistory_1, _a, vacationData, vacationError, vacationEmployeeIds_1, allEmployeeIds, _b, employeeDetails, empError, rollCallMap_1, availableEmployees_1, employeeIds, employeeSkillMatrix, employeeAssignmentCounts_1, totalUniqueBusinesses_1, avgDiversity, businessGroups_1, singleBusinesses_2, processedBusinesses_1, businessGroupMap_1, assignedBusinesses, rollCallBusinesses_2, nonRollCallSingles_1, _loop_1, _i, rollCallBusinesses_1, business, _loop_2, groupIndex, _loop_3, _c, singleBusinesses_1, business, assignment_summary, constraint_report, unassignedEmployees_1, isSuccessful, error_1;
+        var normalizedTargetDate, sampleEmp, batchId, shifts, violations_1, unassigned_businesses_1, constraintViolations, constraintEngine, employeeBusinessHistory_1, _a, vacationData, vacationError, vacationEmployeeIds_1, allEmployeeIds, _b, employeeDetails, empError, rollCallMap_1, availableEmployees_1, employeeSkillMatrix, employeeAssignmentCounts_1, totalUniqueBusinesses_1, avgDiversity, businessGroups_1, singleBusinesses_2, processedBusinesses_1, businessGroupMap_1, assignedBusinesses, rollCallBusinesses_2, nonRollCallSingles_1, _loop_1, _i, rollCallBusinesses_1, business, _loop_2, groupIndex, _loop_3, _c, singleBusinesses_1, business, assignment_summary, constraint_report, unassignedEmployees_1, isSuccessful, error_1;
         return __generator(this, function (_d) {
             switch (_d.label) {
                 case 0:
@@ -262,6 +300,10 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                     console.log('👥 Available employees:', employees.length);
                     console.log('🏢 Business masters:', businessMasters.length);
                     console.log('📍 Location:', location);
+                    normalizedTargetDate = targetDate && typeof targetDate === 'object' && targetDate !== null && targetDate && 'start' in targetDate
+                        ? targetDate.start
+                        : targetDate;
+                    console.log('🔍 [DEBUG] targetDate:', targetDate, '-> normalized:', normalizedTargetDate);
                     // Debug: Check employee data structure
                     if (employees.length > 0) {
                         sampleEmp = employees[0];
@@ -303,7 +345,7 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                     return [4 /*yield*/, supabaseClient_1.supabase
                             .from("vacation_masters")
                             .select("employee_id")
-                            .eq("vacation_date", targetDate)];
+                            .eq("vacation_date", normalizedTargetDate)];
                 case 6:
                     _a = _d.sent(), vacationData = _a.data, vacationError = _a.error;
                     vacationEmployeeIds_1 = new Set();
@@ -359,8 +401,7 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                         return !vacationEmployeeIds_1.has(empId);
                     });
                     console.log('👥 Available employees (after vacation filter):', availableEmployees_1.length);
-                    employeeIds = availableEmployees_1.map(function (emp) { return emp.id || emp.従業員ID || emp.employee_id; }).filter(function (id) { return id; });
-                    return [4 /*yield*/, loadSkillMatrixFromDB(employeeIds)];
+                    return [4 /*yield*/, loadSkillMatrixFromDB(availableEmployees_1)];
                 case 8:
                     employeeSkillMatrix = _d.sent();
                     console.log('📊 Skill matrix loaded for', employeeSkillMatrix.size, 'employees');
@@ -633,7 +674,9 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                                         end_time: business.終了時間 || '05:30:00',
                                         status: 'scheduled',
                                         generation_batch_id: batchId,
-                                        location: location
+                                        location: location,
+                                        multi_day_set_id: undefined,
+                                        multi_day_info: undefined
                                     };
                                     shifts.push(shift);
                                     assignedBusinesses++;
@@ -829,7 +872,9 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                                         end_time: business.終了時間 || '17:00:00',
                                         status: 'scheduled',
                                         generation_batch_id: batchId,
-                                        location: location
+                                        location: location,
+                                        multi_day_set_id: undefined,
+                                        multi_day_info: undefined
                                     };
                                     shifts.push(shift);
                                     assignedBusinesses++;
@@ -977,7 +1022,9 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
                                         end_time: business.終了時間 || '17:00:00',
                                         status: 'scheduled',
                                         generation_batch_id: batchId,
-                                        location: location
+                                        location: location,
+                                        multi_day_set_id: undefined,
+                                        multi_day_info: undefined
                                     };
                                     shifts.push(shift);
                                     assignedBusinesses++;
@@ -1109,64 +1156,96 @@ function generateShiftsForSingleDate(employees, businessMasters, targetDate, pai
  */
 function generateShifts(employees, businessMasters, dateRange, pairGroups, location) {
     return __awaiter(this, void 0, void 0, function () {
-        var dates, cumulativeBusinessHistory, allShifts, allViolations, allUnassignedBusinesses, allUnassignedEmployees, allConstraintViolations, totalAssignedCount, totalBusinessCount, _i, dates_1, targetDate, result, isSuccessful, batchId;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
+        var dates, cumulativeBusinessHistory, batchId, employeeSkillMatrix, _a, preprocessMultiDayBusinesses, filterOutMultiDayBusinesses, multiDayResult, regularBusinessMasters, allShifts, allViolations, allUnassignedBusinesses, allUnassignedEmployees, allConstraintViolations, totalAssignedCount, totalBusinessCount, _loop_4, _i, dates_1, targetDate, isSuccessful;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
                 case 0:
+                    console.log('🔴 [DEBUG] generateShifts function called!');
+                    console.log('🔴 [DEBUG] employees:', employees.length);
+                    console.log('🔴 [DEBUG] businessMasters:', businessMasters.length);
+                    console.log('🔴 [DEBUG] dateRange:', dateRange);
                     console.log('🚀 Starting multi-day shift generation');
                     dates = Array.isArray(dateRange) ? dateRange : [dateRange];
                     console.log("\uD83D\uDCC5 Processing ".concat(dates.length, " date(s):"), dates);
                     return [4 /*yield*/, loadBusinessHistoryFromDB()];
                 case 1:
-                    cumulativeBusinessHistory = _a.sent();
+                    cumulativeBusinessHistory = _b.sent();
                     console.log("\uD83D\uDCDA Loaded initial business history for ".concat(cumulativeBusinessHistory.size, " employees"));
-                    allShifts = [];
+                    batchId = (0, uuid_1.v4)();
+                    return [4 /*yield*/, loadSkillMatrixFromDB(employees)];
+                case 2:
+                    employeeSkillMatrix = _b.sent();
+                    _a = require('./multi-day-integration-patch'), preprocessMultiDayBusinesses = _a.preprocessMultiDayBusinesses, filterOutMultiDayBusinesses = _a.filterOutMultiDayBusinesses;
+                    return [4 /*yield*/, preprocessMultiDayBusinesses(businessMasters, dates, employees, batchId, employeeSkillMatrix, location)];
+                case 3:
+                    multiDayResult = _b.sent();
+                    regularBusinessMasters = filterOutMultiDayBusinesses(businessMasters, multiDayResult.processedBusinessIds);
+                    console.log("\n\uD83D\uDCCA Business split: ".concat(multiDayResult.processedBusinessIds.size, " multi-day, ").concat(regularBusinessMasters.length, " regular"));
+                    allShifts = __spreadArray([], multiDayResult.multiDayShifts, true);
                     allViolations = [];
                     allUnassignedBusinesses = [];
                     allUnassignedEmployees = [];
                     allConstraintViolations = [];
-                    totalAssignedCount = 0;
-                    totalBusinessCount = 0;
-                    _i = 0, dates_1 = dates;
-                    _a.label = 2;
-                case 2:
-                    if (!(_i < dates_1.length)) return [3 /*break*/, 5];
-                    targetDate = dates_1[_i];
-                    console.log("\n\uD83D\uDCC5 Processing date: ".concat(targetDate));
-                    return [4 /*yield*/, generateShiftsForSingleDate(employees, businessMasters, targetDate, pairGroups, location, cumulativeBusinessHistory)];
-                case 3:
-                    result = _a.sent();
-                    // Accumulate results
-                    allShifts.push.apply(allShifts, result.shifts);
-                    allViolations.push.apply(allViolations, result.violations);
-                    if (result.unassigned_businesses) {
-                        allUnassignedBusinesses.push.apply(allUnassignedBusinesses, result.unassigned_businesses);
-                    }
-                    if (result.unassigned_employees) {
-                        allUnassignedEmployees.push.apply(allUnassignedEmployees, result.unassigned_employees);
-                    }
-                    if (result.constraint_violations) {
-                        allConstraintViolations.push.apply(allConstraintViolations, result.constraint_violations);
-                    }
-                    totalAssignedCount += result.assigned_count || 0;
-                    totalBusinessCount += result.total_businesses || 0;
-                    // Update cumulative business history with new assignments
-                    if (result.business_history) {
-                        result.business_history.forEach(function (businesses, empId) {
-                            var existing = cumulativeBusinessHistory.get(empId) || new Set();
-                            businesses.forEach(function (biz) { return existing.add(biz); });
-                            cumulativeBusinessHistory.set(empId, existing);
+                    totalAssignedCount = multiDayResult.multiDayShifts.length;
+                    totalBusinessCount = multiDayResult.processedBusinessIds.size;
+                    _loop_4 = function (targetDate) {
+                        var assignedEmployeesOnThisDate, availableEmployeesForThisDate, result;
+                        return __generator(this, function (_c) {
+                            switch (_c.label) {
+                                case 0:
+                                    console.log("\n\uD83D\uDCC5 Processing date: ".concat(targetDate));
+                                    assignedEmployeesOnThisDate = multiDayResult.assignedEmployeesByDate.get(targetDate) || new Set();
+                                    availableEmployeesForThisDate = employees.filter(function (emp) {
+                                        var empId = emp.id || emp.従業員ID || emp.employee_id;
+                                        return !assignedEmployeesOnThisDate.has(empId);
+                                    });
+                                    console.log("  Available employees: ".concat(availableEmployeesForThisDate.length, " (").concat(assignedEmployeesOnThisDate.size, " assigned to multi-day)"));
+                                    return [4 /*yield*/, generateShiftsForSingleDate(availableEmployeesForThisDate, regularBusinessMasters, targetDate, pairGroups, location, cumulativeBusinessHistory)];
+                                case 1:
+                                    result = _c.sent();
+                                    // Accumulate results
+                                    allShifts.push.apply(allShifts, result.shifts);
+                                    allViolations.push.apply(allViolations, result.violations);
+                                    if (result.unassigned_businesses) {
+                                        allUnassignedBusinesses.push.apply(allUnassignedBusinesses, result.unassigned_businesses);
+                                    }
+                                    if (result.unassigned_employees) {
+                                        allUnassignedEmployees.push.apply(allUnassignedEmployees, result.unassigned_employees);
+                                    }
+                                    if (result.constraint_violations) {
+                                        allConstraintViolations.push.apply(allConstraintViolations, result.constraint_violations);
+                                    }
+                                    totalAssignedCount += result.assigned_count || 0;
+                                    totalBusinessCount += result.total_businesses || 0;
+                                    // Update cumulative business history with new assignments
+                                    if (result.business_history) {
+                                        result.business_history.forEach(function (businesses, empId) {
+                                            var existing = cumulativeBusinessHistory.get(empId) || new Set();
+                                            businesses.forEach(function (biz) { return existing.add(biz); });
+                                            cumulativeBusinessHistory.set(empId, existing);
+                                        });
+                                    }
+                                    console.log("\u2705 ".concat(targetDate, ": Generated ").concat(result.shifts.length, " shifts"));
+                                    return [2 /*return*/];
+                            }
                         });
-                    }
-                    console.log("\u2705 ".concat(targetDate, ": Generated ").concat(result.shifts.length, " shifts"));
-                    _a.label = 4;
+                    };
+                    _i = 0, dates_1 = dates;
+                    _b.label = 4;
                 case 4:
-                    _i++;
-                    return [3 /*break*/, 2];
+                    if (!(_i < dates_1.length)) return [3 /*break*/, 7];
+                    targetDate = dates_1[_i];
+                    return [5 /*yield**/, _loop_4(targetDate)];
                 case 5:
+                    _b.sent();
+                    _b.label = 6;
+                case 6:
+                    _i++;
+                    return [3 /*break*/, 4];
+                case 7:
                     console.log("\n\uD83C\uDF89 Multi-day generation complete: ".concat(allShifts.length, " total shifts across ").concat(dates.length, " day(s)"));
                     isSuccessful = allShifts.length > 0;
-                    batchId = allShifts.length > 0 ? allShifts[0].generation_batch_id || (0, uuid_1.v4)() : (0, uuid_1.v4)();
+                    // batchId already defined at the top of the function
                     return [2 /*return*/, {
                             success: isSuccessful,
                             batch_id: batchId,
