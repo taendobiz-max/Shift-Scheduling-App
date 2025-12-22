@@ -1,5 +1,6 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from './supabaseClient';
 import { EnhancedConstraint, ConstraintFormData, ConstraintViolation } from '@/types/constraint';
+import { UnifiedRuleAdapter } from './UnifiedRuleAdapter';
 
 interface ConstraintStatistics {
   total: number;
@@ -15,53 +16,20 @@ export class ConstraintManager {
 
   /**
    * 全ての制約条件を取得
+   * unified_shift_rulesテーブルから取得（フォールバック付き）
    */
   static async getAllConstraints(): Promise<EnhancedConstraint[]> {
-    try {
-      const { data, error } = await supabase
-        .from(this.TABLE_NAME)
-        .select('*')
-        .order('priority_level', { ascending: true })
-        .order('constraint_category', { ascending: true })
-        .order('constraint_name', { ascending: true });
-
-      if (error) {
-        throw new Error(`制約条件の取得に失敗しました: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('制約条件取得エラー:', error);
-      throw error;
-    }
+    console.log('🔄 [CONSTRAINT_MANAGER] Loading all constraints via UnifiedRuleAdapter');
+    return await UnifiedRuleAdapter.getAllConstraintsWithFallback();
   }
 
   /**
    * 指定拠点の有効な制約条件を取得
+   * unified_shift_rulesテーブルから取得（フォールバック付き）
    */
   static async getActiveConstraintsByLocation(location: string): Promise<EnhancedConstraint[]> {
-    try {
-      const { data, error } = await supabase
-        .from(this.TABLE_NAME)
-        .select('*')
-        .eq('is_active', true)
-        .order('priority_level', { ascending: true });
-
-      if (error) {
-        throw new Error(`制約条件の取得に失敗しました: ${error.message}`);
-      }
-
-      // 指定拠点に適用される制約のみフィルタリング
-      const filteredConstraints = (data || []).filter(constraint => 
-        constraint.applicable_locations.includes(location) || 
-        constraint.applicable_locations.includes('全拠点')
-      );
-
-      return filteredConstraints;
-    } catch (error) {
-      console.error('制約条件取得エラー:', error);
-      throw error;
-    }
+    console.log(`🔄 [CONSTRAINT_MANAGER] Loading active constraints for location: ${location} via UnifiedRuleAdapter`);
+    return await UnifiedRuleAdapter.getActiveConstraintsByLocationWithFallback(location);
   }
 
   /**

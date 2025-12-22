@@ -17,9 +17,12 @@ import {
   Settings,
   AlertCircle,
   CheckCircle,
-  Info
+  Info,
+  Home
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import UnifiedRuleManager from '../utils/UnifiedRuleManager';
+import EditRuleModal from '../components/EditRuleModal';
 import type { UnifiedRule, RuleType } from '../types/unifiedRule';
 
 const UnifiedRuleManagement: React.FC = () => {
@@ -30,6 +33,7 @@ const UnifiedRuleManagement: React.FC = () => {
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | 'all'>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [editingRule, setEditingRule] = useState<UnifiedRule | null>(null);
   
   // 統計情報
   const [stats, setStats] = useState({
@@ -148,6 +152,21 @@ const UnifiedRuleManagement: React.FC = () => {
     }
   };
 
+  const handleEdit = (rule: UnifiedRule) => {
+    setEditingRule(rule);
+  };
+
+  const handleSaveEdit = async (updatedRule: UnifiedRule) => {
+    try {
+      await UnifiedRuleManager.updateRule(updatedRule.id, updatedRule);
+      await loadRules();
+      await loadStatistics();
+    } catch (error) {
+      console.error('ルール更新エラー:', error);
+      throw error;
+    }
+  };
+
   // 強制レベルのアイコン
   const getEnforcementIcon = (level: string) => {
     switch (level) {
@@ -181,13 +200,21 @@ const UnifiedRuleManagement: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* ヘッダー */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          シフトルール管理
-        </h1>
-        <p className="text-gray-600">
-          制約条件、フィルター、割り当てロジック、検証、最適化ルールを統合管理
-        </p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            シフトルール管理
+          </h1>
+          <p className="text-gray-600">
+            制約条件、フィルター、割り当てロジック、検証、最適化ルールを統合管理
+          </p>
+        </div>
+        <Link to="/">
+          <button className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <Home className="w-5 h-5" />
+            <span>ホーム</span>
+          </button>
+        </Link>
       </div>
 
       {/* 統計情報 */}
@@ -355,6 +382,13 @@ const UnifiedRuleManagement: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <button
+                          onClick={() => handleEdit(rule)}
+                          className="text-gray-600 hover:text-blue-600"
+                          title="編集"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
                           onClick={() => handleToggleActive(rule.id)}
                           className="text-gray-600 hover:text-blue-600"
                           title={rule.is_active ? '無効にする' : '有効にする'}
@@ -386,6 +420,15 @@ const UnifiedRuleManagement: React.FC = () => {
       <div className="mt-4 text-sm text-gray-600 text-center">
         {filteredRules.length} 件のルールを表示中（全 {rules.length} 件）
       </div>
+
+      {/* 編集モーダル */}
+      {editingRule && (
+        <EditRuleModal
+          rule={editingRule}
+          onClose={() => setEditingRule(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
     </div>
   );
 };
