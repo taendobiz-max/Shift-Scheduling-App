@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { BusinessRuleAdapter } from './BusinessRuleAdapter';
 import type {
   BusinessRule,
   RuleContext,
@@ -25,10 +26,14 @@ export class BusinessRuleEngine implements IBusinessRuleEngine {
   private rules: BusinessRule[] = [];
   private handlers: Map<string, RuleHandler> = new Map();
   private supabase: any;
+  private adapter: BusinessRuleAdapter;
 
   constructor(supabaseUrl?: string, supabaseKey?: string) {
     if (supabaseUrl && supabaseKey) {
       this.supabase = createClient(supabaseUrl, supabaseKey);
+      this.adapter = new BusinessRuleAdapter(supabaseUrl, supabaseKey);
+    } else {
+      this.adapter = new BusinessRuleAdapter();
     }
     
     // ハンドラーを登録
@@ -48,39 +53,16 @@ export class BusinessRuleEngine implements IBusinessRuleEngine {
 
   /**
    * ルールをデータベースから読み込み
+   * BusinessRuleAdapterを使用してunified_shift_rulesまたはbusiness_rulesから取得
    */
   async loadRules(location?: string): Promise<void> {
     try {
       console.log(`🔍 [RULE ENGINE] loadRules called with location: ${location}`);
-      console.log(`🔍 [RULE ENGINE] Supabase client initialized: ${!!this.supabase}`);
       
-      if (!this.supabase) {
-        console.warn('⚠️ [RULE ENGINE] Supabase client not initialized, skipping rule loading');
-        return;
-      }
-
-      console.log(`🔍 [RULE ENGINE] Querying business_rules table...`);
+      // BusinessRuleAdapterを使用してルールを取得
+      this.rules = await this.adapter.loadBusinessRules(location);
       
-      let query = this.supabase
-        .from('business_rules')
-        .select('*')
-        .eq('enabled', true)
-        .order('priority', { ascending: false });
-
-      if (location) {
-        console.log(`🔍 [RULE ENGINE] Filtering by location: ${location}`);
-        query = query.or(`営業所.eq.${location},営業所.is.null`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('❌ [RULE ENGINE] Query error:', error);
-        throw error;
-      }
-
-      this.rules = data || [];
-      console.log(`✅ [RULE ENGINE] Loaded ${this.rules.length} rules`);
+      console.log(`✅ [RULE ENGINE] Loaded ${this.rules.length} rules via BusinessRuleAdapter`);
       if (this.rules.length > 0) {
         console.log(`📋 [RULE ENGINE] Rules:`, this.rules.map(r => `${r.rule_name} (priority: ${r.priority})`));
       }
