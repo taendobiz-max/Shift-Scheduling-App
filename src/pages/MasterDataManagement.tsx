@@ -32,7 +32,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  Layers
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabaseClient';
@@ -976,6 +977,42 @@ export default function MasterDataManagement() {
 
         {/* Enhanced Constraints Tab */}
         <TabsContent value="constraints" className="space-y-6">
+          {/* Deprecation Warning */}
+          <Card className="border-yellow-500 bg-yellow-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-800">
+                <AlertCircle className="h-5 w-5" />
+                この機能は非推奨となりました
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-yellow-800">
+                制約条件の管理機能は<strong>「シフトルール管理」画面</strong>に統合されました。
+                今後は統合ルール管理システムをご利用ください。
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => window.location.href = '/unified-rules'} 
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  シフトルール管理画面へ移動
+                </Button>
+              </div>
+              <div className="mt-4 p-3 bg-white rounded border border-yellow-200">
+                <p className="text-xs text-gray-600">
+                  <strong>統合ルール管理システムの利点:</strong>
+                </p>
+                <ul className="text-xs text-gray-600 mt-2 space-y-1 list-disc list-inside">
+                  <li>制約条件、フィルター、割り当てロジック、検証、最適化ルールを一元管理</li>
+                  <li>より柔軟なルール設定（JSON形式でカスタマイズ可能）</li>
+                  <li>拠点別のルール適用が容易</li>
+                  <li>ルールの優先度と強制レベルの明確な管理</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Constraint Statistics */}
           {constraintStats && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
