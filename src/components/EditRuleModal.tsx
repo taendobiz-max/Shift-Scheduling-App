@@ -13,7 +13,18 @@ interface EditRuleModalProps {
 }
 
 const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) => {
-  const [formData, setFormData] = useState<UnifiedRule>(rule);
+  const [formData, setFormData] = useState<UnifiedRule>(rule.id ? rule : {
+    ...rule,
+    rule_name: '',
+    rule_type: 'constraint',
+    rule_category: '',
+    description: '',
+    applicable_locations: ['全拠点'],
+    priority_level: 5,
+    enforcement_level: 'recommended',
+    rule_config: {},
+    is_active: true
+  });
   const [saving, setSaving] = useState(false);
 
   // ルールタイプのラベル
@@ -53,7 +64,7 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">ルール編集</h2>
+          <h2 className="text-xl font-bold text-gray-900">{rule.id ? 'ルール編集' : 'ルール新規作成'}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -128,7 +139,7 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               適用営業所 <span className="text-red-500">*</span>
             </label>
             <div className="space-y-2">
-              {['全拠点', '東京', '川越'].map((location) => (
+              {['全拠点', '東京', '川越', '川口'].map((location) => (
                 <label key={location} className="flex items-center space-x-2">
                   <input
                     type="checkbox"

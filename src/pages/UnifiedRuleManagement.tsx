@@ -165,11 +165,18 @@ const UnifiedRuleManagement: React.FC = () => {
 
   const handleSaveEdit = async (updatedRule: UnifiedRule) => {
     try {
-      await UnifiedRuleManager.updateRule(updatedRule.id, updatedRule);
+      if (updatedRule.id) {
+        // 更新
+        await UnifiedRuleManager.updateRule(updatedRule.id, updatedRule);
+      } else {
+        // 新規作成
+        const { id, created_at, updated_at, ...ruleData } = updatedRule;
+        await UnifiedRuleManager.createRule(ruleData);
+      }
       await loadRules();
       await loadStatistics();
     } catch (error) {
-      console.error('ルール更新エラー:', error);
+      console.error('ルール保存エラー:', error);
       throw error;
     }
   };
@@ -216,12 +223,21 @@ const UnifiedRuleManagement: React.FC = () => {
             制約条件、フィルター、割り当てロジック、検証、最適化ルールを統合管理
           </p>
         </div>
-        <Link to="/">
-          <button className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            <Home className="w-5 h-5" />
-            <span>ホーム</span>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setEditingRule({} as UnifiedRule)}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span>新規作成</span>
           </button>
-        </Link>
+          <Link to="/">
+            <button className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <Home className="w-5 h-5" />
+              <span>ホーム</span>
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* 統計情報 */}
