@@ -1,14 +1,22 @@
 /**
  * 制約グループ評価エンジン
  * OR/AND条件で複数の制約をグループ化して評価
- * 
- * v2: UnifiedRuleAdapter対応
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { UnifiedRuleAdapter, ConstraintGroup } from './UnifiedRuleAdapter';
+import { supabase } from './supabaseClient';
 import { EnhancedConstraint, ConstraintViolation, ConstraintValidationResult } from '@/types/constraint';
 import { validateSplitRest, checkMonthlySplitRestLimit } from './splitRestValidator';
+
+export interface ConstraintGroup {
+  id: string;
+  group_name: string;
+  group_description?: string;
+  evaluation_logic: 'OR' | 'AND';
+  priority_level: number;
+  is_active: boolean;
+  constraints?: EnhancedConstraint[];
+}
 
 interface Employee {
   id: string;
@@ -37,7 +45,18 @@ interface ShiftContext {
  */
 export async function getAllConstraintGroups(): Promise<ConstraintGroup[]> {
   try {
-    return await UnifiedRuleAdapter.getAllConstraintGroupsWithFallback();
+    const { data, error } = await supabase
+      .from('constraint_groups')
+      .select('*')
+      .eq('is_active', true)
+      .order('priority_level', { ascending: true });
+    
+    if (error) {
+      console.error('❌ [CONSTRAINT_GROUP] Failed to fetch constraint groups:', error);
+      return [];
+    }
+    
+    return data || [];
   } catch (error) {
     console.error('❌ [CONSTRAINT_GROUP] Error fetching constraint groups:', error);
     return [];
@@ -49,7 +68,18 @@ export async function getAllConstraintGroups(): Promise<ConstraintGroup[]> {
  */
 export async function getConstraintsByGroupId(groupId: string): Promise<EnhancedConstraint[]> {
   try {
-    return await UnifiedRuleAdapter.getConstraintsByGroupIdWithFallback(groupId);
+    const { data, error } = await supabase
+      .from('enhanced_constraints')
+      .select('*')
+      .eq('constraint_group_id', groupId)
+      .eq('is_active', true);
+    
+    if (error) {
+      console.error('❌ [CONSTRAINT_GROUP] Failed to fetch constraints for group:', error);
+      return [];
+    }
+    
+    return data || [];
   } catch (error) {
     console.error('❌ [CONSTRAINT_GROUP] Error fetching constraints:', error);
     return [];
@@ -72,12 +102,14 @@ export async function evaluateConstraintGroup(
   const violations: ConstraintViolation[] = [];
   
   // グループに所属する制約条件を取得
-  const constraints = await getConstraintsByGroupId(group.id);
+  if (!group.constraints || group.constraints.length === 0) {
+    group.constraints = await getConstraintsByGroupId(group.id);
+  }
   
   // 各制約条件を評価
   const results: ConstraintValidationResult[] = [];
   
-  for (const constraint of constraints) {
+  for (const constraint of group.constraints) {
     const result = constraintEngine.validateShiftAssignment(
       employee,
       shift,
@@ -302,5 +334,3 @@ export async function evaluateAllConstraintGroups(
   };
 }
 
-// 型エクスポート
-export type { ConstraintGroup };
