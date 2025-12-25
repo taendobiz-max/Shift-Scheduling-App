@@ -31,7 +31,7 @@ const UnifiedRuleManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | 'all'>('all');
-  const [selectedLocation, setSelectedLocation] = useState<string>('all');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [editingRule, setEditingRule] = useState<UnifiedRule | null>(null);
   
@@ -68,7 +68,7 @@ const UnifiedRuleManagement: React.FC = () => {
   // フィルタリング
   useEffect(() => {
     filterRules();
-  }, [rules, searchQuery, selectedRuleType, selectedLocation, showActiveOnly]);
+  }, [rules, searchQuery, selectedRuleType, selectedLocations, showActiveOnly]);
 
   const loadRules = async () => {
     try {
@@ -92,6 +92,14 @@ const UnifiedRuleManagement: React.FC = () => {
     }
   };
 
+  const handleLocationToggle = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location)
+        ? prev.filter(loc => loc !== location)
+        : [...prev, location]
+    );
+  };
+
   const filterRules = () => {
     let filtered = [...rules];
 
@@ -105,11 +113,10 @@ const UnifiedRuleManagement: React.FC = () => {
       filtered = filtered.filter(r => r.rule_type === selectedRuleType);
     }
 
-    // 営業所フィルター
-    if (selectedLocation !== 'all') {
+    // 営業所フィルター（チェックボックス形式）
+    if (selectedLocations.length > 0) {
       filtered = filtered.filter(r => 
-        r.applicable_locations.includes(selectedLocation) ||
-        r.applicable_locations.includes('全拠点')
+        selectedLocations.some(loc => r.applicable_locations.includes(loc))
       );
     }
 
@@ -271,17 +278,21 @@ const UnifiedRuleManagement: React.FC = () => {
             <option value="optimization">最適化</option>
           </select>
 
-          {/* 営業所フィルター */}
-          <select
-            value={selectedLocation}
-            onChange={(e) => setSelectedLocation(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">すべての営業所</option>
-            <option value="全拠点">全拠点</option>
-            <option value="東京">東京</option>
-            <option value="川越">川越</option>
-          </select>
+          {/* 営業所フィルター（チェックボックス） */}
+          <div className="flex items-center gap-4 px-4 py-2 border border-gray-300 rounded-lg bg-white">
+            <span className="text-sm text-gray-600 font-medium">営業所:</span>
+            {['全拠点', '東京', '川越', '川口'].map(location => (
+              <label key={location} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedLocations.includes(location)}
+                  onChange={() => handleLocationToggle(location)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{location}</span>
+              </label>
+            ))}
+          </div>
 
           {/* 有効/無効フィルター */}
           <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
