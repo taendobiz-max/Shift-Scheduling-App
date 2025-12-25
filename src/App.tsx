@@ -11,6 +11,7 @@ import ShiftGenerator from './pages/ShiftGenerator';
 import VacationManagement from './pages/VacationManagement';
 import Reports from './pages/Reports';
 import Login from './pages/Login';
+import Profile from './pages/Profile';
 import BusinessRuleManagement from './pages/BusinessRuleManagement';
 import UnifiedRuleManagement from './pages/UnifiedRuleManagement';
 import UserManagement from './pages/UserManagement';
@@ -30,6 +31,7 @@ const App = () => {
             {/* 一般ユーザー（権限レベル1）がアクセス可能 */}
             <Route path="/" element={<ProtectedRoute requiredRole={1}><Index /></ProtectedRoute>} />
             <Route path="/shift-schedule" element={<ProtectedRoute requiredRole={1}><ShiftSchedule /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute requiredRole={1}><Profile /></ProtectedRoute>} />
             
             {/* 営業所長以上（権限レベル2）がアクセス可能 */}
             <Route path="/shift-generator" element={<ProtectedRoute requiredRole={2}><ShiftGenerator /></ProtectedRoute>} />

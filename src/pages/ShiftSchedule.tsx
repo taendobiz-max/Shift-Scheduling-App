@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ShiftCopyDialog } from '@/components/ShiftCopyDialog';
 import {
   DndContext,
   DragEndEvent,
@@ -216,6 +217,7 @@ export default function ShiftSchedule() {
   const [activeTab, setActiveTab] = useState('daily');
   const [periodViewMode, setPeriodViewMode] = useState<'employee' | 'business'>('employee');
   const [dailyViewMode, setDailyViewMode] = useState<'employee' | 'business'>('employee');
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
 
 
   const timeSlots = generateTimeSlots();
@@ -774,6 +776,10 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setShowCopyDialog(true)} variant="outline">
+            <Calendar className="h-4 w-4 mr-2" />
+            シフトをコピー
+          </Button>
           {hasChanges && (
             <Button onClick={saveChanges} disabled={isLoading}>
               <Save className="h-4 w-4 mr-2" />
@@ -1476,6 +1482,21 @@ export default function ShiftSchedule() {
       </Card>
     </TabsContent>
   </Tabs>
+  
+  {/* Shift Copy Dialog */}
+  <ShiftCopyDialog
+    open={showCopyDialog}
+    onOpenChange={setShowCopyDialog}
+    locations={locations}
+    onCopyComplete={() => {
+      if (activeTab === 'period') {
+        loadPeriodShifts();
+      } else {
+        loadShifts();
+      }
+      toast.success('シフトのコピーが完了しました');
+    }}
+  />
   </div>
   );
 }
