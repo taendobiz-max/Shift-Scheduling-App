@@ -1129,7 +1129,15 @@ export default function ShiftGenerator() {
 
     const dates = [...new Set(shiftResults.map(r => r.date))].sort();
     // Only show business masters that are in the shift results (filtered by location)
-    const businessMasterNames = [...new Set(shiftResults.map(r => r.businessMaster))].sort();
+    const businessMasterNames = [...new Set(shiftResults.map(r => r.businessMaster))]
+      .sort((a, b) => {
+        // 点呼業務を一番上に表示
+        const aIsRollCall = a.includes('点呼');
+        const bIsRollCall = b.includes('点呼');
+        if (aIsRollCall && !bIsRollCall) return -1;
+        if (!aIsRollCall && bIsRollCall) return 1;
+        return a.localeCompare(b);
+      });
 
     const matrix: { [key: string]: { [key: string]: { employeeName: string; shift?: ShiftResult } } } = {};
     businessMasterNames.forEach(bm => {

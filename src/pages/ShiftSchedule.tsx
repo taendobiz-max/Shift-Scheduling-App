@@ -1059,7 +1059,15 @@ export default function ShiftSchedule() {
                   /* Business View: Businesses x Dates */
                   (() => {
                     const dates = [...new Set(periodShifts.map(s => s.date))].sort();
-                    const businesses = [...new Set(periodShifts.map(s => s.business_name))].sort();
+                    const businesses = [...new Set(periodShifts.map(s => s.business_name))]
+                      .sort((a, b) => {
+                        // 点呼業務を一番上に表示
+                        const aIsRollCall = a.includes('点呼');
+                        const bIsRollCall = b.includes('点呼');
+                        if (aIsRollCall && !bIsRollCall) return -1;
+                        if (!aIsRollCall && bIsRollCall) return 1;
+                        return a.localeCompare(b);
+                      });
                     
                     const shiftMap = new Map();
                     periodShifts.forEach(shift => {
@@ -1335,7 +1343,15 @@ export default function ShiftSchedule() {
           ) : (
             /* Business View: Businesses x Time */
             (() => {
-              const businesses = [...new Set(shifts.map(s => s.business_name))].sort();
+              const businesses = [...new Set(shifts.map(s => s.business_name))]
+                .sort((a, b) => {
+                  // 点呼業務を一番上に表示
+                  const aIsRollCall = a.includes('点呼');
+                  const bIsRollCall = b.includes('点呼');
+                  if (aIsRollCall && !bIsRollCall) return -1;
+                  if (!aIsRollCall && bIsRollCall) return 1;
+                  return a.localeCompare(b);
+                });
               
               const shiftMap = new Map();
               shifts.forEach(shift => {
