@@ -553,6 +553,18 @@ async function generateShiftsForSingleDate(
       
       // Check if this business has a business group with multiple businesses
       const businessGroup = business.業務グループ || business.business_group;
+      const businessName = business.業務名 || business.name || '';
+      
+      // IMPORTANT: Roll call businesses should NOT be paired together
+      // They should be assigned to different employees
+      const isRollCallBusiness = businessName.includes('点呼') || businessGroup?.includes('点呼');
+      if (isRollCallBusiness) {
+        console.log(`📞 Excluding roll call business from pairing: ${businessName}`);
+        singleBusinesses.push(business);
+        processedBusinesses.add(businessId);
+        return;
+      }
+      
       if (businessGroup && businessGroupMap.has(businessGroup)) {
         const groupBusinesses = businessGroupMap.get(businessGroup)!;
         if (groupBusinesses.length > 1) {
