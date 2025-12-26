@@ -126,12 +126,31 @@ export interface GenerationResult {
 
 // Helper function to check if two time ranges overlap
 function timeRangesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
-  const s1 = new Date(`2000-01-01T${start1}`);
-  const e1 = new Date(`2000-01-01T${end1}`);
-  const s2 = new Date(`2000-01-01T${start2}`);
-  const e2 = new Date(`2000-01-01T${end2}`);
+  // 時間を分に変換（日をまたぐシフトに対応）
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
   
-  return s1 < e2 && s2 < e1;
+  const s1 = timeToMinutes(start1);
+  let e1 = timeToMinutes(end1);
+  const s2 = timeToMinutes(start2);
+  let e2 = timeToMinutes(end2);
+  
+  // 日をまたぐシフトの場合（終了時間が開始時間より前）、翌日として扱う
+  if (e1 <= s1) e1 += 24 * 60; // 翌日の時間として扱う
+  if (e2 <= s2) e2 += 24 * 60;
+  
+  // 重複チェック
+  // ケース1: 通常の重複（両方が同じ日の範囲内）
+  const normalOverlap = s1 < e2 && s2 < e1;
+  
+  // ケース2: 一方が日をまたぐ場合の追加チェック
+  // シフト2が日をまたぐ場合、シフト1の開始が0時以降でシフト2の終了前かチェック
+  const s2NextDay = s2 + 24 * 60; // シフト2を翌日開始として扱う
+  const crossDayOverlap = (e1 > 24 * 60 && s2 < e1 - 24 * 60) || (e2 > 24 * 60 && s1 < e2 - 24 * 60);
+  
+  return normalOverlap || crossDayOverlap;
 }
 
 // Helper function to get employee's current shifts for time overlap check
@@ -162,6 +181,54 @@ function canAssignBusiness(employeeId: string, business: any, currentShifts: Shi
   
   console.log(`✅ [TIME_CHECK] No conflict found for ${employeeId} - ${businessName}`);
   return true;
+}
+
+// シフトの労働時間を計算（日をまたぐシフトに対応）
+function calculateShiftHours(startTime: string, endTime: string): number {
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  let start = timeToMinutes(startTime);
+  let end = timeToMinutes(endTime);
+  
+  // 日をまたぐシフトの場合
+  if (end <= start) {
+    end += 24 * 60;
+  }
+  
+  return (end - start) / 60; // 時間に変換
+}
+
+// 1日の最大労働時間チェック（15時間制約）
+const MAX_DAILY_WORK_HOURS = 15;
+
+function checkDailyWorkHours(employeeId: string, newBusiness: any, currentShifts: Shift[]): { canAssign: boolean; totalHours: number; message?: string } {
+  const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
+  
+  // 既存シフトの労働時間を計算
+  let totalHours = 0;
+  for (const shift of employeeShifts) {
+    totalHours += calculateShiftHours(shift.start_time, shift.end_time);
+  }
+  
+  // 新しい業務の労働時間を追加
+  const newStart = newBusiness.開始時間 || newBusiness.start_time || '09:00:00';
+  const newEnd = newBusiness.終了時間 || newBusiness.end_time || '17:00:00';
+  const newHours = calculateShiftHours(newStart, newEnd);
+  totalHours += newHours;
+  
+  if (totalHours > MAX_DAILY_WORK_HOURS) {
+    const businessName = newBusiness.業務名 || newBusiness.name || 'Unknown';
+    return {
+      canAssign: false,
+      totalHours,
+      message: `${employeeId}の1日の労働時間が${totalHours.toFixed(1)}時間となり、上限${MAX_DAILY_WORK_HOURS}時間を超過（${businessName}を追加した場合）`
+    };
+  }
+  
+  return { canAssign: true, totalHours };
 }
 
 // Enhanced generateShifts function with multi-assignment support
@@ -500,6 +567,13 @@ export async function generateShifts(
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
+        // Check daily work hours limit (15 hours)
+        const dailyCheck = checkDailyWorkHours(empId, business, shifts);
+        if (!dailyCheck.canAssign) {
+          console.log(`⚠️ [DAILY_HOURS] ${dailyCheck.message}`);
+          continue;
+        }
+        
         selectedEmployee = emp;
         break;
       }
@@ -606,6 +680,30 @@ export async function generateShifts(
         }
         
         if (hasTimeConflict) continue;
+        
+        // Check daily work hours limit (15 hours)
+        let exceedsDailyLimit = false;
+        let tempShifts = [...shifts]; // 一時的なシフトリストで累積チェック
+        for (const business of businessGroup) {
+          const dailyCheck = checkDailyWorkHours(empId, business, tempShifts);
+          if (!dailyCheck.canAssign) {
+            console.log(`⚠️ [DAILY_HOURS] ${dailyCheck.message}`);
+            exceedsDailyLimit = true;
+            break;
+          }
+          // 一時的にシフトを追加して累積時間をチェック
+          tempShifts.push({
+            shift_date: targetDate,
+            employee_id: empId,
+            business_group: business.業務グループ || 'default',
+            shift_type: 'regular',
+            start_time: business.開始時間 || '09:00:00',
+            end_time: business.終了時間 || '17:00:00',
+            status: 'scheduled'
+          });
+        }
+        
+        if (exceedsDailyLimit) continue;
         
         // Test constraint validation for each business in the group
         let totalViolations = 0;
@@ -752,6 +850,13 @@ export async function generateShifts(
         
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
+        
+        // Check daily work hours limit (15 hours)
+        const dailyCheck = checkDailyWorkHours(empId, business, shifts);
+        if (!dailyCheck.canAssign) {
+          console.log(`⚠️ [DAILY_HOURS] ${dailyCheck.message}`);
+          continue;
+        }
         
         // Test constraint validation
         const testShift: Shift = {

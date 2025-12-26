@@ -65,8 +65,8 @@ export class UnifiedRuleManager {
       .order('priority_level', { ascending: true });
     
     // 営業所フィルター
-    // applicable_locations に location または '全拠点' が含まれる
-    query = query.or(`applicable_locations.cs.{${location}},applicable_locations.cs.{全拠点}`);
+    // applicable_locations に location が含まれる
+    query = query.contains('applicable_locations', [location]);
     
     // ルールタイプフィルター
     if (ruleType) {

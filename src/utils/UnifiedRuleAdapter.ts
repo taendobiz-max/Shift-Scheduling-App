@@ -128,8 +128,7 @@ export class UnifiedRuleAdapter {
 
       // 指定拠点に適用される制約のみフィルタリング
       const filteredRules = (data || []).filter((rule: any) => 
-        rule.applicable_locations.includes(location) || 
-        rule.applicable_locations.includes('全拠点')
+        rule.applicable_locations.includes(location)
       );
 
       const constraints = filteredRules
@@ -193,8 +192,7 @@ export class UnifiedRuleAdapter {
 
       // 指定拠点に適用されるグループのみフィルタリング
       const filteredRules = (data || []).filter((rule: any) => 
-        rule.applicable_locations.includes(location) || 
-        rule.applicable_locations.includes('全拠点')
+        rule.applicable_locations.includes(location)
       );
 
       const groups = filteredRules
@@ -304,8 +302,7 @@ export class UnifiedRuleAdapter {
 
         // 指定拠点に適用される制約のみフィルタリング
         const filteredConstraints = (data || []).filter((constraint: any) => 
-          constraint.applicable_locations.includes(location) || 
-          constraint.applicable_locations.includes('全拠点')
+          constraint.applicable_locations.includes(location)
         );
 
         return filteredConstraints;

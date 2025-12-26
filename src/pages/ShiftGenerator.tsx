@@ -215,9 +215,7 @@ export default function ShiftGenerator() {
       console.log('🏖️ Loaded vacations:', vacations);
       
       // 選択された拠点でフィルタリング
-      const filteredVacations = selectedLocation === '全拠点' 
-        ? vacations 
-        : vacations.filter(v => v.location === selectedLocation);
+      const filteredVacations = vacations.filter(v => v.location === selectedLocation);
       
       const vacationMembers = VacationManager.convertToNonWorkingMembers(filteredVacations);
       console.log('🏖️ Converted vacation members:', vacationMembers);
@@ -306,7 +304,7 @@ export default function ShiftGenerator() {
       // If no locations found, add some default options
       if (uniqueLocations.length === 0) {
         console.log('⚠️ No locations found in employee data, adding defaults');
-        const defaultLocations = ['川越', '東京', '川口', '全拠点'];
+        const defaultLocations = ['川越', '東京', '川口'];
         setLocations(defaultLocations);
       }
 
@@ -317,7 +315,7 @@ export default function ShiftGenerator() {
       setGenerationResult(`データの読み込みに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
       
       // Set default locations as fallback
-      const fallbackLocations = ['川越', '東京', '川口', '全拠点'];
+      const fallbackLocations = ['川越', '東京', '川口'];
       setLocations(fallbackLocations);
     } finally {
       setIsLoading(false);
@@ -417,9 +415,7 @@ export default function ShiftGenerator() {
       let totalUnassigned = 0;
 
       // Filter employees by location
-      const filteredEmployees = selectedLocation === '全拠点' 
-        ? employees 
-        : employees.filter(emp => emp.location === selectedLocation);
+      const filteredEmployees = employees.filter(emp => emp.location === selectedLocation);
 
       console.log(`👥 Filtered employees for location ${selectedLocation}:`, filteredEmployees);
 
@@ -430,9 +426,7 @@ export default function ShiftGenerator() {
       }
 
       // Filter business masters by location
-      const filteredBusinessMasters = selectedLocation === '全拠点' 
-        ? businessMasters 
-        : businessMasters.filter(bm => bm.営業所 === selectedLocation);
+      const filteredBusinessMasters = businessMasters.filter(bm => bm.営業所 === selectedLocation);
 
       // Validate business masters data
       if (!filteredBusinessMasters || filteredBusinessMasters.length === 0) {
@@ -1661,9 +1655,7 @@ export default function ShiftGenerator() {
             <div className="text-sm text-gray-600 p-4 bg-blue-50 rounded-lg">
               <p><strong>選択された拠点:</strong> {selectedLocation}</p>
               <p><strong>該当従業員数:</strong> {
-                selectedLocation === '全拠点' 
-                  ? employees.length 
-                  : employees.filter(emp => emp.location === selectedLocation).length
+                employees.filter(emp => emp.location === selectedLocation).length
               }名</p>
               <p><strong>業務マスタ数:</strong> {businessMasters.length}件</p>
               <p><strong>利用可能な拠点:</strong> {locations.join(', ')}</p>

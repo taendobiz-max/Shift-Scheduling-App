@@ -32,7 +32,7 @@ const UnifiedRuleManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | 'all'>('all');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [showActiveOnly, setShowActiveOnly] = useState(true);
+  // showActiveOnlyは削除済み（常に全ルール表示）
   const [editingRule, setEditingRule] = useState<UnifiedRule | null>(null);
   
   // 統計情報
@@ -68,7 +68,7 @@ const UnifiedRuleManagement: React.FC = () => {
   // フィルタリング
   useEffect(() => {
     filterRules();
-  }, [rules, searchQuery, selectedRuleType, selectedLocations, showActiveOnly]);
+  }, [rules, searchQuery, selectedRuleType, selectedLocations]);
 
   const loadRules = async () => {
     try {
@@ -102,11 +102,6 @@ const UnifiedRuleManagement: React.FC = () => {
 
   const filterRules = () => {
     let filtered = [...rules];
-
-    // 有効/無効フィルター
-    if (showActiveOnly) {
-      filtered = filtered.filter(r => r.is_active);
-    }
 
     // ルールタイプフィルター
     if (selectedRuleType !== 'all') {
@@ -297,7 +292,7 @@ const UnifiedRuleManagement: React.FC = () => {
           {/* 営業所フィルター（チェックボックス） */}
           <div className="flex items-center gap-4 px-4 py-2 border border-gray-300 rounded-lg bg-white">
             <span className="text-sm text-gray-600 font-medium">営業所:</span>
-            {['全拠点', '東京', '川越', '川口'].map(location => (
+            {['東京', '川越', '川口'].map(location => (
               <label key={location} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -309,17 +304,6 @@ const UnifiedRuleManagement: React.FC = () => {
               </label>
             ))}
           </div>
-
-          {/* 有効/無効フィルター */}
-          <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input
-              type="checkbox"
-              checked={showActiveOnly}
-              onChange={(e) => setShowActiveOnly(e.target.checked)}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span className="text-sm">有効なルールのみ</span>
-          </label>
         </div>
       </div>
 

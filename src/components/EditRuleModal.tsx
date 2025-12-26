@@ -19,7 +19,7 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
     rule_type: 'constraint',
     rule_category: '',
     description: '',
-    applicable_locations: ['全拠点'],
+    applicable_locations: ['東京'],
     priority_level: 5,
     enforcement_level: 'recommended',
     rule_config: {},
@@ -139,7 +139,7 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               適用営業所 <span className="text-red-500">*</span>
             </label>
             <div className="space-y-2">
-              {['全拠点', '東京', '川越', '川口'].map((location) => (
+              {['東京', '川越', '川口'].map((location) => (
                 <label key={location} className="flex items-center space-x-2">
                   <input
                     type="checkbox"
