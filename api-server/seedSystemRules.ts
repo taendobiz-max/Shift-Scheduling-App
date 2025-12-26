@@ -23,7 +23,7 @@ const SYSTEM_RULES: SystemRule[] = [
     rule_name: '1日の最大労働時間',
     rule_category: 'work_hours',
     description: '1日の労働時間が指定時間を超えないようにする制約',
-    applicable_locations: ['大阪営業所', '福岡営業所'],
+    applicable_locations: ['東京', '川越', '川口', '本社'],
     rule_type: 'constraint',
     rule_config: {
       constraint_type: 'max_daily_work_hours',
@@ -39,7 +39,7 @@ const SYSTEM_RULES: SystemRule[] = [
     rule_name: '1日の最大シフト数',
     rule_category: 'shift_count',
     description: '1日に割り当てられるシフト数の上限',
-    applicable_locations: ['大阪営業所', '福岡営業所'],
+    applicable_locations: ['東京', '川越', '川口', '本社'],
     rule_type: 'constraint',
     rule_config: {
       constraint_type: 'max_daily_shifts',
@@ -55,7 +55,7 @@ const SYSTEM_RULES: SystemRule[] = [
     rule_name: '点呼業務の排他制約',
     rule_category: 'roll_call',
     description: '点呼①早番と点呼②遅番を同じ従業員に割り当てない',
-    applicable_locations: ['大阪営業所', '福岡営業所'],
+    applicable_locations: ['東京', '川越', '川口', '本社'],
     rule_type: 'constraint',
     rule_config: {
       constraint_type: 'exclusive_assignment',
