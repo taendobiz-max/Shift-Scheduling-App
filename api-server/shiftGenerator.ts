@@ -1305,11 +1305,15 @@ export async function generateShifts(
   for (const targetDate of dates) {
     console.log(`\n📅 Processing date: ${targetDate}`);
     
+    // Normalize date format (YYYY-MM-DD)
+    const normalizedDate = targetDate.split('T')[0];
+    console.log(`📅 Normalized date for vacation check: ${normalizedDate}`);
+    
     // Load vacation data for this specific date
     const { data: vacationData, error: vacationError } = await supabase
       .from("vacation_masters")
       .select("employee_id")
-      .eq("vacation_date", targetDate);
+      .eq("vacation_date", normalizedDate);
     
     const vacationEmployeeIds = new Set<string>();
     if (!vacationError && vacationData) {
