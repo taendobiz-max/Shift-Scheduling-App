@@ -1326,11 +1326,25 @@ export async function generateShifts(
   for (const targetDate of dates) {
     console.log(`\n📅 Processing date: ${targetDate}`);
     
-    // Filter out employees assigned to multi-day businesses on this date
+    // Load vacation data for this specific date
+    const { data: vacationData, error: vacationError } = await supabase
+      .from("vacation_masters")
+      .select("employee_id")
+      .eq("vacation_date", targetDate);
+    
+    const vacationEmployeeIds = new Set<string>();
+    if (!vacationError && vacationData) {
+      vacationData.forEach((v: any) => vacationEmployeeIds.add(v.employee_id));
+      console.log(`🏖️ Employees on vacation on ${targetDate}:`, vacationEmployeeIds.size, "IDs:", Array.from(vacationEmployeeIds));
+    } else if (vacationError) {
+      console.warn(`⚠️ Failed to load vacation data for ${targetDate}:`, vacationError.message);
+    }
+    
+    // Filter out employees assigned to multi-day businesses on this date AND employees on vacation
     const assignedEmployeesOnThisDate = multiDayResult.assignedEmployeesByDate.get(targetDate) || new Set();
     const availableEmployeesForThisDate = employees.filter(emp => {
       const empId = emp.id || emp.従業員ID || emp.employee_id;
-      return !assignedEmployeesOnThisDate.has(empId);
+      return !assignedEmployeesOnThisDate.has(empId) && !vacationEmployeeIds.has(empId);
     });
     
     console.log(`  Available employees: ${availableEmployeesForThisDate.length} (${assignedEmployeesOnThisDate.size} assigned to multi-day)`);
