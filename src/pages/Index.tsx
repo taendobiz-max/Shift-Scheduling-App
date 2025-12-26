@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, User } from 'lucide-react';
+import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, Workflow, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '@/utils/auth';
 
@@ -132,24 +132,6 @@ export default function Index() {
             </Card>
           </Link>
 
-          <Link to="/skill-matrix">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BarChart3 className="h-6 w-6 mr-2" />
-                  スキル管理
-                </CardTitle>
-                <CardDescription>
-                  従業員のスキル・資格管理
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  運転免許、路線資格、特殊技能などを管理。適切な人員配置とスキル向上をサポートします。
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
 
           <Link to="/reports">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -169,38 +151,27 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
+
+          <Link to="/unified-rules">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-green-200 hover:border-green-400">
+              <CardHeader>
+                <CardTitle className="flex items-center text-green-700">
+                  <Workflow className="h-6 w-6 mr-2" />
+                  シフトルール管理
+                </CardTitle>
+                <CardDescription>
+                  制約条件・ルールの統合管理
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  制約条件、フィルター、割り当てロジック、検証、最適化ルールを統合管理し、シフト生成を最適化できます。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
-        {/* クイックアクション */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4">クイックアクション</h2>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/shift-generator">
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Zap className="h-4 w-4 mr-2" />
-                今すぐシフト生成
-              </Button>
-            </Link>
-            <Link to="/vacation-management">
-              <Button className="bg-red-600 hover:bg-red-700">
-                <UserX className="h-4 w-4 mr-2" />
-                休暇登録
-              </Button>
-            </Link>
-            <Link to="/employees">
-              <Button variant="outline">
-                <Users className="h-4 w-4 mr-2" />
-                従業員登録
-              </Button>
-            </Link>
-            <Link to="/shift-schedule">
-              <Button variant="outline">
-                <Calendar className="h-4 w-4 mr-2" />
-                シフト確認
-              </Button>
-            </Link>
-          </div>
-        </div>
       </div>
     </div>
   );
