@@ -179,6 +179,52 @@ export class RuleEngine {
   }
 
   /**
+   * 休暇チェック（非同期）
+   */
+  async checkVacation(
+    employeeId: string,
+    targetDate: string
+  ): Promise<RuleEvaluationResult> {
+    try {
+      const { data, error } = await supabase
+        .from('vacation_masters')
+        .select('employee_id')
+        .eq('employee_id', employeeId)
+        .eq('vacation_date', targetDate)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('❌ [RULE_ENGINE] Error checking vacation:', error);
+        return {
+          passed: true, // エラー時はアサインを許可（既存の動作を維持）
+          rule_name: '休暇申請者の除外'
+        };
+      }
+
+      if (data) {
+        console.log(`🏖️ [RULE_ENGINE] ${employeeId} is on vacation on ${targetDate}`);
+        return {
+          passed: false,
+          rule_name: '休暇申請者の除外',
+          message: `${employeeId}は${targetDate}に休暇申請済みです`,
+          details: { employeeId, targetDate }
+        };
+      }
+
+      return {
+        passed: true,
+        rule_name: '休暇申請者の除外'
+      };
+    } catch (err) {
+      console.error('❌ [RULE_ENGINE] Unexpected error in checkVacation:', err);
+      return {
+        passed: true, // エラー時はアサインを許可
+        rule_name: '休暇申請者の除外'
+      };
+    }
+  }
+
+  /**
    * 排他的業務チェック
    */
   checkExclusiveAssignment(
@@ -223,16 +269,20 @@ export class RuleEngine {
   }
 
   /**
-   * 全ての制約をチェック
+   * 全ての制約をチェック（非同期）
    */
-  checkAllConstraints(
+  async checkAllConstraints(
     employeeId: string,
     newBusiness: any,
     currentShifts: Shift[],
     targetDate: string
-  ): RuleEvaluationResult[] {
+  ): Promise<RuleEvaluationResult[]> {
     const results: RuleEvaluationResult[] = [];
     const businessName = newBusiness.業務名 || newBusiness.name || 'Unknown';
+
+    // 休暇チェック（最優先）
+    const vacationResult = await this.checkVacation(employeeId, targetDate);
+    results.push(vacationResult);
 
     // 1日の最大労働時間チェック
     results.push(this.checkDailyWorkHours(employeeId, newBusiness, currentShifts, targetDate));
@@ -244,15 +294,15 @@ export class RuleEngine {
   }
 
   /**
-   * 全ての制約が満たされているかチェック
+   * 全ての制約が満たされているかチェック（非同期）
    */
-  canAssign(
+  async canAssign(
     employeeId: string,
     newBusiness: any,
     currentShifts: Shift[],
     targetDate: string
-  ): { canAssign: boolean; violations: RuleEvaluationResult[] } {
-    const results = this.checkAllConstraints(employeeId, newBusiness, currentShifts, targetDate);
+  ): Promise<{ canAssign: boolean; violations: RuleEvaluationResult[] }> {
+    const results = await this.checkAllConstraints(employeeId, newBusiness, currentShifts, targetDate);
     const violations = results.filter(r => !r.passed);
 
     return {

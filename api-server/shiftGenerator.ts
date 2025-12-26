@@ -741,8 +741,8 @@ async function generateShiftsForSingleDate(
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
-        // Check rule engine constraints (daily work hours, exclusive assignments)
-        const ruleCheck = ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
+        // Check rule engine constraints (daily work hours, exclusive assignments, vacation)
+        const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
         if (!ruleCheck.canAssign) {
           console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
           ruleCheck.violations.forEach(v => {
@@ -900,7 +900,7 @@ async function generateShiftsForSingleDate(
         // Check rule engine constraints for each business in the group
         let ruleViolationFound = false;
         for (const business of businessGroup) {
-          const ruleCheck = ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
+          const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
           if (!ruleCheck.canAssign) {
             console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned to pair: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
             ruleCheck.violations.forEach(v => {
@@ -1075,8 +1075,8 @@ async function generateShiftsForSingleDate(
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
-        // Check rule engine constraints (daily work hours, exclusive assignments)
-        const ruleCheck = ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
+        // Check rule engine constraints (daily work hours, exclusive assignments, vacation)
+        const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
         if (!ruleCheck.canAssign) {
           console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
           ruleCheck.violations.forEach(v => {
