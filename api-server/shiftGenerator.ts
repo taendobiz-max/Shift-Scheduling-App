@@ -1264,6 +1264,29 @@ export async function generateShifts(
   const cumulativeBusinessHistory = await loadBusinessHistoryFromDB();
   console.log(`📚 Loaded initial business history for ${cumulativeBusinessHistory.size} employees`);
   
+  // === VACATION DATA LOADING (事前フィルタリング方式) ===
+  console.log('\n🏖️ Loading vacation data for all dates...');
+  const vacationMap = new Map<string, Set<string>>();
+  
+  for (const date of dates) {
+    const normalizedDate = date.split('T')[0];
+    const { data: vacationData, error: vacationError } = await supabase
+      .from("vacation_masters")
+      .select("employee_id")
+      .eq("vacation_date", normalizedDate);
+    
+    const vacationIds = new Set<string>();
+    if (!vacationError && vacationData) {
+      vacationData.forEach((v: any) => vacationIds.add(v.employee_id));
+      console.log(`  📅 ${normalizedDate}: ${vacationIds.size} employee(s) on vacation`);
+    } else if (vacationError) {
+      console.warn(`  ⚠️ Failed to load vacation data for ${normalizedDate}:`, vacationError.message);
+    }
+    vacationMap.set(normalizedDate, vacationIds);
+  }
+  console.log(`✅ Vacation data loaded for ${vacationMap.size} date(s)`);
+  // === END VACATION DATA LOADING ===
+  
   // === MULTI-DAY BUSINESS PREPROCESSING ===
   const batchId = uuidv4();
   
@@ -1273,11 +1296,24 @@ export async function generateShifts(
   // Import multi-day business functions
   const { preprocessMultiDayBusinesses, filterOutMultiDayBusinesses } = require('./multi-day-integration-patch');
   
-  // Preprocess multi-day businesses
+  // Filter employees for multi-day businesses (exclude vacation on start date)
+  const startDateNormalized = dates[0].split('T')[0];
+  const startDateVacationIds = vacationMap.get(startDateNormalized) || new Set();
+  const availableEmployeesForMultiDay = employees.filter(emp => {
+    const empId = emp.id || emp.従業員ID || emp.employee_id;
+    return !startDateVacationIds.has(empId);
+  });
+  
+  console.log(`\n👥 Employees available for multi-day businesses: ${availableEmployeesForMultiDay.length}/${employees.length}`);
+  if (startDateVacationIds.size > 0) {
+    console.log(`  🏖️ Excluded ${startDateVacationIds.size} employee(s) on vacation on start date (${startDateNormalized})`);
+  }
+  
+  // Preprocess multi-day businesses with filtered employees
   const multiDayResult = await preprocessMultiDayBusinesses(
     businessMasters,
     dates,
-    employees,
+    availableEmployeesForMultiDay,
     batchId,
     employeeSkillMatrix,
     location
@@ -1305,22 +1341,12 @@ export async function generateShifts(
   for (const targetDate of dates) {
     console.log(`\n📅 Processing date: ${targetDate}`);
     
-    // Normalize date format (YYYY-MM-DD)
+    // Get pre-loaded vacation data for this date
     const normalizedDate = targetDate.split('T')[0];
-    console.log(`📅 Normalized date for vacation check: ${normalizedDate}`);
+    const vacationEmployeeIds = vacationMap.get(normalizedDate) || new Set();
     
-    // Load vacation data for this specific date
-    const { data: vacationData, error: vacationError } = await supabase
-      .from("vacation_masters")
-      .select("employee_id")
-      .eq("vacation_date", normalizedDate);
-    
-    const vacationEmployeeIds = new Set<string>();
-    if (!vacationError && vacationData) {
-      vacationData.forEach((v: any) => vacationEmployeeIds.add(v.employee_id));
-      console.log(`🏖️ Employees on vacation on ${targetDate}:`, vacationEmployeeIds.size, "IDs:", Array.from(vacationEmployeeIds));
-    } else if (vacationError) {
-      console.warn(`⚠️ Failed to load vacation data for ${targetDate}:`, vacationError.message);
+    if (vacationEmployeeIds.size > 0) {
+      console.log(`  🏖️ ${vacationEmployeeIds.size} employee(s) on vacation: ${Array.from(vacationEmployeeIds).join(', ')}`);
     }
     
     // Filter out employees assigned to multi-day businesses on this date AND employees on vacation
