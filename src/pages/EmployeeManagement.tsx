@@ -78,6 +78,18 @@ export default function EmployeeManagement() {
     }
   };
 
+  // 従業員が点呼スキルを持っているかどうかを判定
+  const hasRollCallSkill = (employeeId: string): boolean => {
+    const skills = employeeSkills[employeeId];
+    if (!skills) return false;
+    return Array.from(skills).some(skill => skill.includes('点呼'));
+  };
+
+  // 点呼スキルを持つ従業員の数を計算
+  const getRollCallCapableCount = (): number => {
+    return employees.filter(emp => hasRollCallSkill(emp.employee_id || '')).length;
+  };
+
   const loadEmployeeSkills = async (employeeData: EmployeeMaster[]) => {
     try {
       const { data: skillsData, error } = await supabase
@@ -379,7 +391,7 @@ export default function EmployeeManagement() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">点呼対応可能</p>
                 <p className="text-2xl font-bold">
-                  {employees.filter(emp => emp.roll_call_capable || emp.roll_call_duty === '1').length}名
+                  {getRollCallCapableCount()}名
                 </p>
               </div>
               <UserCheck className="h-8 w-8 text-green-600" />
@@ -593,7 +605,7 @@ export default function EmployeeManagement() {
                           <div className="text-sm text-muted-foreground">営業所</div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          {employee.roll_call_capable || employee.roll_call_duty === '1' ? (
+                          {hasRollCallSkill(employee.employee_id || '') ? (
                             <Badge className="bg-green-500">点呼対応可</Badge>
                           ) : (
                             <Badge className="bg-gray-400">点呼対応不可</Badge>
@@ -716,6 +728,10 @@ export default function EmployeeManagement() {
           employeeId={selectedEmployeeForSkill.id}
           employeeName={selectedEmployeeForSkill.name}
           employeeOffice={selectedEmployeeForSkill.office}
+          onSkillUpdate={() => {
+            // スキル更新時に従業員データを再読み込み
+            loadData();
+          }}
         />
       )}
     </div>

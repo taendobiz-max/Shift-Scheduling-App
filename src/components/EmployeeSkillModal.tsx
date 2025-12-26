@@ -23,9 +23,10 @@ interface EmployeeSkillModalProps {
   employeeId: string;
   employeeName: string;
   employeeOffice?: string;
+  onSkillUpdate?: () => void; // 親コンポーネントに更新を通知するコールバック
 }
 
-export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, employeeOffice }: EmployeeSkillModalProps) {
+export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, employeeOffice, onSkillUpdate }: EmployeeSkillModalProps) {
   const [skills, setSkills] = useState<EmployeeSkill[]>([]);
   const [businessGroups, setBusinessGroups] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -82,6 +83,39 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
     }
   };
 
+  // 点呼スキルかどうかを判定
+  const isRollCallSkill = (businessGroup: string): boolean => {
+    return businessGroup.includes('点呼');
+  };
+
+  // 従業員のroll_call_capableを更新
+  const updateRollCallCapable = async (hasRollCallSkill: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({
+          roll_call_capable: hasRollCallSkill,
+          roll_call_duty: hasRollCallSkill ? '1' : '0'
+        })
+        .eq('employee_id', employeeId);
+
+      if (error) throw error;
+      console.log(`✅ Updated roll_call_capable to ${hasRollCallSkill} for employee ${employeeId}`);
+      
+      // 親コンポーネントに更新を通知
+      if (onSkillUpdate) {
+        onSkillUpdate();
+      }
+    } catch (error) {
+      console.error('Error updating roll_call_capable:', error);
+    }
+  };
+
+  // 現在のスキル一覧に点呼スキルがあるかチェック
+  const checkHasRollCallSkill = (skillList: EmployeeSkill[]): boolean => {
+    return skillList.some(skill => isRollCallSkill(skill.business_group));
+  };
+
   const handleAddSkill = async () => {
     if (!newSkill.business_group || !newSkill.skill_level) {
       toast.error('業務グループとスキルレベルを入力してください');
@@ -101,9 +135,20 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
 
       if (error) throw error;
 
-      toast.success('スキルを追加しました');
+      // 点呼スキルを追加した場合はメッセージを変更
+      if (isRollCallSkill(newSkill.business_group)) {
+        toast.success('スキルを追加しました（点呼対応可に更新）');
+      } else {
+        toast.success('スキルを追加しました');
+      }
+
       setNewSkill({ business_group: '', skill_level: '', skill_name: '' });
       loadSkills();
+      
+      // 親コンポーネントに更新を通知（点呼スキルに限らず全てのスキル追加時）
+      if (onSkillUpdate) {
+        onSkillUpdate();
+      }
     } catch (error) {
       console.error('Error adding skill:', error);
       toast.error('スキルの追加に失敗しました');
@@ -113,6 +158,10 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
   };
 
   const handleDeleteSkill = async (skillId: number) => {
+    // 削除対象のスキルを取得
+    const skillToDelete = skills.find(s => s.id === skillId);
+    if (!skillToDelete) return;
+
     if (!confirm('このスキルを削除しますか？')) return;
 
     setIsLoading(true);
@@ -124,8 +173,27 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
 
       if (error) throw error;
 
-      toast.success('スキルを削除しました');
+      // 削除後のスキル一覧を計算
+      const remainingSkills = skills.filter(s => s.id !== skillId);
+      
+      // 点呼スキルを削除した場合はメッセージを変更
+      if (isRollCallSkill(skillToDelete.business_group)) {
+        const hasOtherRollCallSkill = checkHasRollCallSkill(remainingSkills);
+        if (!hasOtherRollCallSkill) {
+          toast.success('スキルを削除しました（点呼対応不可に更新）');
+        } else {
+          toast.success('スキルを削除しました');
+        }
+      } else {
+        toast.success('スキルを削除しました');
+      }
+
       loadSkills();
+      
+      // 親コンポーネントに更新を通知（点呼スキルに限らず全てのスキル削除時）
+      if (onSkillUpdate) {
+        onSkillUpdate();
+      }
     } catch (error) {
       console.error('Error deleting skill:', error);
       toast.error('スキルの削除に失敗しました');
@@ -152,7 +220,7 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
             スキル管理 - {employeeName}
           </DialogTitle>
           <DialogDescription>
-            従業員のスキル情報を管理します
+            従業員のスキル情報を管理します（点呼スキルの追加・削除は「点呼対応可」に自動反映されます）
           </DialogDescription>
         </DialogHeader>
 
@@ -169,7 +237,10 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
                 </SelectTrigger>
                 <SelectContent>
                   {businessGroups.map(bg => (
-                    <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                    <SelectItem key={bg} value={bg}>
+                      {bg}
+                      {isRollCallSkill(bg) && ' 📞'}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -221,9 +292,13 @@ export function EmployeeSkillModal({ isOpen, onClose, employeeId, employeeName, 
                   <TableBody>
                     {businessGroups.map((group) => {
                       const skill = skills.find(s => s.business_group === group);
+                      const isRollCall = isRollCallSkill(group);
                       return (
-                        <TableRow key={group}>
-                          <TableCell className="font-medium">{group}</TableCell>
+                        <TableRow key={group} className={isRollCall ? 'bg-blue-50' : ''}>
+                          <TableCell className="font-medium">
+                            {group}
+                            {isRollCall && <span className="ml-1 text-blue-600">📞</span>}
+                          </TableCell>
                           <TableCell>
                             {skill ? (
                               <Badge className={getSkillLevelBadgeColor(skill.skill_level)}>
