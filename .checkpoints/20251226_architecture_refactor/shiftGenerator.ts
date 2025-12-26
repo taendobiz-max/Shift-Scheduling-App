@@ -2,7 +2,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './supabaseClient';
 import { ConstraintEngine } from './constraintEngine';
 import { ConstraintManager } from './constraintManager';
-import { RuleEngine } from './RuleEngine';
 
 // Load skill matrix from database
 // Load skill matrix from database
@@ -360,13 +359,6 @@ async function generateShiftsForSingleDate(
     const constraintEngine = new ConstraintEngine();
     await constraintEngine.loadConstraints(location);
     
-    // Initialize rule engine for unified rules
-    const ruleEngine = new RuleEngine(location || '大阪営業所');
-    await ruleEngine.loadRules();
-    console.log(`📋 [RULE_ENGINE] Max daily work hours: ${ruleEngine.getMaxDailyWorkHours()}h`);
-    console.log(`📋 [RULE_ENGINE] Max daily shifts: ${ruleEngine.getMaxDailyShifts()}`);
-    console.log(`📋 [RULE_ENGINE] Exclusive groups: ${JSON.stringify(ruleEngine.getExclusiveGroups())}`);
-    
     // Load business history from DB if not provided
     console.log('🔍 [DEBUG] existingBusinessHistory:', existingBusinessHistory);
     let employeeBusinessHistory: Map<string, Set<string>>;
@@ -711,12 +703,8 @@ async function generateShiftsForSingleDate(
         const empId = emp.id || emp.従業員ID || emp.employee_id;
         const currentCount = employeeAssignmentCounts.get(empId) || 0;
         
-        // Skip if employee already has max assignments (from rule engine)
-        const maxShifts = ruleEngine.getMaxDailyShifts();
-        if (currentCount >= maxShifts) {
-          console.log(`⛔ ${emp.name || empId} already has ${currentCount} shifts (max: ${maxShifts})`);
-          continue;
-        }
+        // Skip if employee already has 3 assignments
+        if (currentCount >= 3) continue;
         
         // Check skill matrix - employee must have the required business group skill
         const businessGroup = business.業務グループ || business.business_group || '';
@@ -728,18 +716,6 @@ async function generateShiftsForSingleDate(
         
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
-        
-        // Check rule engine constraints (daily work hours, exclusive assignments)
-        const ruleCheck = ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
-        if (!ruleCheck.canAssign) {
-          console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
-          ruleCheck.violations.forEach(v => {
-            if (!violations.includes(v.message || '')) {
-              violations.push(v.message || '');
-            }
-          });
-          continue;
-        }
         
         selectedEmployee = emp;
         break;
@@ -812,12 +788,8 @@ async function generateShiftsForSingleDate(
         const empId = emp.id || emp.従業員ID || emp.employee_id;
         const currentCount = employeeAssignmentCounts.get(empId) || 0;
         
-        // Skip if employee already has max assignments (from rule engine)
-        const maxShifts = ruleEngine.getMaxDailyShifts();
-        if (currentCount >= maxShifts) {
-          console.log(`⛔ ${emp.name || empId} already has ${currentCount} shifts (max: ${maxShifts})`);
-          continue;
-        }
+        // Skip if employee already has 3 assignments
+        if (currentCount >= 3) continue;
         
         // Check if this is a roll call business group
         const isRollCallGroup = businessGroup.some(b => {
@@ -884,23 +856,6 @@ async function generateShiftsForSingleDate(
         }
         
         if (hasTimeConflict) continue;
-        
-        // Check rule engine constraints for each business in the group
-        let ruleViolationFound = false;
-        for (const business of businessGroup) {
-          const ruleCheck = ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
-          if (!ruleCheck.canAssign) {
-            console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned to pair: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
-            ruleCheck.violations.forEach(v => {
-              if (!violations.includes(v.message || '')) {
-                violations.push(v.message || '');
-              }
-            });
-            ruleViolationFound = true;
-            break;
-          }
-        }
-        if (ruleViolationFound) continue;
         
         // Test constraint validation for each business in the group
         let totalViolations = 0;
@@ -1045,12 +1000,8 @@ async function generateShiftsForSingleDate(
         const empId = emp.id || emp.従業員ID || emp.employee_id;
         const currentCount = employeeAssignmentCounts.get(empId) || 0;
         
-        // Skip if employee already has max assignments (from rule engine)
-        const maxShifts = ruleEngine.getMaxDailyShifts();
-        if (currentCount >= maxShifts) {
-          console.log(`⛔ ${emp.name || empId} already has ${currentCount} shifts (max: ${maxShifts})`);
-          continue;
-        }
+        // Skip if employee already has 3 assignments
+        if (currentCount >= 3) continue;
         
         // Check skill matrix - employee must have the required business group skill
         const businessGroup = business.業務グループ || business.business_group || '';
@@ -1062,18 +1013,6 @@ async function generateShiftsForSingleDate(
         
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
-        
-        // Check rule engine constraints (daily work hours, exclusive assignments)
-        const ruleCheck = ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
-        if (!ruleCheck.canAssign) {
-          console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
-          ruleCheck.violations.forEach(v => {
-            if (!violations.includes(v.message || '')) {
-              violations.push(v.message || '');
-            }
-          });
-          continue;
-        }
         
         // Test constraint validation
         const testShift: Shift = {
