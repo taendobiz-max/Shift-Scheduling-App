@@ -382,20 +382,6 @@ async function generateShiftsForSingleDate(
     
     console.log('📋 Loaded constraints:', constraintEngine.getConstraintCount());
     
-    // Load vacation data for the target date
-    const { data: vacationData, error: vacationError } = await supabase
-      .from("vacation_masters")
-      .select("employee_id")
-      .eq("vacation_date", normalizedTargetDate);
-    
-    const vacationEmployeeIds = new Set<string>();
-    if (!vacationError && vacationData) {
-      vacationData.forEach((v: any) => vacationEmployeeIds.add(v.employee_id));
-      console.log("🏖️ Employees on vacation:", vacationEmployeeIds.size, "IDs:", Array.from(vacationEmployeeIds));
-    } else if (vacationError) {
-      console.warn("⚠️ Failed to load vacation data:", vacationError.message);
-    }
-    
     // Enrich employees data with roll_call information from DB
     console.log('🔍 [DEBUG] Enriching employees data with roll_call information...');
     const allEmployeeIds = employees.map(emp => emp.id || emp.従業員ID || emp.employee_id);
@@ -430,16 +416,9 @@ async function generateShiftsForSingleDate(
       }
     });
     
-    // Filter out employees on vacation
-    const availableEmployees = employees.filter(emp => {
-      const empId = emp.id || emp.従業員ID || emp.employee_id;
-      return !vacationEmployeeIds.has(empId);
-    });
-    
-    console.log('👥 Available employees (after vacation filter):', availableEmployees.length);
-    
-    // Load skill matrix for available employees
-    const employeeSkillMatrix = await loadSkillMatrixFromDB(availableEmployees);
+    // Load skill matrix for employees (vacation filtering is done in generateShifts)
+    const employeeSkillMatrix = await loadSkillMatrixFromDB(employees);
+    const availableEmployees = employees; // Use employees directly (already filtered in generateShifts)
     console.log('📊 Skill matrix loaded for', employeeSkillMatrix.size, 'employees');
     
     if (availableEmployees.length === 0) {
