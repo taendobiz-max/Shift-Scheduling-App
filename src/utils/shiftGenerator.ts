@@ -154,8 +154,16 @@ function timeRangesOverlap(start1: string, end1: string, start2: string, end2: s
 }
 
 // Helper function to get employee's current shifts for time overlap check
-function getEmployeeShifts(employeeId: string, shifts: Shift[]): Shift[] {
-  return shifts.filter(s => s.employee_id === employeeId);
+function getEmployeeShifts(employeeId: string, shifts: Shift[], targetDate?: string): Shift[] {
+  return shifts.filter(s => {
+    const matchEmployee = s.employee_id === employeeId;
+    // 日付が指定されている場合は同じ日のシフトのみを取得
+    if (targetDate) {
+      const shiftDate = s.shift_date || s.date;
+      return matchEmployee && shiftDate === targetDate;
+    }
+    return matchEmployee;
+  });
 }
 
 // Helper function to check if a business can be assigned to an employee (time-wise)
@@ -204,8 +212,9 @@ function calculateShiftHours(startTime: string, endTime: string): number {
 // 1日の最大労働時間チェック（15時間制約）
 const MAX_DAILY_WORK_HOURS = 15;
 
-function checkDailyWorkHours(employeeId: string, newBusiness: any, currentShifts: Shift[]): { canAssign: boolean; totalHours: number; message?: string } {
-  const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
+function checkDailyWorkHours(employeeId: string, newBusiness: any, currentShifts: Shift[], targetDate?: string): { canAssign: boolean; totalHours: number; message?: string } {
+  // 同じ日のシフトのみを取得
+  const employeeShifts = getEmployeeShifts(employeeId, currentShifts, targetDate);
   
   // 既存シフトの労働時間を計算
   let totalHours = 0;
@@ -568,7 +577,7 @@ export async function generateShifts(
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
         // Check daily work hours limit (15 hours)
-        const dailyCheck = checkDailyWorkHours(empId, business, shifts);
+        const dailyCheck = checkDailyWorkHours(empId, business, shifts, targetDate);
         if (!dailyCheck.canAssign) {
           console.log(`⚠️ [DAILY_HOURS] ${dailyCheck.message}`);
           continue;
@@ -685,7 +694,7 @@ export async function generateShifts(
         let exceedsDailyLimit = false;
         let tempShifts = [...shifts]; // 一時的なシフトリストで累積チェック
         for (const business of businessGroup) {
-          const dailyCheck = checkDailyWorkHours(empId, business, tempShifts);
+          const dailyCheck = checkDailyWorkHours(empId, business, tempShifts, targetDate);
           if (!dailyCheck.canAssign) {
             console.log(`⚠️ [DAILY_HOURS] ${dailyCheck.message}`);
             exceedsDailyLimit = true;
@@ -852,7 +861,7 @@ export async function generateShifts(
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
         // Check daily work hours limit (15 hours)
-        const dailyCheck = checkDailyWorkHours(empId, business, shifts);
+        const dailyCheck = checkDailyWorkHours(empId, business, shifts, targetDate);
         if (!dailyCheck.canAssign) {
           console.log(`⚠️ [DAILY_HOURS] ${dailyCheck.message}`);
           continue;
