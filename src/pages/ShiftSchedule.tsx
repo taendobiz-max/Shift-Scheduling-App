@@ -190,6 +190,41 @@ const DroppableCell = ({
   );
 };
 
+// Droppable Table Cell Component
+const DroppableTd = ({ 
+  id, 
+  children, 
+  isEmpty,
+  colSpan,
+  className
+}: { 
+  id: string; 
+  children: React.ReactNode;
+  isEmpty?: boolean;
+  colSpan?: number;
+  className?: string;
+}) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id,
+  });
+
+  return (
+    <td
+      ref={setNodeRef}
+      colSpan={colSpan}
+      className={`
+        border p-2 text-center
+        ${isOver ? 'bg-blue-100' : ''}
+        ${isEmpty ? 'hover:bg-gray-100' : ''}
+        ${className || ''}
+        transition-colors
+      `}
+    >
+      {children}
+    </td>
+  );
+}
+
 export default function ShiftSchedule() {
   const [shifts, setShifts] = useState<ShiftData[]>([]);
   const shiftsRef = useRef<ShiftData[]>([]);
@@ -640,6 +675,60 @@ export default function ShiftSchedule() {
     }
   };
 
+  // Handle drag end for period view
+  const handlePeriodDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const overId = over.id as string;
+
+    console.log('🎯 Period drag end:', { 
+      active: active.id, 
+      over: overId,
+      activeData 
+    });
+
+    // Parse the drop target
+    // Format: "period-cell-{employeeId}-{date}"
+    if (overId.startsWith('period-cell-')) {
+      const parts = overId.split('-');
+      if (parts.length >= 4) {
+        // Extract employee ID and date
+        const dateStr = parts[parts.length - 1];
+        const targetEmployeeId = parts.slice(2, -1).join('-');
+        
+        console.log('📍 Drop target:', { targetEmployeeId, dateStr });
+        
+        // Check if dragging a shift
+        if (activeData?.shiftId) {
+          const activeShift = periodShifts.find(s => s.id === activeData.shiftId);
+          
+          if (activeShift) {
+            // Update the shift's employee and date
+            const updatedShifts = periodShifts.map(s => {
+              if (s.id === activeData.shiftId) {
+                return {
+                  ...s,
+                  employee_id: targetEmployeeId,
+                  employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
+                  date: dateStr,
+                };
+              }
+              return s;
+            });
+            
+            setPeriodShifts(updatedShifts);
+            setHasChanges(true);
+            toast.success('シフトを移動しました');
+          }
+        }
+      }
+    }
+  };
+
   // Handle shift selection
   const handleShiftClick = (shiftId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -702,6 +791,46 @@ export default function ShiftSchedule() {
       toast.error('シフトの削除に失敗しました');
     }
   }, [selectedShiftIds, shifts]);
+
+  const savePeriodChanges = async () => {
+    if (!hasChanges) return;
+
+    setIsLoading(true);
+    try {
+      console.log('💾 Saving period shifts to database...');
+      
+      // Get all shift IDs that have been modified
+      const shiftIds = periodShifts.map(s => s.id);
+      
+      // Update each shift individually
+      for (const shift of periodShifts) {
+        const { error } = await supabase
+          .from('shifts')
+          .update({
+            employee_id: shift.employee_id,
+            date: shift.date,
+          })
+          .eq('id', shift.id);
+
+        if (error) {
+          console.error('❌ Error updating shift:', error);
+          throw error;
+        }
+      }
+
+      console.log('✅ Saved', periodShifts.length, 'shifts');
+      toast.success('変更を保存しました');
+      setHasChanges(false);
+      
+      // Reload period data
+      await loadPeriodShifts();
+    } catch (error) {
+      console.error('Error saving period changes:', error);
+      toast.error('保存中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const saveChanges = async () => {
     if (!hasChanges) return;
@@ -873,6 +1002,12 @@ export default function ShiftSchedule() {
                 <div className="flex items-center justify-between">
                   <CardTitle>期間勤務割マトリクス</CardTitle>
                   <div className="flex gap-2">
+                    {hasChanges && activeTab === 'period' && (
+                      <Button onClick={savePeriodChanges} disabled={isLoading}>
+                        <Save className="h-4 w-4 mr-2" />
+                        変更を保存
+                      </Button>
+                    )}
                     <Button 
                       variant={periodViewMode === 'employee' ? 'default' : 'outline'}
                       size="sm"
@@ -891,6 +1026,12 @@ export default function ShiftSchedule() {
                 </div>
               </CardHeader>
               <CardContent>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handlePeriodDragEnd}
+                >
                 {periodViewMode === 'employee' ? (
                   /* Employee View: Employees x Dates (Multi-day support) */
                   (() => {
@@ -1005,14 +1146,11 @@ export default function ShiftSchedule() {
                                       colspan = multiDayBusiness.colspan;
                                     }
                                     
+                                    const employeeShift = periodShifts.find(s => s.employee_name === employee);
+                                    const cellId = `period-cell-${employeeShift?.employee_id || employee.replace(/\s/g, '_')}-${date}`;
+                                    
                                     return (
-                                      <td 
-                                        key={date} 
-                                        colSpan={colspan}
-                                        className={`border p-2 text-center ${
-                                          multiDayBusiness ? 'bg-purple-50' : ''
-                                        }`}
-                                      >
+                                      <DroppableTd key={date} id={cellId} isEmpty={businesses.length === 0} colSpan={colspan} className={multiDayBusiness ? 'bg-purple-50' : ''}>
                                         {businesses.length > 0 ? (
                                           <div className="space-y-1">
                                             {businesses.map((business: any, idx: number) => {
@@ -1025,32 +1163,25 @@ export default function ShiftSchedule() {
                                               );
                                               const isSelected = actualShift && selectedShiftIds.has(actualShift.id);
                                               
+                                              if (!actualShift) return null;
+                                              
                                               return (
-                                                <div 
-                                                  key={idx} 
-                                                  onClick={(e) => actualShift && handleShiftClick(actualShift.id, e)}
-                                                  className={`text-xs rounded px-1 py-0.5 cursor-pointer transition-colors ${
-                                                    isSelected
-                                                      ? 'bg-orange-300 font-bold border-2 border-orange-500'
-                                                      : business.isMultiDay 
-                                                        ? 'bg-purple-200 font-semibold border-2 border-purple-400 hover:bg-purple-300' 
-                                                        : 'bg-blue-100 hover:bg-blue-200'
-                                                  }`}
-                                                >
-                                                  {business.name}
-                                                  {business.isMultiDay && (
-                                                    <span className="ml-1 text-[10px] text-purple-600">
-                                                      ({business.colspan}日間)
-                                                    </span>
-                                                  )}
-                                                </div>
+                                                <DraggableEmployee
+                                                  key={idx}
+                                                  employeeId={actualShift.employee_id}
+                                                  employeeName={actualShift.employee_name || ''}
+                                                  shiftId={actualShift.id}
+                                                  businessName={business.name}
+                                                  isSelected={isSelected}
+                                                  onClick={(e) => handleShiftClick(actualShift.id, e)}
+                                                />
                                               );
                                             })}
                                           </div>
                                         ) : (
                                           <span className="text-gray-400">-</span>
                                         )}
-                                      </td>
+                                      </DroppableTd>
                                     );
                                   })}
                                 </tr>
@@ -1126,8 +1257,9 @@ export default function ShiftSchedule() {
                         </table>
                       </div>
                     );
-                  })()
+                  })()  
                 )}
+                </DndContext>
               </CardContent>
             </Card>
           )}
