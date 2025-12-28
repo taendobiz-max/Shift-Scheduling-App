@@ -485,7 +485,12 @@ export default function ShiftSchedule() {
 
 
   const loadPeriodShifts = async () => {
+    console.log('🔍 [DEBUG] loadPeriodShifts called');
+    console.log('🔍 [DEBUG] periodStartDate:', periodStartDate);
+    console.log('🔍 [DEBUG] periodEndDate:', periodEndDate);
+    
     if (!periodStartDate || !periodEndDate) {
+      console.log('❌ [DEBUG] Missing dates, showing toast');
       toast.error('開始日と終了日を入力してください');
       return;
     }
