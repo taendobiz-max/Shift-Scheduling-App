@@ -978,7 +978,10 @@ export default function ShiftSchedule() {
                     id="period-start-date"
                     type="date"
                     value={periodStartDate}
-                    onChange={(e) => setPeriodStartDate(e.target.value)}
+                    onChange={(e) => {
+                      console.log('🔍 [DEBUG] Start date changed:', e.target.value);
+                      setPeriodStartDate(e.target.value);
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -987,7 +990,10 @@ export default function ShiftSchedule() {
                     id="period-end-date"
                     type="date"
                     value={periodEndDate}
-                    onChange={(e) => setPeriodEndDate(e.target.value)}
+                    onChange={(e) => {
+                      console.log('🔍 [DEBUG] End date changed:', e.target.value);
+                      setPeriodEndDate(e.target.value);
+                    }}
                   />
                 </div>
                 <div className="flex items-end">
