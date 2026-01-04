@@ -4,7 +4,42 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>シフト管理システム</title>
+    <script>
+      // キャッシュバスティング: 現在のビルドバージョン
+      window.BUILD_VERSION = '5.0.0';
+      window.BUILD_TIMESTAMP = Date.now();
+      
+      // ページロード時にバージョンをチェック
+      window.addEventListener('load', function() {
+        const currentVersion = window.BUILD_VERSION;
+        const storedVersion = localStorage.getItem('app_version');
+        
+        if (storedVersion && storedVersion !== currentVersion) {
+          console.log('🔄 Version mismatch detected. Clearing cache...');
+          console.log('  Stored:', storedVersion, '→ Current:', currentVersion);
+          
+          // キャッシュをクリアしてリロード
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              return Promise.all(names.map(name => caches.delete(name)));
+            }).then(function() {
+              localStorage.setItem('app_version', currentVersion);
+              window.location.reload(true);
+            });
+          } else {
+            localStorage.setItem('app_version', currentVersion);
+            window.location.reload(true);
+          }
+        } else {
+          localStorage.setItem('app_version', currentVersion);
+          console.log('✅ App version:', currentVersion);
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

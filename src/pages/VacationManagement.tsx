@@ -22,8 +22,9 @@ import {
 } from 'lucide-react';
 import { VacationManager } from '@/utils/vacationManager';
 import { Link } from 'react-router-dom';
-import { VacationMaster, VacationFormData } from '@/types/vacation';
+import { VacationMaster } from '@/types/vacation';
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
+import { getCurrentUser } from '@/utils/auth';
 
 interface Employee {
   id: string;
@@ -32,6 +33,15 @@ interface Employee {
   従業員ID?: string;
   氏名?: string;
   拠点?: string;
+}
+
+interface VacationFormData {
+  location: string;
+  employee_id: string;
+  employee_name: string;
+  vacation_date_from: string;
+  vacation_date_to: string;
+  reason: string;
 }
 
 export default function VacationManagement() {
@@ -45,12 +55,18 @@ export default function VacationManagement() {
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
   const [editingVacation, setEditingVacation] = useState<VacationMaster | null>(null);
 
+  // 今日の日付を取得
+  const getTodayString = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
   // フォームデータ
   const [formData, setFormData] = useState<VacationFormData>({
     location: '',
     employee_id: '',
     employee_name: '',
-    vacation_date: '',
+    vacation_date_from: getTodayString(),
+    vacation_date_to: getTodayString(),
     reason: ''
   });
 
@@ -94,6 +110,15 @@ export default function VacationManagement() {
       )];
       
       setLocations(uniqueLocations);
+
+      // ログインユーザーの拠点を取得してデフォルト設定
+      const currentUser = getCurrentUser();
+      if (currentUser?.office) {
+        setFormData(prev => ({
+          ...prev,
+          location: currentUser.office || ''
+        }));
+      }
 
       // 休暇データを読み込み
       await loadVacations();
@@ -140,19 +165,34 @@ export default function VacationManagement() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // 日付範囲内のすべての日付を生成
+  const generateDateRange = (startDate: string, endDate: string): string[] => {
+    const dates: string[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const current = new Date(start);
+    while (current <= end) {
+      dates.push(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return dates;
+  };
+
   const validateForm = (): string | null => {
     if (!formData.location) return '拠点を選択してください。';
     if (!formData.employee_id) return '従業員を選択してください。';
-    if (!formData.vacation_date) return '休暇日付を選択してください。';
+    if (!formData.vacation_date_from) return '開始日を選択してください。';
+    if (!formData.vacation_date_to) return '終了日を選択してください。';
     if (!formData.reason.trim()) return '休暇理由を入力してください。';
     
-    // 日付が過去でないかチェック
-    const selectedDate = new Date(formData.vacation_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // 日付の妥当性チェック
+    const startDate = new Date(formData.vacation_date_from);
+    const endDate = new Date(formData.vacation_date_to);
     
-    if (selectedDate < today) {
-      return '過去の日付は選択できません。';
+    if (endDate < startDate) {
+      return '終了日は開始日以降の日付を選択してください。';
     }
 
     return null;
@@ -170,46 +210,58 @@ export default function VacationManagement() {
 
     setIsSubmitting(true);
     try {
+      // 日付範囲を生成
+      const dateRange = generateDateRange(formData.vacation_date_from, formData.vacation_date_to);
+      
       // 重複チェック
       if (!editingVacation) {
-        const isDuplicate = await VacationManager.checkDuplicate(formData.employee_id, formData.vacation_date);
-        if (isDuplicate) {
-          setMessage('同じ従業員の同じ日付の休暇が既に登録されています。');
-          setMessageType('error');
-          return;
+        for (const date of dateRange) {
+          const isDuplicate = await VacationManager.checkDuplicate(formData.employee_id, date);
+          if (isDuplicate) {
+            setMessage(`${date} は既に登録されています。重複する日付を除いて登録してください。`);
+            setMessageType('error');
+            setIsSubmitting(false);
+            return;
+          }
         }
       }
 
       if (editingVacation) {
-        // 更新
+        // 更新（単一日付のみ）
         await VacationManager.updateVacation(editingVacation.id, {
           employee_id: formData.employee_id,
           employee_name: formData.employee_name,
           location: formData.location,
-          vacation_date: formData.vacation_date,
+          vacation_date: formData.vacation_date_from,
           reason: formData.reason
         });
         setMessage('休暇データを更新しました。');
       } else {
-        // 新規作成
-        await VacationManager.createVacation({
-          employee_id: formData.employee_id,
-          employee_name: formData.employee_name,
-          location: formData.location,
-          vacation_date: formData.vacation_date,
-          reason: formData.reason
-        });
-        setMessage('休暇データを登録しました。');
+        // 新規作成（範囲内の各日付に対して）
+        let successCount = 0;
+        for (const date of dateRange) {
+          await VacationManager.createVacation({
+            employee_id: formData.employee_id,
+            employee_name: formData.employee_name,
+            location: formData.location,
+            vacation_date: date,
+            reason: formData.reason
+          });
+          successCount++;
+        }
+        setMessage(`${successCount}日分の休暇データを登録しました。`);
       }
 
       setMessageType('success');
       
-      // フォームをリセット
+      // フォームをリセット（拠点とデフォルト日付は保持）
+      const currentUser = getCurrentUser();
       setFormData({
-        location: '',
+        location: currentUser?.office || '',
         employee_id: '',
         employee_name: '',
-        vacation_date: '',
+        vacation_date_from: getTodayString(),
+        vacation_date_to: getTodayString(),
         reason: ''
       });
       setEditingVacation(null);
@@ -232,18 +284,21 @@ export default function VacationManagement() {
       location: vacation.location,
       employee_id: vacation.employee_id,
       employee_name: vacation.employee_name,
-      vacation_date: vacation.vacation_date,
+      vacation_date_from: vacation.vacation_date,
+      vacation_date_to: vacation.vacation_date,
       reason: vacation.reason
     });
   };
 
   const handleCancelEdit = () => {
     setEditingVacation(null);
+    const currentUser = getCurrentUser();
     setFormData({
-      location: '',
+      location: currentUser?.office || '',
       employee_id: '',
       employee_name: '',
-      vacation_date: '',
+      vacation_date_from: getTodayString(),
+      vacation_date_to: getTodayString(),
       reason: ''
     });
   };
@@ -372,20 +427,40 @@ export default function VacationManagement() {
               )}
             </div>
 
-            {/* 休暇日付 */}
-            <div className="space-y-2">
-              <Label htmlFor="vacationDate" className="flex items-center">
-                <Calendar className="w-4 h-4 mr-2" />
-                休暇日付
-              </Label>
-              <Input
-                id="vacationDate"
-                type="date"
-                value={formData.vacation_date}
-                onChange={(e) => handleInputChange('vacation_date', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-              />
+            {/* 休暇期間 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="vacationDateFrom" className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  開始日
+                </Label>
+                <Input
+                  id="vacationDateFrom"
+                  type="date"
+                  value={formData.vacation_date_from}
+                  onChange={(e) => handleInputChange('vacation_date_from', e.target.value)}
+                  disabled={editingVacation !== null}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vacationDateTo" className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  終了日
+                </Label>
+                <Input
+                  id="vacationDateTo"
+                  type="date"
+                  value={formData.vacation_date_to}
+                  onChange={(e) => handleInputChange('vacation_date_to', e.target.value)}
+                  disabled={editingVacation !== null}
+                />
+              </div>
             </div>
+            {editingVacation && (
+              <p className="text-sm text-gray-600">
+                ※ 編集モードでは日付の変更はできません。日付を変更する場合は、削除してから再登録してください。
+              </p>
+            )}
 
             {/* 休暇理由 */}
             <div className="space-y-2">
