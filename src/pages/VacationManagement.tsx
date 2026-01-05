@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { VacationManager } from '@/utils/vacationManager';
 import { Link } from 'react-router-dom';
-import { VacationMaster } from '@/types/vacation';
+import { VacationMaster, VacationType } from '@/types/vacation';
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 import { getCurrentUser } from '@/utils/auth';
 
@@ -41,6 +41,7 @@ interface VacationFormData {
   employee_name: string;
   vacation_date_from: string;
   vacation_date_to: string;
+  vacation_type: VacationType;
   reason: string;
 }
 
@@ -60,6 +61,9 @@ export default function VacationManagement() {
     return new Date().toISOString().split('T')[0];
   };
 
+  // 休暇種別の選択肢
+  const vacationTypes: VacationType[] = ['指定休', '希望休', '有給休暇'];
+
   // フォームデータ
   const [formData, setFormData] = useState<VacationFormData>({
     location: '',
@@ -67,6 +71,7 @@ export default function VacationManagement() {
     employee_name: '',
     vacation_date_from: getTodayString(),
     vacation_date_to: getTodayString(),
+    vacation_type: '有給休暇',
     reason: ''
   });
 
@@ -233,6 +238,7 @@ export default function VacationManagement() {
           employee_name: formData.employee_name,
           location: formData.location,
           vacation_date: formData.vacation_date_from,
+          vacation_type: formData.vacation_type,
           reason: formData.reason
         });
         setMessage('休暇データを更新しました。');
@@ -245,6 +251,7 @@ export default function VacationManagement() {
             employee_name: formData.employee_name,
             location: formData.location,
             vacation_date: date,
+            vacation_type: formData.vacation_type,
             reason: formData.reason
           });
           successCount++;
@@ -262,6 +269,7 @@ export default function VacationManagement() {
         employee_name: '',
         vacation_date_from: getTodayString(),
         vacation_date_to: getTodayString(),
+        vacation_type: '有給休暇',
         reason: ''
       });
       setEditingVacation(null);
@@ -286,6 +294,7 @@ export default function VacationManagement() {
       employee_name: vacation.employee_name,
       vacation_date_from: vacation.vacation_date,
       vacation_date_to: vacation.vacation_date,
+      vacation_type: vacation.vacation_type,
       reason: vacation.reason
     });
   };
@@ -299,6 +308,7 @@ export default function VacationManagement() {
       employee_name: '',
       vacation_date_from: getTodayString(),
       vacation_date_to: getTodayString(),
+      vacation_type: '有給休暇',
       reason: ''
     });
   };
@@ -427,6 +437,29 @@ export default function VacationManagement() {
               )}
             </div>
 
+            {/* 休暇種別 */}
+            <div className="space-y-2">
+              <Label htmlFor="vacationType" className="flex items-center">
+                <Calendar className="w-4 h-4 mr-2" />
+                休暇種別
+              </Label>
+              <Select 
+                value={formData.vacation_type} 
+                onValueChange={(value) => handleInputChange('vacation_type', value as VacationType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="休暇種別を選択してください" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vacationTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* 休暇期間 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -525,6 +558,7 @@ export default function VacationManagement() {
                     <th className="border border-gray-300 px-4 py-2 text-left">日付</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">拠点</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">従業員名</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">種別</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">理由</th>
                     <th className="border border-gray-300 px-4 py-2 text-center">操作</th>
                   </tr>
@@ -539,6 +573,11 @@ export default function VacationManagement() {
                       <td className="border border-gray-300 px-4 py-2">
                         {vacation.employee_name}
                         <div className="text-xs text-gray-500">ID: {vacation.employee_id}</div>
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {vacation.vacation_type}
+                        </span>
                       </td>
                       <td className="border border-gray-300 px-4 py-2">{vacation.reason}</td>
                       <td className="border border-gray-300 px-4 py-2 text-center">

@@ -15,6 +15,7 @@ export class VacationManager {
           employee_name: vacation.employee_name,
           location: vacation.location,
           vacation_date: vacation.vacation_date,
+          vacation_type: vacation.vacation_type,
           reason: vacation.reason,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
