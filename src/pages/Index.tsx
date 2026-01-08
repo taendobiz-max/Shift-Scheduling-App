@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, Workflow, User } from 'lucide-react';
+import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, Workflow, User, UserMinus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '@/utils/auth';
 
@@ -166,6 +166,25 @@ export default function Index() {
               <CardContent>
                 <p className="text-sm text-gray-600">
                   制約条件、フィルター、割り当てロジック、検証、最適化ルールを統合管理し、シフト生成を最適化できます。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/excluded-employees">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-orange-200 hover:border-orange-400">
+              <CardHeader>
+                <CardTitle className="flex items-center text-orange-700">
+                  <UserMinus className="h-6 w-6 mr-2" />
+                  除外従業員管理
+                </CardTitle>
+                <CardDescription>
+                  管理職・別業務メンバーの除外設定
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  管理職や別業務を持つメンバーをシフト自動生成時に除外する設定を管理します。拠点ごとに除外対象を指定できます。
                 </p>
               </CardContent>
             </Card>

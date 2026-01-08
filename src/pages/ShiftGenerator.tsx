@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 import { loadBusinessMasterFromSupabase, BusinessMaster } from '@/utils/businessMasterLoader';
 import { VacationManager } from '@/utils/vacationManager';
+import { ExcludedEmployeesManager } from '@/utils/excludedEmployeesManager';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -415,9 +416,33 @@ export default function ShiftGenerator() {
       let totalUnassigned = 0;
 
       // Filter employees by location
-      const filteredEmployees = employees.filter(emp => emp.location === selectedLocation);
+      let filteredEmployees = employees.filter(emp => emp.location === selectedLocation);
 
-      console.log(`👥 Filtered employees for location ${selectedLocation}:`, filteredEmployees);
+      console.log(`👥 Filtered employees for location ${selectedLocation} (before exclusion):`, filteredEmployees);
+
+      // 除外従業員をフィルタリング
+      try {
+        const excludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIds(selectedLocation);
+        console.log(`🚫 Excluded employee IDs for ${selectedLocation}:`, excludedIds);
+        
+        const beforeCount = filteredEmployees.length;
+        filteredEmployees = filteredEmployees.filter(emp => {
+          const empId = emp.従業員ID || emp.id;
+          return !excludedIds.includes(empId);
+        });
+        const afterCount = filteredEmployees.length;
+        const excludedCount = beforeCount - afterCount;
+        
+        if (excludedCount > 0) {
+          console.log(`✅ Excluded ${excludedCount} employees from shift generation`);
+          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load excluded employees:', error);
+        // 除外従業員の読み込み失敗は警告レベル（テーブルが存在しない可能性）
+      }
+
+      console.log(`👥 Filtered employees for location ${selectedLocation} (after exclusion):`, filteredEmployees);
 
       if (filteredEmployees.length === 0) {
         setGenerationResult(`選択された拠点「${selectedLocation}」に従業員が見つかりません。従業員管理画面で従業員を登録してください。`);
