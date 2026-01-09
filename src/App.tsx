@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import Profile from './pages/Profile';
 import BusinessRuleManagement from './pages/BusinessRuleManagement';
 import UnifiedRuleManagement from './pages/UnifiedRuleManagement';
+import { ExcludedEmployeesManagement } from './components/ExcludedEmployeesManagement';
 import UserManagement from './pages/UserManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -39,6 +40,7 @@ const App = () => {
             <Route path="/employees" element={<ProtectedRoute requiredRole={2}><EmployeeManagement /></ProtectedRoute>} />
             <Route path="/business-rules" element={<ProtectedRoute requiredRole={2}><BusinessRuleManagement /></ProtectedRoute>} />
             <Route path="/unified-rules" element={<ProtectedRoute requiredRole={2}><UnifiedRuleManagement /></ProtectedRoute>} />
+            <Route path="/excluded-employees" element={<ProtectedRoute requiredRole={2}><ExcludedEmployeesManagement /></ProtectedRoute>} />
             <Route path="/master-data" element={<ProtectedRoute requiredRole={2}><MasterDataManagement /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute requiredRole={2}><Reports /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute requiredRole={2}><UserManagement /></ProtectedRoute>} />
