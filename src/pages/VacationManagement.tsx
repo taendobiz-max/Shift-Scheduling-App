@@ -62,7 +62,7 @@ export default function VacationManagement() {
   };
 
   // 休暇種別の選択肢
-  const vacationTypes: VacationType[] = ['指定休', '希望休', '有給休暇'];
+  const vacationTypes: VacationType[] = ['公休', '私用', '病欠', '忌引', 'その他'];
 
   // フォームデータ
   const [formData, setFormData] = useState<VacationFormData>({
@@ -71,7 +71,7 @@ export default function VacationManagement() {
     employee_name: '',
     vacation_date_from: getTodayString(),
     vacation_date_to: getTodayString(),
-    vacation_type: '有給休暇',
+    vacation_type: '公休',
     reason: ''
   });
 
@@ -269,7 +269,7 @@ export default function VacationManagement() {
         employee_name: '',
         vacation_date_from: getTodayString(),
         vacation_date_to: getTodayString(),
-        vacation_type: '有給休暇',
+        vacation_type: '公休',
         reason: ''
       });
       setEditingVacation(null);
@@ -308,7 +308,7 @@ export default function VacationManagement() {
       employee_name: '',
       vacation_date_from: getTodayString(),
       vacation_date_to: getTodayString(),
-      vacation_type: '有給休暇',
+      vacation_type: '公休',
       reason: ''
     });
   };

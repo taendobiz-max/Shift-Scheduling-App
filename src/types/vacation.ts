@@ -1,7 +1,7 @@
 // 休暇管理関連の型定義
 
 // 休暇種別の型定義
-export type VacationType = '指定休' | '希望休' | '有給休暇';
+export type VacationType = '公休' | '私用' | '病欠' | '忌引' | 'その他';
 
 export interface VacationMaster {
   id: string;
