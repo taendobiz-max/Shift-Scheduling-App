@@ -30,8 +30,6 @@ import {
   Plus, 
   Edit, 
   Trash2, 
-  ToggleLeft, 
-  ToggleRight, 
   Home,
   AlertTriangle,
   CheckCircle
@@ -176,25 +174,6 @@ export const ExcludedEmployeesManagement: React.FC = () => {
     }
   };
 
-  const handleToggleActive = async (id: number, currentActive: boolean) => {
-    setLoading(true);
-    try {
-      const result = await ExcludedEmployeesManager.toggleExcludedEmployee(id, !currentActive);
-      
-      if (result.success) {
-        toast.success(currentActive ? '除外を無効にしました' : '除外を有効にしました');
-        await loadExcludedEmployees();
-      } else {
-        toast.error(`更新に失敗しました: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error toggling excluded employee:', error);
-      toast.error('除外設定の更新に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDelete = async (id: number, name: string) => {
     if (!confirm(`${name}さんを除外リストから削除しますか？`)) {
       return;
@@ -332,27 +311,12 @@ export const ExcludedEmployeesManagement: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{employee.employee_name}</span>
                       <Badge variant="outline">{employee.location}</Badge>
-                      <Badge variant={employee.is_active ? 'default' : 'secondary'}>
-                        {employee.is_active ? '有効' : '無効'}
-                      </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
                       従業員ID: {employee.employee_id} | 理由: {employee.reason}
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleActive(employee.id!, employee.is_active)}
-                      disabled={loading}
-                    >
-                      {employee.is_active ? (
-                        <ToggleRight className="w-4 h-4" />
-                      ) : (
-                        <ToggleLeft className="w-4 h-4" />
-                      )}
-                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"
