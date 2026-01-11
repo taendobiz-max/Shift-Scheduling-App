@@ -96,10 +96,17 @@ export const ExcludedEmployeesManagement: React.FC = () => {
 
       if (error) throw error;
 
-      const options = (data || []).map(emp => ({
-        id: emp.employee_id,
-        name: emp.name
-      }));
+      // 既に除外登録されている従業員をフィルタリング
+      const excludedIds = excludedEmployees
+        .filter(ex => ex.location === location)
+        .map(ex => ex.employee_id);
+
+      const options = (data || [])
+        .filter(emp => !excludedIds.includes(emp.employee_id))
+        .map(emp => ({
+          id: emp.employee_id,
+          name: emp.name
+        }));
 
       setEmployeeOptions(options);
     } catch (error) {
@@ -154,7 +161,12 @@ export const ExcludedEmployeesManagement: React.FC = () => {
         setEmployeeOptions([]);
         await loadExcludedEmployees();
       } else {
-        toast.error(`追加に失敗しました: ${result.error}`);
+        // エラーメッセージをわかりやすく表示
+        if (result.error?.includes('duplicate') || result.error?.includes('unique')) {
+          toast.error('この従業員は既に除外登録されています');
+        } else {
+          toast.error(`追加に失敗しました: ${result.error}`);
+        }
       }
     } catch (error) {
       console.error('Error adding excluded employee:', error);
