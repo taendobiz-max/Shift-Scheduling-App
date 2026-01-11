@@ -232,7 +232,7 @@ export class VacationManager {
       date: vacation.vacation_date,
       employeeName: vacation.employee_name,
       employeeId: vacation.employee_id,
-      reason: vacation.reason,
+      reason: `【${vacation.vacation_type}】${vacation.reason}`,
       source: 'vacation_master' as const
     }));
   }

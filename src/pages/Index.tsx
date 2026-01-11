@@ -189,6 +189,25 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
+
+          <Link to="/incompatible-pairs">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-purple-200 hover:border-purple-400">
+              <CardHeader>
+                <CardTitle className="flex items-center text-purple-700">
+                  <UserX className="h-6 w-6 mr-2" />
+                  相性ペア管理
+                </CardTitle>
+                <CardDescription>
+                  相性の悪い従業員ペアの登録
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  相性の悪い従業員ペアを登録し、シフト自動生成時に同じ時間帯への配置を避けます。重要度を設定できます。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
       </div>
