@@ -89,7 +89,7 @@ export const ExcludedEmployeesManagement: React.FC = () => {
 
     try {
       const { data, error } = await supabase
-        .from('employee_masters')
+        .from('employee_master')
         .select('従業員id, 氏名')
         .eq('拠点', location)
         .order('従業員id');
