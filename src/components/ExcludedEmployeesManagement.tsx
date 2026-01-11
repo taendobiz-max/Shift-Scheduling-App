@@ -89,16 +89,16 @@ export const ExcludedEmployeesManagement: React.FC = () => {
 
     try {
       const { data, error } = await supabase
-        .from('employee_master')
-        .select('従業員id, 氏名')
-        .eq('拠点', location)
-        .order('従業員id');
+        .from('employees')
+        .select('employee_id, name')
+        .eq('office', location)
+        .order('employee_id');
 
       if (error) throw error;
 
       const options = (data || []).map(emp => ({
-        id: emp.従業員id,
-        name: emp.氏名
+        id: emp.employee_id,
+        name: emp.name
       }));
 
       setEmployeeOptions(options);
