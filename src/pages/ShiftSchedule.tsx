@@ -13,19 +13,10 @@ import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShiftCopyDialog } from '@/components/ShiftCopyDialog';
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  useDraggable,
-  useDroppable,
-} from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
+import { useShiftSelection } from '@/hooks/useShiftSelection';
+import { useShiftData } from '@/hooks/useShiftData';
+import { SwapConfirmDialog } from '@/components/shift-schedule/SwapConfirmDialog';
+import { CellPosition } from '@/types/shift';
 
 interface ShiftData {
   id: string;
@@ -76,12 +67,14 @@ const generateTimeSlots = (): TimeSlot[] => {
   return slots;
 };
 
-// Draggable Employee Component
-const DraggableEmployee = ({ 
+// シフトバーコンポーネント（クリック可能）
+const ShiftBar = ({ 
   employeeId, 
   employeeName, 
   shiftId,
+  businessId,
   businessName,
+  date,
   startTime,
   endTime,
   barStyle,
@@ -92,47 +85,23 @@ const DraggableEmployee = ({
   employeeId: string; 
   employeeName: string;
   shiftId?: string;
+  businessId?: string;
   businessName?: string;
+  date?: string;
   startTime?: string;
   endTime?: string;
   barStyle?: { left: string; width: string };
   isSelected?: boolean;
-  onClick?: (e: React.MouseEvent) => void;
+  onClick?: () => void;
   colorScheme?: 'blue' | 'green';
 }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    isDragging,
-  } = useDraggable({
-    id: shiftId || `employee-${employeeId}`,
-    data: { 
-      employeeId, 
-      employeeName, 
-      type: 'employee',
-      shiftId: shiftId || null
-    }
-  });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-    cursor: 'grab',
-    ...(barStyle ? { left: barStyle.left, width: barStyle.width } : {})
-  };
-
-  // If barStyle is provided, render as a shift bar
+  // barStyleが提供されている場合は、シフトバーとしてレンダリング
   if (barStyle && businessName) {
     return (
       <div
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
+        style={{ left: barStyle.left, width: barStyle.width }}
         onClick={onClick}
-        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-20 cursor-grab active:cursor-grabbing ${
+        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-20 cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
             : colorScheme === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
@@ -147,16 +116,12 @@ const DraggableEmployee = ({
     );
   }
 
-  // If businessName is provided but no barStyle, render as a period shift box
+  // businessNameが提供されているがbarStyleがない場合は、期間シフトボックスとしてレンダリング
   if (businessName && !barStyle) {
     return (
       <div
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
         onClick={onClick}
-        className={`inline-block px-2 py-1 rounded text-white text-xs font-medium cursor-grab active:cursor-grabbing ${
+        className={`inline-block px-2 py-1 rounded text-white text-xs font-medium cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
             : 'bg-red-500 hover:bg-red-600'
@@ -173,85 +138,15 @@ const DraggableEmployee = ({
     );
   }
 
-  // Otherwise, render as a badge
+  // それ以外の場合は、バッジとしてレンダリング
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="inline-block"
-    >
-      <Badge variant="secondary" className="cursor-grab active:cursor-grabbing">
+    <div className="inline-block">
+      <Badge variant="secondary" className="cursor-pointer">
         {employeeName}
       </Badge>
     </div>
   );
 };
-
-// Droppable Cell Component
-const DroppableCell = ({ 
-  id, 
-  children, 
-  isEmpty 
-}: { 
-  id: string; 
-  children: React.ReactNode;
-  isEmpty?: boolean;
-}) => {
-  const { isOver, setNodeRef } = useDroppable({
-    id,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`
-        min-h-[40px] p-1 border-r border-b
-        ${isOver ? 'bg-blue-50' : isEmpty ? 'bg-gray-50' : 'bg-white'}
-        ${isEmpty ? 'hover:bg-gray-100' : ''}
-        transition-colors
-      `}
-    >
-      {children}
-    </div>
-  );
-};
-
-// Droppable Table Cell Component
-const DroppableTd = ({ 
-  id, 
-  children, 
-  isEmpty,
-  colSpan,
-  className
-}: { 
-  id: string; 
-  children: React.ReactNode;
-  isEmpty?: boolean;
-  colSpan?: number;
-  className?: string;
-}) => {
-  const { isOver, setNodeRef } = useDroppable({
-    id,
-  });
-
-  return (
-    <td
-      ref={setNodeRef}
-      colSpan={colSpan}
-      className={`
-        border p-2 text-center
-        ${isOver ? 'bg-blue-100' : ''}
-        ${isEmpty ? 'hover:bg-gray-100' : ''}
-        ${className || ''}
-        transition-colors
-      `}
-    >
-      {children}
-    </td>
-  );
-}
 
 export default function ShiftSchedule() {
   const [shifts, setShifts] = useState<ShiftData[]>([]);
@@ -264,9 +159,22 @@ export default function ShiftSchedule() {
   const [allEmployees, setAllEmployees] = useState<EmployeeData[]>([]);
   const [businessMasters, setBusinessMasters] = useState<BusinessMaster[]>([]);
   const [unassignedEmployees, setUnassignedEmployees] = useState<EmployeeData[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [selectedShiftIds, setSelectedShiftIds] = useState<Set<string>>(new Set());
+  
+  // セル選択用のhooks
+  const {
+    firstCell,
+    secondCell,
+    isDialogOpen,
+    selectCell,
+    clearSelection,
+    isCellSelected,
+    getSwapOperation,
+    setIsDialogOpen,
+  } = useShiftSelection();
+  
+  const { swapShifts, isSwapping } = useShiftData();
   
   // Excel export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -450,13 +358,34 @@ export default function ShiftSchedule() {
     periodShiftsRef.current = periodShifts;
   }, [periodShifts]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
+  // セル選択のハンドラー
+  const handleCellClick = (cell: CellPosition) => {
+    selectCell(cell);
+  };
+  
+  // スワップ確認ダイアログのハンドラー
+  const handleSwapConfirm = async () => {
+    const operation = getSwapOperation();
+    if (!operation) return;
+    
+    const success = await swapShifts(operation);
+    if (success) {
+      toast.success('シフトを入れ替えました');
+      clearSelection();
+      // データを再読み込み
+      if (activeTab === 'daily') {
+        loadData();
+      } else {
+        loadPeriodData();
+      }
+    } else {
+      toast.error('シフトの入れ替えに失敗しました');
+    }
+  };
+  
+  const handleSwapCancel = () => {
+    clearSelection();
+  };
 
   useEffect(() => {
     // Set default date to today
@@ -762,180 +691,7 @@ export default function ShiftSchedule() {
     console.log('🔍 Unassigned employees:', unassigned.length);
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-    const data = event.active.data.current;
-    if (data?.employeeName) {
-      setDraggedEmployee({
-        id: data.employeeId || event.active.id as string,
-        name: data.employeeName
-      });
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    setDraggedEmployee(null);
-
-    if (!over) return;
-
-    const activeData = active.data.current;
-    const overId = over.id as string;
-
-    console.log('🎯 Drag end:', { 
-      active: active.id, 
-      over: overId,
-      activeData 
-    });
-
-    // Parse the drop target
-    // Format: "cell-{employeeId}-{hour}"
-    if (overId.startsWith('cell-')) {
-      const parts = overId.split('-');
-      if (parts.length >= 3) {
-        const targetEmployeeId = parts.slice(1, -1).join('-');
-        const targetHour = parseInt(parts[parts.length - 1]);
-        
-        console.log('📍 Drop target:', { targetEmployeeId, targetHour });
-        
-        // Check if dragging from unassigned employees
-        if (activeData?.type === 'employee' && !activeData.shiftId) {
-          // Dragging unassigned employee to a cell
-          const sourceEmployeeId = activeData.employeeId;
-          
-          if (sourceEmployeeId !== targetEmployeeId) {
-            // Swap: move unassigned employee to target, and move target's shift to unassigned
-            const targetShift = shifts.find(s => s.employee_id === targetEmployeeId);
-            
-            if (targetShift) {
-              // Update the shift to assign to the source employee
-              const updatedShifts = shifts.map(s => {
-                if (s.id === targetShift.id) {
-                  return {
-                    ...s,
-                    employee_id: sourceEmployeeId,
-                    employee_name: activeData.employeeName,
-                  };
-                }
-                return s;
-              });
-              
-              setShifts(updatedShifts);
-              setHasChanges(true);
-              toast.success(`${activeData.employeeName}と${targetShift.employee_name}を交換しました`);
-            } else {
-              toast.info('交換先の従業員にシフトがありません');
-            }
-          }
-        } else if (activeData?.shiftId) {
-          // Dragging existing shift to another cell
-          const activeShift = shifts.find(s => s.id === activeData.shiftId);
-          
-          if (activeShift && activeShift.employee_id !== targetEmployeeId) {
-            // Swap shifts between two employees
-            const targetShift = shifts.find(s => s.employee_id === targetEmployeeId);
-            
-            if (targetShift) {
-              // Swap the two shifts
-              const updatedShifts = shifts.map(s => {
-                if (s.id === activeShift.id) {
-                  return {
-                    ...s,
-                    employee_id: targetEmployeeId,
-                    employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
-                  };
-                }
-                if (s.id === targetShift.id) {
-                  return {
-                    ...s,
-                    employee_id: activeShift.employee_id,
-                    employee_name: activeShift.employee_name,
-                  };
-                }
-                return s;
-              });
-              
-              setShifts(updatedShifts);
-              setHasChanges(true);
-              toast.success('シフトを交換しました');
-            } else {
-              // Move shift to unassigned employee
-              const updatedShifts = shifts.map(s => {
-                if (s.id === activeShift.id) {
-                  return {
-                    ...s,
-                    employee_id: targetEmployeeId,
-                    employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
-                  };
-                }
-                return s;
-              });
-              
-              setShifts(updatedShifts);
-              setHasChanges(true);
-              toast.success('シフトを移動しました');
-            }
-          }
-        }
-      }
-    }
-  };
-
-  // Handle drag end for period view
-  const handlePeriodDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    setDraggedEmployee(null);
-
-    if (!over) return;
-
-    const activeData = active.data.current;
-    const overId = over.id as string;
-
-    console.log('🎯 Period drag end:', { 
-      active: active.id, 
-      over: overId,
-      activeData 
-    });
-
-    // Parse the drop target
-    // Format: "period-cell-{employeeId}-{date}"
-    if (overId.startsWith('period-cell-')) {
-      const parts = overId.split('-');
-      if (parts.length >= 4) {
-        // Extract employee ID and date
-        const dateStr = parts[parts.length - 1];
-        const targetEmployeeId = parts.slice(2, -1).join('-');
-        
-        console.log('📍 Drop target:', { targetEmployeeId, dateStr });
-        
-        // Check if dragging a shift
-        if (activeData?.shiftId) {
-          const activeShift = periodShifts.find(s => s.id === activeData.shiftId);
-          
-          if (activeShift) {
-            // Update the shift's employee and date
-            const updatedShifts = periodShifts.map(s => {
-              if (s.id === activeData.shiftId) {
-                return {
-                  ...s,
-                  employee_id: targetEmployeeId,
-                  employee_name: allEmployees.find(e => e.employee_id === targetEmployeeId)?.name,
-                  date: dateStr,
-                };
-              }
-              return s;
-            });
-            
-            setPeriodShifts(updatedShifts);
-            setHasChanges(true);
-            toast.success('シフトを移動しました');
-          }
-        }
-      }
-    }
-  };
+  // ドラッグ＆ドロップ機能を削除し、セル選択方式に変更
 
   // Handle shift selection
   const handleShiftClick = (shiftId: string, e: React.MouseEvent) => {
@@ -1240,12 +996,6 @@ export default function ShiftSchedule() {
                 </div>
               </CardHeader>
               <CardContent>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handlePeriodDragEnd}
-                >
                 {periodViewMode === 'employee' && periodEmployeeViewData ? (
                   /* Employee View: Employees x Dates (Multi-day support) */
                   <div className="overflow-x-auto">
@@ -1286,7 +1036,23 @@ export default function ShiftSchedule() {
                                 const cellId = `period-cell-${employeeShift?.employee_id || employee.replace(/\s/g, '_')}-${date}`;
                                 
                                 return (
-                                  <DroppableTd key={date} id={cellId} isEmpty={businesses.length === 0} colSpan={colspan} className={multiDayBusiness ? 'bg-purple-50' : ''}>
+                                  <td 
+                                    key={date} 
+                                    colSpan={colspan} 
+                                    className={`border p-2 text-center cursor-pointer hover:bg-blue-50 transition-colors ${
+                                      multiDayBusiness ? 'bg-purple-50' : ''
+                                    }`}
+                                    onClick={() => {
+                                      const employeeShift = periodShifts.find(s => s.employee_name === employee);
+                                      if (employeeShift) {
+                                        handleCellClick({
+                                          employeeId: employeeShift.employee_id,
+                                          businessId: '', // Period viewでは業務IDは不要
+                                          date: date,
+                                        });
+                                      }
+                                    }}
+                                  >
                                     {businesses.length > 0 ? (
                                       <div className="space-y-1">
                                         {businesses.map((business: any, idx: number) => (
@@ -1298,7 +1064,7 @@ export default function ShiftSchedule() {
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
-                                  </DroppableTd>
+                                  </td>
                                 );
                               })}
                             </tr>
@@ -1347,14 +1113,6 @@ export default function ShiftSchedule() {
                     </table>
                   </div>
                 ) : null}
-                <DragOverlay>
-                  {draggedEmployee && draggedEmployee.name && (
-                    <Badge variant="default" className="cursor-grabbing">
-                      {draggedEmployee.name}
-                    </Badge>
-                  )}
-                </DragOverlay>
-                </DndContext>
               </CardContent>
             </Card>
           )}
@@ -1466,12 +1224,6 @@ export default function ShiftSchedule() {
           </div>
         </CardHeader>
         <CardContent>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
           {dailyViewMode === 'employee' ? (
             <div className="overflow-x-auto">
               <div className="min-w-[1200px]">
@@ -1529,13 +1281,16 @@ export default function ShiftSchedule() {
                           {/* Time Grid Background */}
                           <div className="absolute inset-0 flex">
                             {timeSlots.map((slot, index) => (
-                              <DroppableCell
+                              <div
                                 key={`${employee.employee_id}-${index}`}
-                                id={`cell-${employee.employee_id}-${slot.hour}`}
-                                isEmpty={employeeShifts.length === 0}
+                                className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  // 空セルをクリックした場合の処理
+                                  // TODO: 必要に応じて実装
+                                }}
                               >
                                 {/* Empty cell */}
-                              </DroppableCell>
+                              </div>
                             ))}
                           </div>
                           
@@ -1547,17 +1302,28 @@ export default function ShiftSchedule() {
                             );
                             
                             return (
-                              <DraggableEmployee
+                              <ShiftBar
                                 key={shift.id}
                                 employeeId={shift.employee_id}
                                 employeeName={shift.employee_name || employee.name}
                                 shiftId={shift.id}
+                                businessId={shift.business_master_id}
                                 businessName={shift.business_name}
+                                date={shift.date}
                                 startTime={shift.start_time}
                                 endTime={shift.end_time}
                                 barStyle={barStyle}
-                                isSelected={selectedShiftIds.has(shift.id)}
-                                onClick={(e) => handleShiftClick(shift.id, e)}
+                                isSelected={isCellSelected({
+                                  employeeId: shift.employee_id,
+                                  businessId: shift.business_master_id,
+                                  date: shift.date,
+                                })}
+                                onClick={() => handleCellClick({
+                                  employeeId: shift.employee_id,
+                                  businessId: shift.business_master_id,
+                                  date: shift.date,
+                                  shiftId: shift.id,
+                                })}
                                 colorScheme='blue'
                               />
                             );
@@ -1624,13 +1390,16 @@ export default function ShiftSchedule() {
                           {/* Time Grid Background */}
                           <div className="absolute inset-0 flex">
                             {timeSlots.map((slot, index) => (
-                              <DroppableCell
+                              <div
                                 key={`${business}-${index}`}
-                                id={`cell-${business}-${slot.hour}`}
-                                isEmpty={businessShifts.length === 0}
+                                className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  // 空セルをクリックした場合の処理
+                                  // TODO: 必要に応じて実装
+                                }}
                               >
                                 {/* Empty cell */}
-                              </DroppableCell>
+                              </div>
                             ))}
                           </div>
                           
@@ -1642,17 +1411,28 @@ export default function ShiftSchedule() {
                             );
                             
                             return (
-                              <DraggableEmployee
+                              <ShiftBar
                                 key={shift.id}
                                 employeeId={shift.employee_id}
                                 employeeName={shift.employee_name}
                                 shiftId={shift.id}
+                                businessId={shift.business_master_id}
                                 businessName={shift.business_name}
+                                date={shift.date}
                                 startTime={shift.start_time}
                                 endTime={shift.end_time}
                                 barStyle={barStyle}
-                                isSelected={selectedShiftIds.has(shift.id)}
-                                onClick={(e) => handleShiftClick(shift.id, e)}
+                                isSelected={isCellSelected({
+                                  employeeId: shift.employee_id,
+                                  businessId: shift.business_master_id,
+                                  date: shift.date,
+                                })}
+                                onClick={() => handleCellClick({
+                                  employeeId: shift.employee_id,
+                                  businessId: shift.business_master_id,
+                                  date: shift.date,
+                                  shiftId: shift.id,
+                                })}
                                 colorScheme='green'
                               />
                             );
@@ -1665,15 +1445,6 @@ export default function ShiftSchedule() {
               </div>
             </div>
           )}
-          
-          <DragOverlay>
-            {activeId && (
-              <Badge variant="secondary" className="cursor-grabbing">
-                ドラッグ中...
-              </Badge>
-            )}
-          </DragOverlay>
-          </DndContext>
         </CardContent>
       </Card>
 
@@ -1688,11 +1459,9 @@ export default function ShiftSchedule() {
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {unassignedEmployees.map((emp) => (
-              <DraggableEmployee
-                key={emp.employee_id}
-                employeeId={emp.employee_id}
-                employeeName={emp.name}
-              />
+              <Badge key={emp.employee_id} variant="secondary">
+                {emp.name}
+              </Badge>
             ))}
             {unassignedEmployees.length === 0 && (
               <p className="text-gray-500">すべての従業員がアサインされています</p>
@@ -1716,6 +1485,16 @@ export default function ShiftSchedule() {
       }
       toast.success('シフトのコピーが完了しました');
     }}
+  />
+  
+  {/* Swap Confirm Dialog */}
+  <SwapConfirmDialog
+    open={isDialogOpen}
+    onOpenChange={setIsDialogOpen}
+    swapOperation={getSwapOperation()}
+    onConfirm={handleSwapConfirm}
+    onCancel={handleSwapCancel}
+    isLoading={isSwapping}
   />
   </div>
   );
