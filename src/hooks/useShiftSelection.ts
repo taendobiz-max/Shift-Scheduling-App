@@ -8,8 +8,11 @@ export const useShiftSelection = () => {
 
   // セルを選択
   const selectCell = useCallback((cell: CellPosition) => {
+    console.log('🔵 [DEBUG] selectCell called:', cell);
+    console.log('🔵 [DEBUG] Current firstCell:', firstCell);
     if (!firstCell) {
       // 1つ目のセルを選択
+      console.log('🔵 [DEBUG] Setting firstCell:', cell);
       setFirstCell(cell);
     } else if (
       firstCell.employeeId === cell.employeeId &&
@@ -17,9 +20,11 @@ export const useShiftSelection = () => {
       firstCell.date === cell.date
     ) {
       // 同じセルをクリックした場合は選択解除
+      console.log('🔵 [DEBUG] Same cell clicked, clearing selection');
       setFirstCell(null);
     } else {
       // 2つ目のセルを選択して確認ダイアログを表示
+      console.log('🔵 [DEBUG] Setting secondCell and opening dialog:', cell);
       setSecondCell(cell);
       setIsDialogOpen(true);
     }
@@ -35,11 +40,15 @@ export const useShiftSelection = () => {
   // セルが選択されているかチェック
   const isCellSelected = useCallback((cell: CellPosition): boolean => {
     if (!firstCell) return false;
-    return (
+    const isSelected = (
       firstCell.employeeId === cell.employeeId &&
       firstCell.businessId === cell.businessId &&
       firstCell.date === cell.date
     );
+    if (isSelected) {
+      console.log('🟢 [DEBUG] Cell is selected:', cell);
+    }
+    return isSelected;
   }, [firstCell]);
 
   // スワップ操作を取得

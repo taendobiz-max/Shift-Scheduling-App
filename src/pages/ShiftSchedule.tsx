@@ -360,6 +360,7 @@ export default function ShiftSchedule() {
 
   // セル選択のハンドラー
   const handleCellClick = (cell: CellPosition) => {
+    console.log('🟠 [DEBUG] handleCellClick called:', cell);
     selectCell(cell);
   };
   
