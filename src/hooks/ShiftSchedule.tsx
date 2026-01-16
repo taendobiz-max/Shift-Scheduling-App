@@ -1046,12 +1046,9 @@ export default function ShiftSchedule() {
                                     onClick={() => {
                                       const employeeShift = periodShifts.find(s => s.employee_name === employee);
                                       if (employeeShift) {
-                                        const businessNames = businesses.map((b: any) => b.name).join(', ');
                                         handleCellClick({
                                           employeeId: employeeShift.employee_id,
-                                          employeeName: employee,
                                           businessId: '', // Period viewでは業務IDは不要
-                                          businessName: businessNames || '未割り当て',
                                           date: date,
                                         });
                                       }
@@ -1324,9 +1321,7 @@ export default function ShiftSchedule() {
                                 })}
                                 onClick={() => handleCellClick({
                                   employeeId: shift.employee_id,
-                                  employeeName: shift.employee_name || employee.name,
                                   businessId: shift.business_master_id,
-                                  businessName: shift.business_name,
                                   date: shift.date,
                                   shiftId: shift.id,
                                 })}
@@ -1435,9 +1430,7 @@ export default function ShiftSchedule() {
                                 })}
                                 onClick={() => handleCellClick({
                                   employeeId: shift.employee_id,
-                                  employeeName: shift.employee_name,
                                   businessId: shift.business_master_id,
-                                  businessName: shift.business_name,
                                   date: shift.date,
                                   shiftId: shift.id,
                                 })}

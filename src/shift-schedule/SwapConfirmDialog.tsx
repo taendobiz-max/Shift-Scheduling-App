@@ -45,8 +45,8 @@ export const SwapConfirmDialog: React.FC<SwapConfirmDialogProps> = ({
           <div className="border rounded-lg p-4 bg-blue-50">
             <p className="font-semibold text-sm text-gray-600 mb-2">入れ替え元</p>
             <p className="text-sm">
-              従業員: {from.employeeName || from.employeeId}<br />
-              業務: {from.businessName || from.businessId}<br />
+              従業員ID: {from.employeeId}<br />
+              業務ID: {from.businessId}<br />
               日付: {from.date}
             </p>
           </div>
@@ -60,8 +60,8 @@ export const SwapConfirmDialog: React.FC<SwapConfirmDialogProps> = ({
           <div className="border rounded-lg p-4 bg-green-50">
             <p className="font-semibold text-sm text-gray-600 mb-2">入れ替え先</p>
             <p className="text-sm">
-              従業員: {to.employeeName || to.employeeId}<br />
-              業務: {to.businessName || to.businessId}<br />
+              従業員ID: {to.employeeId}<br />
+              業務ID: {to.businessId}<br />
               日付: {to.date}
             </p>
           </div>
