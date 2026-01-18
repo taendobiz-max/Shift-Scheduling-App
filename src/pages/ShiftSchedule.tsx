@@ -361,7 +361,7 @@ export default function ShiftSchedule() {
   }, [periodShifts]);
   // セルクリックハンドラー
   const handleCellClick = async (cell: CellPosition) => {
-    console.log('🟠 [DEBUG] handleCellClick called:', cell);
+    window.alert("handleCellClick called: " + JSON.stringify(cell)); console.log("🟠 [DEBUG] handleCellClick called:", cell);
     
     // 最初の選択の場合はそのまま選択
     if (!firstCell) {
