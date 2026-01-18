@@ -23,7 +23,8 @@ export const useShiftSelection = () => {
       console.log('🔵 [DEBUG] Same cell clicked, clearing selection');
       setFirstCell(null);
     } else {
-      // 2つ目のセルを選択して確認ダイアログを表示
+      // 2つ目のセルを選択
+      // 空セルへの移動も許可する
       console.log('🔵 [DEBUG] Setting secondCell and opening dialog:', cell);
       setSecondCell(cell);
       setIsDialogOpen(true);

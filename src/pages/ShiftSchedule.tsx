@@ -16,6 +16,8 @@ import { ShiftCopyDialog } from '@/components/ShiftCopyDialog';
 import { useShiftSelection } from '@/hooks/useShiftSelection';
 import { useShiftData } from '@/hooks/useShiftData';
 import { SwapConfirmDialog } from '@/components/shift-schedule/SwapConfirmDialog';
+import { EmptyCell } from '@/components/shift-schedule/EmptyCell';
+import { calculateEmptyTimeSlots } from '@/utils/emptyTimeSlots';
 import { CellPosition } from '@/types/shift';
 
 interface ShiftData {
@@ -357,17 +359,49 @@ export default function ShiftSchedule() {
   useEffect(() => {
     periodShiftsRef.current = periodShifts;
   }, [periodShifts]);
-
-  // セル選択のハンドラー
-  const handleCellClick = (cell: CellPosition) => {
+  // セルクリックハンドラー
+  const handleCellClick = async (cell: CellPosition) => {
     console.log('🟠 [DEBUG] handleCellClick called:', cell);
+    
+    // 最初の選択の場合はそのまま選択
+    if (!firstCell) {
+      selectCell(cell);
+      return;
+    }
+    
+    // 2つ目の選択の場合は確認ダイアログを表示
     selectCell(cell);
+    
+    // 少し待ってから確認ダイアログを表示（選択状態が更新されるのを待つ）
+    setTimeout(async () => {
+      const operation = getSwapOperation();
+      if (!operation) {
+        console.log('⚠️ [ShiftSchedule] No operation found');
+        return;
+      }
+      
+      // window.confirmで確認
+      const fromInfo = `${operation.from.employeeName} - ${operation.from.businessName || '未割り当て'} (${operation.from.date})`;
+      const toInfo = `${operation.to.employeeName} - ${operation.to.businessName || '未割り当て'} (${operation.to.date})`;
+      const confirmed = window.confirm(`以下のシフトを入れ替えますか？\n\n入れ替え元:\n${fromInfo}\n\n入れ替え先:\n${toInfo}`);
+      
+      if (confirmed) {
+        await handleSwapConfirm();
+      } else {
+        handleSwapCancel();
+      }
+    }, 100);
   };
   
   // スワップ確認ダイアログのハンドラー
   const handleSwapConfirm = async () => {
+    console.log('🟢 [ShiftSchedule] handleSwapConfirm called');
     const operation = getSwapOperation();
-    if (!operation) return;
+    console.log('🟢 [ShiftSchedule] operation:', operation);
+    if (!operation) {
+      console.log('⚠️ [ShiftSchedule] No operation found');
+      return;
+    }
     
     const success = await swapShifts(operation);
     if (success) {
@@ -1287,16 +1321,57 @@ export default function ShiftSchedule() {
                             {timeSlots.map((slot, index) => (
                               <div
                                 key={`${employee.employee_id}-${index}`}
-                                className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
-                                onClick={() => {
-                                  // 空セルをクリックした場合の処理
-                                  // TODO: 必要に応じて実装
-                                }}
+                                className="flex-1 min-h-[40px] p-1 border-r border-b bg-gray-50"
                               >
-                                {/* Empty cell */}
+                                {/* Empty cell background */}
                               </div>
                             ))}
                           </div>
+                          
+                          {/* Empty Cells (clickable) */}
+                          {(() => {
+                            const emptySlots = calculateEmptyTimeSlots(employeeShifts);
+                            return emptySlots.map((slot, index) => {
+                              const calculatePosition = (hour: number) => {
+                                const adjustedHour = (hour - 4 + 24) % 24;
+                                return (adjustedHour / 24) * 100;
+                              };
+                              const left = calculatePosition(slot.startHour);
+                              const width = calculatePosition(slot.endHour) - left;
+                              const isSelected = firstCell?.employeeId === employee.employee_id && firstCell?.businessId === '';
+                              
+                              return (
+                                <div
+                                  key={`empty-${employee.employee_id}-${index}`}
+                                  style={{ 
+                                    left: `${left}%`, 
+                                    width: `${width}%` 
+                                  }}
+                                  onClick={() => {
+                                    console.log('🟢 [EmptyCell] Clicked (inline):', { employeeId: employee.employee_id, employeeName: employee.name, startHour: slot.startHour, endHour: slot.endHour });
+                                    handleCellClick({
+                                      employeeId: employee.employee_id,
+                                      employeeName: employee.name,
+                                      businessId: '',
+                                      businessName: '未割り当て',
+                                      date: selectedDate,
+                                      shiftId: undefined,
+                                    });
+                                  }}
+                                  className={`absolute top-2 bottom-2 rounded border-2 border-dashed flex items-center justify-center text-xs font-medium transition-all z-10 cursor-pointer ${
+                                    isSelected 
+                                      ? 'bg-orange-100 border-orange-400 hover:bg-orange-200' 
+                                      : 'bg-gray-50 border-gray-300 hover:bg-gray-100'
+                                  }`}
+                                  title={`${employee.name}の空き時間帯（${slot.startHour}:00 - ${slot.endHour}:00）をクリックしてシフトを移動`}
+                                >
+                                  {isSelected && (
+                                    <span className="text-orange-600 font-semibold">選択中</span>
+                                  )}
+                                </div>
+                              );
+                            });
+                          })()}
                           
                           {/* Shift Bars */}
                           {employeeShifts.map((shift) => {
@@ -1398,13 +1473,9 @@ export default function ShiftSchedule() {
                             {timeSlots.map((slot, index) => (
                               <div
                                 key={`${business}-${index}`}
-                                className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
-                                onClick={() => {
-                                  // 空セルをクリックした場合の処理
-                                  // TODO: 必要に応じて実装
-                                }}
+                                className="flex-1 min-h-[40px] p-1 border-r border-b bg-gray-50"
                               >
-                                {/* Empty cell */}
+                                {/* Empty cell background */}
                               </div>
                             ))}
                           </div>
@@ -1495,15 +1566,15 @@ export default function ShiftSchedule() {
     }}
   />
   
-  {/* Swap Confirm Dialog */}
-  <SwapConfirmDialog
+  {/* Swap Confirm Dialog - 現在はwindow.confirmを使用しているためコメントアウト */}
+  {/* <SwapConfirmDialog
     open={isDialogOpen}
     onOpenChange={setIsDialogOpen}
     swapOperation={getSwapOperation()}
     onConfirm={handleSwapConfirm}
     onCancel={handleSwapCancel}
     isLoading={isSwapping}
-  />
+  /> */}
   </div>
   );
 }
