@@ -59,7 +59,7 @@ const ShiftSchedule: React.FC = () => {
                     {emptySlots.map((slot, idx) => (
                       <div
                         key={idx}
-                        onClickCapture={(e) => { window.alert("CLICKED"); console.log("CLICKED"); e.stopPropagation(); console.log("STOPPED"); console.log("TARGET:", e.target); window.alert("CLICKED");
+                        onClickCapture={(e) => { console.log("CLICKED"); e.stopPropagation(); console.log("STOPPED"); console.log("TARGET:", e.target); window.alert("CLICKED"); window.alert("CLICKED");
                           console.log('🔴 [DEBUG] Empty cell clicked:', slot);
                           handleCellClick({ ...slot, employee_id: employee.id });
                         }}
