@@ -1077,7 +1077,7 @@ export default function ShiftSchedule() {
                                     className={`border p-2 text-center cursor-pointer hover:bg-blue-50 transition-colors ${
                                       multiDayBusiness ? 'bg-purple-50' : ''
                                     }`}
-                                    onClick={(e) => { window.alert("CLICKED"); console.log("🔥 [DEBUG] DIV CLICKED", e); window.alert("DIV CLICKED");
+                                    onMouseDown={(e) => { console.log("MOUSE DOWN"); window.alert("CLICKED"); console.log("🔥 [DEBUG] DIV CLICKED", e); window.alert("DIV CLICKED");
                                       const employeeShift = periodShifts.find(s => s.employee_name === employee);
                                       if (employeeShift) {
                                         const businessNames = businesses.map((b: any) => b.name).join(', ');
@@ -1347,7 +1347,7 @@ export default function ShiftSchedule() {
                                     left: `${left}%`, 
                                     width: `${width}%` 
                                   }}
-                                  onClick={(e) => { window.alert("CLICKED"); console.log("🔥 [DEBUG] DIV CLICKED", e); window.alert("DIV CLICKED");
+                                  onMouseDown={(e) => { console.log("MOUSE DOWN"); window.alert("CLICKED"); console.log("🔥 [DEBUG] DIV CLICKED", e); window.alert("DIV CLICKED");
                                     console.log('🟢 [EmptyCell] Clicked (inline):', { employeeId: employee.employee_id, employeeName: employee.name, startHour: slot.startHour, endHour: slot.endHour });
                                     handleCellClick({
                                       employeeId: employee.employee_id,
