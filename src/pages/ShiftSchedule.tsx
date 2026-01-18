@@ -59,7 +59,7 @@ const ShiftSchedule: React.FC = () => {
                     {emptySlots.map((slot, idx) => (
                       <div
                         key={idx}
-                        onClickCapture={(e) => { console.log("CLICKED"); e.stopPropagation(); window.alert("CLICKED"); } } onMouseDownCapture={(e) => { console.log("MOUSEDOWN"); e.stopPropagation(); window.alert("MOUSEDOWN"); } } onClick={(e) => {
+                        onClickCapture={(e) => { console.log("CLICKED"); e.stopPropagation(); window.alert("CLICKED"); } } onMouseDownCapture={(e) => { console.log("MOUSEDOWN"); e.stopPropagation(); window.alert("MOUSEDOWN"); } } onPointerDownCapture={(e) => { console.log("POINTERDOWN"); e.stopPropagation(); window.alert("POINTERDOWN"); } } onClick={(e) => {
                           console.log('🔴 [DEBUG] Empty cell clicked:', slot);
                           handleCellClick({ ...slot, employee_id: employee.id });
                         }}
