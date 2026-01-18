@@ -103,7 +103,7 @@ const ShiftBar = ({
       <div
         style={{ left: barStyle.left, width: barStyle.width }}
         onClick={onClick}
-        style={{ pointerEvents: "auto", zIndex: 10000, position: "absolute" }} className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-20 cursor-pointer ${
+        style={{ pointerEvents: "auto", zIndex: 10000, position: "absolute", backgroundColor: "rgba(255, 0, 0, 0.2)" }} className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-20 cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
             : colorScheme === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
@@ -1358,7 +1358,7 @@ export default function ShiftSchedule() {
                                       shiftId: undefined,
                                     });
                                   }}
-                                  style={{ pointerEvents: "auto", zIndex: 10000, position: "absolute" }} className={`absolute top-2 bottom-2 rounded border-2 border-dashed flex items-center justify-center text-xs font-medium transition-all z-10 cursor-pointer ${
+                                  style={{ pointerEvents: "auto", zIndex: 10000, position: "absolute", backgroundColor: "rgba(255, 0, 0, 0.2)" }} className={`absolute top-2 bottom-2 rounded border-2 border-dashed flex items-center justify-center text-xs font-medium transition-all z-10 cursor-pointer ${
                                     isSelected 
                                       ? 'bg-orange-100 border-orange-400 hover:bg-orange-200' 
                                       : 'bg-gray-50 border-gray-300 hover:bg-gray-100'
