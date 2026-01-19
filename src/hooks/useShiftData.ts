@@ -19,14 +19,10 @@ export const useShiftData = () => {
       setLoading(true);
       setError(null);
 
-      // シフトデータを取得
+      // シフトデータを取得（リレーションシップを使わない）
       const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
-        .select(`
-          *,
-          employees(id, name),
-          businesses(id, business_name, start_time, end_time)
-        `)
+        .select('*')
         .order('date', { ascending: true });
 
       if (shiftsError) {
@@ -43,16 +39,32 @@ export const useShiftData = () => {
         throw new Error(`従業員データの取得に失敗しました: ${employeesError.message}`);
       }
 
+      // 業務データを取得
+      const { data: businessesData, error: businessesError } = await supabase
+        .from('businesses')
+        .select('*');
+
+      if (businessesError) {
+        throw new Error(`業務データの取得に失敗しました: ${businessesError.message}`);
+      }
+
+      // 従業員と業務のマップを作成
+      const employeeMap = new Map(employeesData?.map(e => [e.id, e]) || []);
+      const businessMap = new Map(businessesData?.map(b => [b.id, b]) || []);
+
       // シフトデータを整形
-      const formattedShifts = (shiftsData || []).map(shift => ({
-        ...shift,
-        employee_id: shift.employee_id,
-        employee_name: shift.employees?.name || '',
-        business_id: shift.business_id,
-        business_name: shift.businesses?.business_name || '',
-        start_time: shift.businesses?.start_time || '',
-        end_time: shift.businesses?.end_time || '',
-      }));
+      const formattedShifts = (shiftsData || []).map(shift => {
+        const employee = employeeMap.get(shift.employee_id);
+        const business = businessMap.get(shift.business_id);
+        
+        return {
+          ...shift,
+          employee_name: employee?.name || '',
+          business_name: business?.business_name || '',
+          start_time: business?.start_time || '',
+          end_time: business?.end_time || '',
+        };
+      });
 
       setShifts(formattedShifts);
       setEmployees(employeesData || []);
