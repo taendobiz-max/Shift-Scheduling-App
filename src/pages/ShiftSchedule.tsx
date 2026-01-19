@@ -9,6 +9,7 @@ const ShiftSchedule: React.FC = () => {
 
   const handleCellClick = (cell: any) => {
     console.log('🟠 [DEBUG] handleCellClick called:', cell);
+    
     if (selectedCell) {
       if (window.confirm('シフトを入れ替えますか？')) {
         swapShifts(selectedCell, cell).then(() => {
@@ -48,6 +49,7 @@ const ShiftSchedule: React.FC = () => {
                 <tr key={employee.id}>
                   <td className="border border-gray-300 p-2">{employee.name}</td>
                   <td colSpan={24} className="border border-gray-300 p-0 relative h-12">
+                    {/* シフトバーのレンダリング */}
                     {employeeShifts.map(shift => (
                       <ShiftBar
                         key={shift.id}
@@ -56,12 +58,15 @@ const ShiftSchedule: React.FC = () => {
                         onClick={() => handleCellClick(shift)}
                       />
                     ))}
+                    
+                    {/* 空セルのレンダリング */}
                     {emptySlots.map((slot, idx) => (
                       <div
-                        key={idx}
-                        onClickCapture={(e) => { console.log("CLICKED"); e.stopPropagation(); window.alert("CLICKED"); } } onMouseDownCapture={(e) => { console.log("MOUSEDOWN"); e.stopPropagation(); window.alert("MOUSEDOWN"); } } onPointerDownCapture={(e) => { console.log("POINTERDOWN"); e.stopPropagation(); window.alert("POINTERDOWN"); } } onTouchStartCapture={(e) => { console.log("TOUCHSTART"); e.stopPropagation(); window.alert("TOUCHSTART"); } } onMouseUpCapture={(e) => { console.log("MOUSEUP"); e.stopPropagation(); window.alert("MOUSEUP"); } } onPointerUpCapture={(e) => { console.log("POINTERUP"); e.stopPropagation(); window.alert("POINTERUP"); } } onMouseDown={(e) => { console.log("MOUSEDOWN_DIRECT"); e.stopPropagation(); window.alert("MOUSEDOWN_DIRECT"); } } onClick={(e) => { console.log("CLICK_DIRECT"); e.stopPropagation(); window.alert("CLICK_DIRECT"); } } onClick={(e) => {
+                        key={`empty-${employee.id}-${idx}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
                           console.log('🔴 [DEBUG] Empty cell clicked:', slot);
-                          handleCellClick({ ...slot, employee_id: employee.id });
+                          handleCellClick({ ...slot, employee_id: employee.id, isEmpty: true });
                         }}
                         style={{
                           position: 'absolute',
@@ -69,10 +74,11 @@ const ShiftSchedule: React.FC = () => {
                           width: `${(slot.endHour - slot.startHour) * 4.16}%`,
                           top: '4px',
                           bottom: '4px',
-                          border: '2px dashed red',
-                          backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                          border: '2px dashed #22c55e',
+                          backgroundColor: 'rgba(34, 197, 94, 0.1)',
                           cursor: 'pointer',
-                          zIndex: 20
+                          zIndex: 10,
+                          pointerEvents: 'auto'
                         }}
                         title={`${employee.name}の空き時間帯 (${slot.startHour}:00 - ${slot.endHour}:00)`}
                       />
@@ -87,4 +93,5 @@ const ShiftSchedule: React.FC = () => {
     </div>
   );
 };
+
 export default ShiftSchedule;
