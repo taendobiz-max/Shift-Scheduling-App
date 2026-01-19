@@ -41,7 +41,7 @@ export const useShiftData = () => {
 
       // 業務データを取得
       const { data: businessesData, error: businessesError } = await supabase
-        .from('businesses')
+        .from('business_master')
         .select('*');
 
       if (businessesError) {
