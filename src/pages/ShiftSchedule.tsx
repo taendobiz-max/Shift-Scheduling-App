@@ -1295,13 +1295,13 @@ export default function ShiftSchedule() {
                         </div>
                         
                         {/* Time Grid Column */}
-                        <div className="flex-1 relative" style={{ height: '60px' }}>
+                        <div className="flex-1 relative z-0" style={{ height: '60px' }}>
                           {/* Time Grid Background */}
-                          <div className="absolute inset-0 flex">
+                          <div className="absolute inset-0 z-5 pointer-events-none flex">
                             {timeSlots.map((slot, index) => (
                               <div
                                 key={`${employee.employee_id}-${index}`}
-                                className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                className="min-h-[40px] pointer-events-auto z-10 p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
                                   handleCellClick({
                                     employeeId: employee.employee_id,
