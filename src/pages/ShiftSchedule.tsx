@@ -1301,7 +1301,7 @@ export default function ShiftSchedule() {
                             {timeSlots.map((slot, index) => (
                               <div
                                 key={`${employee.employee_id}-${index}`}
-                                className="min-h-[40px] pointer-events-auto z-10 p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                className="min-h-[40px] pointer-events-auto z-30 p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
                                   handleCellClick({
                                     employeeId: employee.employee_id,
