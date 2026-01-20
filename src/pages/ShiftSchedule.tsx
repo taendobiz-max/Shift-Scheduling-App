@@ -95,8 +95,20 @@ const ShiftBar = ({
   onClick?: () => void;
   colorScheme?: 'blue' | 'green';
 }) => {
+  // デバッグログを追加
+  console.log('🔍 [ShiftBar Debug]', {
+    employeeName,
+    businessName,
+    startTime,
+    endTime,
+    barStyle,
+    hasBarStyle: !!barStyle,
+    hasBusinessName: !!businessName
+  });
+
   // barStyleが提供されている場合は、シフトバーとしてレンダリング
   if (barStyle && businessName) {
+    console.log('✅ [ShiftBar] Rendering as shift bar');
     return (
       <div
         style={{ left: barStyle.left, width: barStyle.width }}
@@ -115,9 +127,10 @@ const ShiftBar = ({
       </div>
     );
   }
-
+  
   // businessNameが提供されているがbarStyleがない場合は、期間シフトボックスとしてレンダリング
   if (businessName && !barStyle) {
+    console.log('⚠️ [ShiftBar] Rendering as period shift box (RED)');
     return (
       <div
         onClick={onClick}
@@ -137,8 +150,9 @@ const ShiftBar = ({
       </div>
     );
   }
-
+  
   // それ以外の場合は、バッジとしてレンダリング
+  console.log('❓ [ShiftBar] Rendering as badge');
   return (
     <div className="inline-block">
       <Badge variant="secondary" className="cursor-pointer">
@@ -1289,8 +1303,14 @@ export default function ShiftSchedule() {
                                 key={`${employee.employee_id}-${index}`}
                                 className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
-                                  // 空セルをクリックした場合の処理
-                                  // TODO: 必要に応じて実装
+                                  handleCellClick({
+                                    employeeId: employee.employee_id,
+                                    employeeName: employee.name,
+                                    businessId: null,
+                                    businessName: null,
+                                    date: selectedDate,
+                                    shiftId: undefined,
+                                  });
                                 }}
                               >
                                 {/* Empty cell */}
@@ -1401,7 +1421,6 @@ export default function ShiftSchedule() {
                                 className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
                                   // 空セルをクリックした場合の処理
-                                  // TODO: 必要に応じて実装
                                 }}
                               >
                                 {/* Empty cell */}
