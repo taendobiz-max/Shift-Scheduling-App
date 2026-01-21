@@ -88,11 +88,21 @@ export const useShiftData = () => {
     try {
       console.log('🔄 [SWAP] Starting swap operation:', { from, to });
 
-      // fromとtoのシフトを取得
-      const fromShift = shifts.find(s => s.id === from.id);
-      const toShift = shifts.find(s => s.id === to.id);
 
       // 空セルの場合の処理
+      
+      // fromとtoのシフトを取得（空セルでない場合のみ）
+      let fromShift = null;
+      let toShift = null;
+      
+      if (!from.isEmpty && from.shiftId) {
+        fromShift = shifts.find(s => s.id === from.shiftId);
+      }
+      
+      if (!to.isEmpty && to.shiftId) {
+        toShift = shifts.find(s => s.id === to.shiftId);
+      }
+      
       if (from.isEmpty && to.isEmpty) {
         return { success: false, error: '両方とも空セルです' };
       }

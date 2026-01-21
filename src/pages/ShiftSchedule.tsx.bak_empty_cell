@@ -878,36 +878,6 @@ export default function ShiftSchedule() {
 
     return { left: `${left}%`, width: `${width}%` };
   };
-  
-  // Calculate empty time slots for an employee
-  const calculateEmptySlots = (employeeShifts: any[], timeSlots: any[]) => {
-    const emptySlots: number[] = [];
-    
-    for (let i = 0; i < timeSlots.length; i++) {
-      const slot = timeSlots[i];
-      // timeSlots is an array of {hour: number, label: string}
-      const slotStart = slot.hour;
-      
-      // Check if this slot is covered by any shift bar
-      const isCovered = employeeShifts.some(shift => {
-        const shiftStartHour = parseInt((shift.start_time || "00:00:00").split(":")[0]);
-        const shiftEndHour = parseInt((shift.end_time || "00:00:00").split(":")[0]);
-        
-        // Handle shifts that span across midnight
-        const adjustedShiftEndHour = shiftEndHour < shiftStartHour ? shiftEndHour + 24 : shiftEndHour;
-        const adjustedSlotStart = slotStart < 4 ? slotStart + 24 : slotStart;
-        
-        // Check if slot is within shift time range
-        return adjustedSlotStart >= shiftStartHour && adjustedSlotStart < adjustedShiftEndHour;
-      });
-      
-      if (!isCovered) {
-        emptySlots.push(i);
-      }
-    }
-    
-    return emptySlots;
-  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -1326,28 +1296,27 @@ export default function ShiftSchedule() {
                         
                         {/* Time Grid Column */}
                         <div className="flex-1 relative z-0" style={{ height: '60px' }}>
-                          {/* Empty Cells - Only render for time slots without shift bars */}
-                          {calculateEmptySlots(employeeShifts, timeSlots).map((slotIndex) => (
-                            <div
-                              key={`empty-${employee.employee_id}-${slotIndex}`}
-                              className="absolute top-0 bottom-0 z-30 pointer-events-auto cursor-pointer hover:bg-blue-50 transition-colors border-r border-gray-200"
-                              style={{
-                                left: `${(slotIndex / timeSlots.length) * 100}%`,
-                                width: `${(1 / timeSlots.length) * 100}%`,
-                              }}
-                              onClick={() => {
-                                handleCellClick({
-                                  employeeId: employee.employee_id,
-                                  employeeName: employee.name,
-                                  businessId: null,
-                                  businessName: null,
-                                  date: selectedDate,
-                                  shiftId: undefined,
-                                  isEmpty: true,
-                                });
-                              }}
-                            />
-                          ))}
+                          {/* Time Grid Background */}
+                          <div className="absolute inset-0 z-5 pointer-events-none flex">
+                            {timeSlots.map((slot, index) => (
+                              <div
+                                key={`${employee.employee_id}-${index}`}
+                                className="min-h-[40px] pointer-events-auto z-30 p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  handleCellClick({
+                                    employeeId: employee.employee_id,
+                                    employeeName: employee.name,
+                                    businessId: null,
+                                    businessName: null,
+                                    date: selectedDate,
+                                    shiftId: undefined,
+                                  });
+                                }}
+                              >
+                                {/* Empty cell */}
+                              </div>
+                            ))}
+                          </div>
                           
                           {/* Shift Bars */}
                           {employeeShifts.map((shift) => {

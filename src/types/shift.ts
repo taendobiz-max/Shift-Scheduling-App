@@ -1,1 +1,9 @@
-export interface CellPosition {\n  employeeId: string;\n  employeeName: string;\n  businessId: string;\n  businessName: string;\n  date: string;\n  shiftId?: string;\n}
+export interface CellPosition {
+  employeeId: string;
+  employeeName: string;
+  businessId: string | null;
+  businessName: string | null;
+  date: string;
+  shiftId?: string;
+  isEmpty?: boolean;
+}
