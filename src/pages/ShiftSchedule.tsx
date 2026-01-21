@@ -385,7 +385,7 @@ export default function ShiftSchedule() {
     console.log("🔍 [DEBUG] handleSwapConfirm called");
     if (!operation) return;
     
-    const result = await swapShifts(operation);
+    const result = await swapShifts(operation.from, operation.to);
     if (result.success) {
       toast.success('シフトを入れ替えました');
       clearSelection();
