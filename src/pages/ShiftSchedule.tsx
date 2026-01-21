@@ -383,8 +383,8 @@ export default function ShiftSchedule() {
     const operation = getSwapOperation();
     if (!operation) return;
     
-    const success = await swapShifts(operation);
-    if (success) {
+    const result = await swapShifts(operation);
+    if (result.success) {
       toast.success('シフトを入れ替えました');
       clearSelection();
       // データを再読み込み
