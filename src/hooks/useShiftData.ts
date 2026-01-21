@@ -115,7 +115,7 @@ export const useShiftData = () => {
 
         const { error: updateError } = await supabase
           .from('shifts')
-          .update({ employee_id: from.employee_id })
+          .update({ employee_id: from.employeeId })
           .eq('id', toShift.id);
 
         if (updateError) {
@@ -130,7 +130,7 @@ export const useShiftData = () => {
 
         const { error: updateError } = await supabase
           .from('shifts')
-          .update({ employee_id: to.employee_id })
+          .update({ employee_id: to.employeeId })
           .eq('id', fromShift.id);
 
         if (updateError) {
