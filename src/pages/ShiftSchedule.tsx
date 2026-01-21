@@ -885,7 +885,8 @@ export default function ShiftSchedule() {
     
     for (let i = 0; i < timeSlots.length; i++) {
       const slot = timeSlots[i];
-      const slotStart = parseInt(slot.split(":")[0]);
+      // timeSlots is an array of {hour: number, label: string}
+      const slotStart = slot.hour;
       
       // Check if this slot is covered by any shift bar
       const isCovered = employeeShifts.some(shift => {
