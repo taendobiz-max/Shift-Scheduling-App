@@ -87,6 +87,8 @@ export const useShiftData = () => {
     setIsSwapping(true);
     try {
       console.log('🔄 [SWAP] Starting swap operation:', { from, to });
+      console.log("🔍 [DEBUG] from:", from);
+      console.log("🔍 [DEBUG] to:", to);
 
 
       // 空セルの場合の処理

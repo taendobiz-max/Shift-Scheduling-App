@@ -375,12 +375,14 @@ export default function ShiftSchedule() {
   // セル選択のハンドラー
   const handleCellClick = (cell: CellPosition) => {
     console.log('🟠 [DEBUG] handleCellClick called:', cell);
+    console.log("🔍 [DEBUG] handleCellClick:", cell);
     selectCell(cell);
   };
   
   // スワップ確認ダイアログのハンドラー
   const handleSwapConfirm = async () => {
     const operation = getSwapOperation();
+    console.log("🔍 [DEBUG] handleSwapConfirm called");
     if (!operation) return;
     
     const result = await swapShifts(operation);

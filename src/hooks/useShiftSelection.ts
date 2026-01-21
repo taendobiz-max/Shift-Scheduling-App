@@ -55,6 +55,7 @@ export const useShiftSelection = () => {
   // スワップ操作を取得
   const getSwapOperation = useCallback((): SwapOperation | null => {
     if (!firstCell || !secondCell) return null;
+    console.log("🔍 [DEBUG] getSwapOperation - firstCell, secondCell:", firstCell, secondCell);
     return {
       from: firstCell,
       to: secondCell,
