@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, Workflow, User, UserMinus } from 'lucide-react';
+import { Calendar, Users, Clock, BarChart3, Settings, Zap, UserX, LogOut, TrendingUp, Workflow, User, UserMinus, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '@/utils/auth';
 
@@ -204,6 +204,24 @@ export default function Index() {
               <CardContent>
                 <p className="text-sm text-gray-600">
                   相性の悪い従業員ペアを登録し、シフト自動生成時に同じ時間帯への配置を避けます。重要度を設定できます。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link to="/mobile-shift-view">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-blue-200 hover:border-blue-400">
+              <CardHeader>
+                <CardTitle className="flex items-center text-blue-700">
+                  <Smartphone className="h-6 w-6 mr-2" />
+                  スマホからシフトを確認
+                </CardTitle>
+                <CardDescription>
+                  スマートフォンに最適化されたシフト確認画面
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  勤務予定、残業時間、手当支給回数を簡単に確認できます。スマートフォンでの操作に最適化されています。
                 </p>
               </CardContent>
             </Card>
