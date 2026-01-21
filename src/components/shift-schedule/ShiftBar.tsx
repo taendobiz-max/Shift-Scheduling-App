@@ -41,7 +41,7 @@ export const ShiftBar = ({ shift, isSelected, onClick }: ShiftBarProps) => {
         position: 'absolute',
         top: '4px',
         bottom: '4px',
-        zIndex: 20
+        zIndex: 50
       }}
       onClick={handleClick}
       className={`rounded px-2 flex items-center justify-between text-xs font-medium transition-all cursor-pointer ${

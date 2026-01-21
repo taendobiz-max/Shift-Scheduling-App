@@ -93,16 +93,40 @@ export const useShiftData = () => {
 
       // 空セルの場合の処理
       
-      // fromとtoのシフトを取得（空セルでない場合のみ）
+      // fromとtoのシフトを取得（データベースから直接取得）
       let fromShift = null;
       let toShift = null;
       
       if (!from.isEmpty && from.shiftId) {
-        fromShift = shifts.find(s => s.id === from.shiftId);
+        console.log("🔍 [DEBUG] Searching for fromShift with shiftId:", from.shiftId);
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('id', from.shiftId)
+          .single();
+        
+        if (error) {
+          console.error('❌ [SWAP] Error fetching fromShift:', error);
+        } else {
+          fromShift = data;
+          console.log("🔍 [DEBUG] fromShift found:", fromShift);
+        }
       }
       
       if (!to.isEmpty && to.shiftId) {
-        toShift = shifts.find(s => s.id === to.shiftId);
+        console.log("🔍 [DEBUG] Searching for toShift with shiftId:", to.shiftId);
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('id', to.shiftId)
+          .single();
+        
+        if (error) {
+          console.error('❌ [SWAP] Error fetching toShift:', error);
+        } else {
+          toShift = data;
+          console.log("🔍 [DEBUG] toShift found:", toShift);
+        }
       }
       
       if (from.isEmpty && to.isEmpty) {

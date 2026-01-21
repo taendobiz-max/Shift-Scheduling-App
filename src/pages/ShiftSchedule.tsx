@@ -113,7 +113,7 @@ const ShiftBar = ({
       <div
         style={{ left: barStyle.left, width: barStyle.width }}
         onClick={onClick}
-        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-40 cursor-pointer ${
+        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-50 cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
             : colorScheme === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
@@ -382,6 +382,7 @@ export default function ShiftSchedule() {
   // スワップ確認ダイアログのハンドラー
   const handleSwapConfirm = async () => {
     const operation = getSwapOperation();
+    console.log("🔍 [DEBUG] operation:", operation);
     console.log("🔍 [DEBUG] handleSwapConfirm called");
     if (!operation) return;
     
@@ -1327,7 +1328,7 @@ export default function ShiftSchedule() {
                         </div>
                         
                         {/* Time Grid Column */}
-                        <div className="flex-1 relative z-0" style={{ height: '60px' }}>
+                        <div className="flex-1 relative" style={{ height: '60px' }}>
                           {/* Empty Cells - Only render for time slots without shift bars */}
                           {calculateEmptySlots(employeeShifts, timeSlots).map((slotIndex) => (
                             <div

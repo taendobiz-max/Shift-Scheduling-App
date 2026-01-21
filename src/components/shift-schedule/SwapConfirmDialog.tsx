@@ -21,12 +21,9 @@ export const SwapConfirmDialog: React.FC<SwapConfirmDialogProps> = ({
 }) => {
   const handleConfirm = () => {
     console.log('🟢 [SwapConfirmDialog] Confirm button clicked');
-    // ダイアログを閉じてからonConfirmを呼び出す
+    console.log('🟢 [SwapConfirmDialog] Calling onConfirm');
+    onConfirm();
     onOpenChange(false);
-    // 少し遅延させてから呼び出す（ダイアログが閉じるのを待つ）
-    setTimeout(() => {
-      onConfirm();
-    }, 100);
   };
 
   const handleCancel = () => {
