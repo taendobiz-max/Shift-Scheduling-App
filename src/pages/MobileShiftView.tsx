@@ -77,9 +77,9 @@ export default function MobileShiftView() {
   // 営業所リストを設定（固定値）
   useEffect(() => {
     const officeList = [
-      { id: '川越', name: '川越営業所' },
-      { id: '東京', name: '東京営業所' },
-      { id: '川口', name: '川口営業所' }
+      { id: '川越', name: '川越' },
+      { id: '東京', name: '東京' },
+      { id: '川口', name: '川口' }
     ];
     setOffices(officeList);
   }, []);
@@ -110,28 +110,48 @@ export default function MobileShiftView() {
       setLoading(true);
       try {
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        console.log('📅 [DEBUG] Fetching shift data:', { employee_id: selectedEmployee, date: dateStr });
         
+        console.log("📅 [DEBUG] Selected employee type:", typeof selectedEmployee);
+        console.log("📅 [DEBUG] Selected employee value:", selectedEmployee);
         // シフトデータを取得
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
-          .select(`
-            *,
-            business_master (
-              business_name,
-              start_time,
-              end_time
-            )
-          `)
+          .select('*')
           .eq('employee_id', selectedEmployee)
           .eq('date', dateStr);
-
-        if (!shiftError && shiftData) {
-          const formattedShifts = shiftData.map(shift => ({
-            ...shift,
-            business_name: shift.business_master?.business_name || '',
-            start_time: shift.business_master?.start_time || '',
-            end_time: shift.business_master?.end_time || '',
-          }));
+        
+        console.log('📊 [DEBUG] Shift query result:', { data: shiftData, error: shiftError });
+        if (shiftData && shiftData.length > 0) {
+          console.log("✅ [DEBUG] Found shifts:", shiftData);
+        } else {
+          console.log("❌ [DEBUG] No shifts found for employee_id:", selectedEmployee, "date:", dateStr);
+        }
+        
+        if (!shiftError && shiftData && shiftData.length > 0) {
+          // business_nameは既にshiftsテーブルに含まれている
+          // business_master_idを使ってbusiness_masterテーブルから時間情報を取得
+          const businessIds = shiftData.map(s => s.business_master_id).filter(Boolean);
+          const { data: businessData } = await supabase
+            .from('business_master')
+            .select('*')
+            .in('業務id', businessIds);
+          
+          const businessMap = new Map();
+          if (businessData) {
+            businessData.forEach(b => {
+              businessMap.set(b['業務id'], b);
+            });
+          }
+          
+          const formattedShifts = shiftData.map(shift => {
+            const business = businessMap.get(shift.business_master_id);
+            return {
+              ...shift,
+              start_time: business?.['開始時間'] || '',
+              end_time: business?.['終了時間'] || '',
+            };
+          });
           setShifts(formattedShifts);
         }
 
@@ -220,7 +240,7 @@ export default function MobileShiftView() {
               </SelectTrigger>
               <SelectContent>
                 {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
+                  <SelectItem key={employee.id} value={String(employee.employee_id)}>
                     {employee.name}
                   </SelectItem>
                 ))}
@@ -255,6 +275,7 @@ export default function MobileShiftView() {
                   selected={selectedDate}
                   onSelect={(date) => date && setSelectedDate(date)}
                   locale={ja}
+                  weekStartsOn={0}
                   initialFocus
                 />
               </PopoverContent>
