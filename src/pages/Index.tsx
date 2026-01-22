@@ -213,7 +213,7 @@ export default function Index() {
               <CardHeader>
                 <CardTitle className="flex items-center text-blue-700">
                   <Smartphone className="h-6 w-6 mr-2" />
-                  スマホからシフトを確認
+                  シフト確認
                 </CardTitle>
                 <CardDescription>
                   スマートフォンに最適化されたシフト確認画面

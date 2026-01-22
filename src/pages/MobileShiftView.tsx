@@ -32,7 +32,9 @@ interface AllowanceData {
 
 export default function MobileShiftView() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedOffice, setSelectedOffice] = useState<string>('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [offices, setOffices] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [shifts, setShifts] = useState<ShiftData[]>([]);
   const [overtime, setOvertime] = useState<number>(0);
@@ -45,7 +47,7 @@ export default function MobileShiftView() {
     const fetchCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // ユーザーのメタデータから従業員IDを取得
+        // ユーザーのメタデータから従業員IDと営業所IDを取得
         const { data: userData } = await supabase
           .from('users')
           .select('employee_id')
@@ -55,18 +57,47 @@ export default function MobileShiftView() {
         if (userData) {
           setCurrentUser(userData);
           setSelectedEmployee(userData.employee_id);
+          
+          // 従業員情報から営業所IDを取得
+          const { data: employeeData } = await supabase
+            .from('employees')
+            .select('office_id')
+            .eq('id', userData.employee_id)
+            .single();
+          
+          if (employeeData) {
+            setSelectedOffice(employeeData.office_id);
+          }
         }
       }
     };
     fetchCurrentUser();
   }, []);
 
-  // 従業員リストを取得
+  // 営業所リストを取得
   useEffect(() => {
+    const fetchOffices = async () => {
+      const { data, error } = await supabase
+        .from('offices')
+        .select('*')
+        .order('name');
+      
+      if (!error && data) {
+        setOffices(data);
+      }
+    };
+    fetchOffices();
+  }, []);
+
+  // 従業員リストを取得（営業所でフィルタリング）
+  useEffect(() => {
+    if (!selectedOffice) return;
+    
     const fetchEmployees = async () => {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
+        .eq('office_id', selectedOffice)
         .order('name');
       
       if (!error && data) {
@@ -74,7 +105,7 @@ export default function MobileShiftView() {
       }
     };
     fetchEmployees();
-  }, []);
+  }, [selectedOffice]);
 
   // シフトデータを取得
   useEffect(() => {
@@ -159,6 +190,28 @@ export default function MobileShiftView() {
           <p className="text-gray-600">スマートフォンで簡単にシフトを確認</p>
         </div>
 
+        {/* 営業所選択 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>営業所選択</CardTitle>
+            <CardDescription>確認したい営業所を選択してください</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedOffice} onValueChange={setSelectedOffice}>
+              <SelectTrigger>
+                <SelectValue placeholder="営業所を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {offices.map((office) => (
+                  <SelectItem key={office.id} value={office.id}>
+                    {office.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         {/* 従業員選択 */}
         <Card>
           <CardHeader>
@@ -166,7 +219,7 @@ export default function MobileShiftView() {
             <CardDescription>確認したい従業員を選択してください</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee} disabled={!selectedOffice}>
               <SelectTrigger>
                 <SelectValue placeholder="従業員を選択" />
               </SelectTrigger>
@@ -206,6 +259,7 @@ export default function MobileShiftView() {
                   mode="single"
                   selected={selectedDate}
                   onSelect={(date) => date && setSelectedDate(date)}
+                  locale={ja}
                   initialFocus
                 />
               </PopoverContent>
