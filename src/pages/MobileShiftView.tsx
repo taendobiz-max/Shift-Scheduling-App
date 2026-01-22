@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, Clock, TrendingUp, Award, Smartphone } from 'lucide-react';
-import { format } from 'date-fns';
+import { Clock, TrendingUp, Award, Smartphone } from 'lucide-react';
+import { format, parse } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -31,7 +30,7 @@ interface AllowanceData {
 }
 
 export default function MobileShiftView() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [selectedOffice, setSelectedOffice] = useState<string>('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [offices, setOffices] = useState<any[]>([]);
@@ -41,7 +40,7 @@ export default function MobileShiftView() {
   const [allowances, setAllowances] = useState<AllowanceData[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
+
 
   // ログインユーザー情報を取得
   useEffect(() => {
@@ -110,7 +109,7 @@ export default function MobileShiftView() {
     const fetchShiftData = async () => {
       setLoading(true);
       try {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const dateStr = selectedDate;
         console.log('📅 [DEBUG] Fetching shift data:', { employee_id: selectedEmployee, date: dateStr });
         
         console.log("📅 [DEBUG] Selected employee type:", typeof selectedEmployee);
@@ -157,8 +156,9 @@ export default function MobileShiftView() {
         }
 
         // 残業時間を取得（当月）
-        const monthStart = format(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1), 'yyyy-MM-dd');
-        const monthEnd = format(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0), 'yyyy-MM-dd');
+        const date = parse(selectedDate, 'yyyy-MM-dd', new Date());
+        const monthStart = format(new Date(date.getFullYear(), date.getMonth(), 1), 'yyyy-MM-dd');
+        const monthEnd = format(new Date(date.getFullYear(), date.getMonth() + 1, 0), 'yyyy-MM-dd');
         
         const { data: overtimeData } = await supabase
           .from('shifts')
@@ -257,35 +257,12 @@ export default function MobileShiftView() {
             <CardDescription>確認したい日付を選択してください</CardDescription>
           </CardHeader>
           <CardContent>
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'w-full justify-start text-left font-normal',
-                    !selectedDate && 'text-muted-foreground'
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, 'PPP', { locale: ja }) : <span>日付を選択</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (date) {
-                      setSelectedDate(date);
-                      setCalendarOpen(false);
-                    }
-                  }}
-                  locale={ja}
-                  weekStartsOn={1}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full"
+            />
           </CardContent>
         </Card>
 
@@ -297,7 +274,7 @@ export default function MobileShiftView() {
               勤務予定
             </CardTitle>
             <CardDescription>
-              {selectedDate && format(selectedDate, 'yyyy年MM月dd日', { locale: ja })}
+              {selectedDate && format(parse(selectedDate, 'yyyy-MM-dd', new Date()), 'yyyy年MM月dd日', { locale: ja })}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -328,7 +305,7 @@ export default function MobileShiftView() {
               当月の残業時間
             </CardTitle>
             <CardDescription>
-              {format(selectedDate, 'yyyy年MM月', { locale: ja })}
+              {format(parse(selectedDate, 'yyyy-MM-dd', new Date()), 'yyyy年MM月', { locale: ja })}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -347,7 +324,7 @@ export default function MobileShiftView() {
               手当支給回数
             </CardTitle>
             <CardDescription>
-              {format(selectedDate, 'yyyy年MM月', { locale: ja })}
+              {format(parse(selectedDate, 'yyyy-MM-dd', new Date()), 'yyyy年MM月', { locale: ja })}
             </CardDescription>
           </CardHeader>
           <CardContent>
