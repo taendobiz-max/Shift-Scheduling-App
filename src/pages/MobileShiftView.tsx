@@ -281,7 +281,7 @@ export default function MobileShiftView() {
                     }
                   }}
                   locale={ja}
-                  weekStartsOn={0}
+                  weekStartsOn={1}
                   initialFocus
                 />
               </PopoverContent>
