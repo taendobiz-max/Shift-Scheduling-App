@@ -41,6 +41,7 @@ export default function MobileShiftView() {
   const [allowances, setAllowances] = useState<AllowanceData[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // ログインユーザー情報を取得
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function MobileShiftView() {
             <CardDescription>確認したい日付を選択してください</CardDescription>
           </CardHeader>
           <CardContent>
-            <Popover>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -273,7 +274,12 @@ export default function MobileShiftView() {
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setCalendarOpen(false);
+                    }
+                  }}
                   locale={ja}
                   weekStartsOn={0}
                   initialFocus
