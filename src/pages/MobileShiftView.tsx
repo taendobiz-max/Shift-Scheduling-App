@@ -58,15 +58,15 @@ export default function MobileShiftView() {
           setCurrentUser(userData);
           setSelectedEmployee(userData.employee_id);
           
-          // 従業員情報から営業所IDを取得
+          // 従業員情報から営業所を取得
           const { data: employeeData } = await supabase
             .from('employees')
-            .select('office_id')
+            .select('office')
             .eq('id', userData.employee_id)
             .single();
           
           if (employeeData) {
-            setSelectedOffice(employeeData.office_id);
+            setSelectedOffice(employeeData.office);
           }
         }
       }
@@ -74,19 +74,15 @@ export default function MobileShiftView() {
     fetchCurrentUser();
   }, []);
 
-  // 営業所リストを取得
+  // 営業所リストを設定（固定値）
   useEffect(() => {
-    const fetchOffices = async () => {
-      const { data, error } = await supabase
-        .from('offices')
-        .select('*')
-        .order('name');
-      
-      if (!error && data) {
-        setOffices(data);
-      }
-    };
-    fetchOffices();
+    const officeList = [
+      { id: '川越', name: '川越営業所' },
+      { id: '東京', name: '東京営業所' },
+      { id: '埼玉', name: '埼玉営業所' },
+      { id: '千葉', name: '千葉営業所' }
+    ];
+    setOffices(officeList);
   }, []);
 
   // 従業員リストを取得（営業所でフィルタリング）
@@ -97,7 +93,7 @@ export default function MobileShiftView() {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('office_id', selectedOffice)
+        .eq('office', selectedOffice)
         .order('name');
       
       if (!error && data) {
