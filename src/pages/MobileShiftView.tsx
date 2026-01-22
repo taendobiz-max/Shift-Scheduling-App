@@ -79,8 +79,7 @@ export default function MobileShiftView() {
     const officeList = [
       { id: '川越', name: '川越営業所' },
       { id: '東京', name: '東京営業所' },
-      { id: '埼玉', name: '埼玉営業所' },
-      { id: '千葉', name: '千葉営業所' }
+      { id: '川口', name: '川口営業所' }
     ];
     setOffices(officeList);
   }, []);
