@@ -16,7 +16,10 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
       formatters={{
         formatWeekdayName: (date) => {
           const weekdays = ['月', '火', '水', '木', '金', '土', '日'];
-          return weekdays[date.getDay() === 0 ? 6 : date.getDay() - 1];
+          const day = date.getDay();
+          // weekStartsOn=1 (Monday) なので、日曜日(0)を最後に
+          const index = day === 0 ? 6 : day - 1;
+          return weekdays[index];
         },
       }}
       classNames={{
