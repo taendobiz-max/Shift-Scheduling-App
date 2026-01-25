@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, TrendingUp, Award, Smartphone, Plus, Save } from 'lucide-react';
+import { Clock, TrendingUp, Award, Smartphone } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { Textarea } from '@/components/ui/textarea';
+
 
 interface ShiftData {
   id: string;
@@ -30,14 +30,7 @@ interface AllowanceData {
   count: number;
 }
 
-interface ManualOvertimeData {
-  id?: string;
-  employee_id: string;
-  office: string;
-  date: string;
-  overtime_hours: number;
-  memo?: string;
-}
+
 
 export default function MobileShiftView() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -50,10 +43,7 @@ export default function MobileShiftView() {
   const [allowances, setAllowances] = useState<AllowanceData[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [manualOvertimeHours, setManualOvertimeHours] = useState<number>(0);
-  const [manualOvertimeMemo, setManualOvertimeMemo] = useState<string>('');
-  const [savingOvertime, setSavingOvertime] = useState(false);
-  const [existingOvertime, setExistingOvertime] = useState<ManualOvertimeData | null>(null);
+
 
 
   // ログインユーザー情報を取得
@@ -208,110 +198,7 @@ export default function MobileShiftView() {
     fetchShiftData();
   }, [selectedEmployee, selectedDate]);
 
-  // 既存の残業時間登録データを取得
-  useEffect(() => {
-    if (!selectedEmployee || !selectedDate) return;
 
-    const fetchExistingOvertime = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('manual_overtime')
-          .select('*')
-          .eq('employee_id', selectedEmployee)
-          .eq('date', selectedDate)
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching existing overtime:', error);
-          return;
-        }
-
-        if (data) {
-          setExistingOvertime(data);
-          setManualOvertimeHours(data.overtime_hours);
-          setManualOvertimeMemo(data.memo || '');
-        } else {
-          setExistingOvertime(null);
-          setManualOvertimeHours(0);
-          setManualOvertimeMemo('');
-        }
-      } catch (error) {
-        console.error('Error in fetchExistingOvertime:', error);
-      }
-    };
-
-    fetchExistingOvertime();
-  }, [selectedEmployee, selectedDate]);
-
-  // 残業時間登録の保存処理
-  const handleSaveOvertime = async () => {
-    if (!selectedEmployee || !selectedOffice || !selectedDate) {
-      alert('営業所、従業員、日付を選択してください');
-      return;
-    }
-
-    if (manualOvertimeHours === 0) {
-      alert('残業時間を選択してください');
-      return;
-    }
-
-    setSavingOvertime(true);
-    try {
-      const overtimeData = {
-        employee_id: selectedEmployee,
-        office: selectedOffice,
-        date: selectedDate,
-        overtime_hours: manualOvertimeHours,
-        memo: manualOvertimeMemo || null,
-      };
-
-      if (existingOvertime) {
-        // 更新
-        const { error } = await supabase
-          .from('manual_overtime')
-          .update(overtimeData)
-          .eq('id', existingOvertime.id);
-
-        if (error) {
-          console.error('Error updating overtime:', error);
-          alert('残業時間の更新に失敗しました');
-          return;
-        }
-
-        alert('残業時間を更新しました');
-      } else {
-        // 新規登録
-        const { error } = await supabase
-          .from('manual_overtime')
-          .insert([overtimeData]);
-
-        if (error) {
-          console.error('Error inserting overtime:', error);
-          alert('残業時間の登録に失敗しました');
-          return;
-        }
-
-        alert('残業時間を登録しました');
-      }
-
-      // 再読み込み
-      const { data, error: fetchError } = await supabase
-        .from('manual_overtime')
-        .select('*')
-        .eq('employee_id', selectedEmployee)
-        .eq('date', selectedDate)
-        .maybeSingle();
-
-      if (!fetchError && data) {
-        setExistingOvertime(data);
-      }
-    } catch (error) {
-      console.error('Error in handleSaveOvertime:', error);
-      alert('エラーが発生しました');
-    } finally {
-      setSavingOvertime(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4">
@@ -462,89 +349,7 @@ export default function MobileShiftView() {
           </CardContent>
         </Card>
 
-        {/* 残業時間登録 */}
-        {selectedEmployee && selectedOffice && (
-          <Card className="border-2 border-purple-200">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Plus className="h-5 w-5 mr-2 text-purple-600" />
-                残業時間登録
-              </CardTitle>
-              <CardDescription>
-                {format(parse(selectedDate, 'yyyy-MM-dd', new Date()), 'yyyy年MM月dd日', { locale: ja })}の残業時間を登録
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* 残業時間選択 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  残業時間（30分単位、最大6時間）
-                </label>
-                <Select 
-                  value={String(manualOvertimeHours)} 
-                  onValueChange={(value) => setManualOvertimeHours(Number(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="残業時間を選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0.0時間</SelectItem>
-                    <SelectItem value="0.5">0.5時間</SelectItem>
-                    <SelectItem value="1">1.0時間</SelectItem>
-                    <SelectItem value="1.5">1.5時間</SelectItem>
-                    <SelectItem value="2">2.0時間</SelectItem>
-                    <SelectItem value="2.5">2.5時間</SelectItem>
-                    <SelectItem value="3">3.0時間</SelectItem>
-                    <SelectItem value="3.5">3.5時間</SelectItem>
-                    <SelectItem value="4">4.0時間</SelectItem>
-                    <SelectItem value="4.5">4.5時間</SelectItem>
-                    <SelectItem value="5">5.0時間</SelectItem>
-                    <SelectItem value="5.5">5.5時間</SelectItem>
-                    <SelectItem value="6">6.0時間</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              {/* 備考メモ */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  備考メモ（任意）
-                </label>
-                <Textarea
-                  value={manualOvertimeMemo}
-                  onChange={(e) => setManualOvertimeMemo(e.target.value)}
-                  placeholder="備考を入力してください"
-                  rows={3}
-                  className="w-full"
-                />
-              </div>
-
-              {/* 登録ボタン */}
-              <Button
-                onClick={handleSaveOvertime}
-                disabled={savingOvertime || manualOvertimeHours === 0}
-                className="w-full bg-purple-600 hover:bg-purple-700"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {savingOvertime ? '保存中...' : existingOvertime ? '更新' : '登録'}
-              </Button>
-
-              {/* 登録済みデータ表示 */}
-              {existingOvertime && (
-                <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <p className="text-sm font-medium text-purple-900">
-                    登録済み: {existingOvertime.overtime_hours}時間
-                  </p>
-                  {existingOvertime.memo && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      備考: {existingOvertime.memo}
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );

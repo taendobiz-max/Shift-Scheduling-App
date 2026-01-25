@@ -18,6 +18,7 @@ import { ExcludedEmployeesManagement } from './components/ExcludedEmployeesManag
 import { IncompatiblePairsManagement } from './components/IncompatiblePairsManagement';
 import UserManagement from './pages/UserManagement';
 import MobileShiftView from './pages/MobileShiftView';
+import OvertimeRegistration from './pages/OvertimeRegistration';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => {
             <Route path="/shift-schedule" element={<ProtectedRoute requiredRole={1}><ShiftSchedule /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute requiredRole={1}><Profile /></ProtectedRoute>} />
             <Route path="/mobile-shift-view" element={<ProtectedRoute requiredRole={1}><MobileShiftView /></ProtectedRoute>} />
+            <Route path="/overtime-registration" element={<ProtectedRoute requiredRole={2}><OvertimeRegistration /></ProtectedRoute>} />
             
             {/* 営業所長以上（権限レベル2）がアクセス可能 */}
             <Route path="/shift-generator" element={<ProtectedRoute requiredRole={2}><ShiftGenerator /></ProtectedRoute>} />

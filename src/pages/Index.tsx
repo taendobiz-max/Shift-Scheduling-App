@@ -208,6 +208,24 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
+          <Link to="/overtime-registration">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-purple-200 hover:border-purple-400">
+              <CardHeader>
+                <CardTitle className="flex items-center text-purple-700">
+                  <Clock className="h-6 w-6 mr-2" />
+                  残業時間登録
+                </CardTitle>
+                <CardDescription>
+                  管理者用：従業員の残業時間を登録・管理
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  営業所と従業員を選択し、残業時間を30分単位で登録できます。備考メモも記録可能です。
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
           <Link to="/mobile-shift-view">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-blue-200 hover:border-blue-400">
               <CardHeader>
