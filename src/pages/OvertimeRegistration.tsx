@@ -21,26 +21,10 @@ export default function OvertimeRegistration() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [existingData, setExistingData] = useState<any>(null);
 
-  // 営業所リストを取得
+  // 営業所リストを設定（固定値）
   useEffect(() => {
-    const fetchOffices = async () => {
-      console.log('Fetching offices...');
-      const { data, error } = await supabase
-        .from('営業所マスタ')
-        .select('営業所')
-        .neq('営業所', '本社')
-        .order('営業所');
-      
-      console.log('Offices data:', data);
-      console.log('Offices error:', error);
-      
-      if (data) {
-        const officeList = data.map(item => item.営業所);
-        console.log('Office list:', officeList);
-        setOffices(officeList);
-      }
-    };
-    fetchOffices();
+    const officeList = ['川越', '東京', '川口'];
+    setOffices(officeList);
   }, []);
 
   // 従業員リストを取得
@@ -52,10 +36,10 @@ export default function OvertimeRegistration() {
       }
 
       const { data, error } = await supabase
-        .from('従業員マスタ')
-        .select('従業員ID, 氏名')
-        .eq('営業所', selectedOffice)
-        .order('氏名');
+        .from('employees')
+        .select('id, name')
+        .eq('office', selectedOffice)
+        .order('name');
       
       if (data) {
         setEmployees(data);
@@ -194,8 +178,8 @@ export default function OvertimeRegistration() {
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map(emp => (
-                    <SelectItem key={emp.従業員ID} value={emp.従業員ID}>
-                      {emp.氏名}
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
