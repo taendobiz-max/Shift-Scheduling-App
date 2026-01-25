@@ -24,14 +24,20 @@ export default function OvertimeRegistration() {
   // 営業所リストを取得
   useEffect(() => {
     const fetchOffices = async () => {
+      console.log('Fetching offices...');
       const { data, error } = await supabase
         .from('営業所マスタ')
         .select('営業所')
         .neq('営業所', '本社')
         .order('営業所');
       
+      console.log('Offices data:', data);
+      console.log('Offices error:', error);
+      
       if (data) {
-        setOffices(data.map(item => item.営業所));
+        const officeList = data.map(item => item.営業所);
+        console.log('Office list:', officeList);
+        setOffices(officeList);
       }
     };
     fetchOffices();
