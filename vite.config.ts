@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     host: '0.0.0.0',
+    cors: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

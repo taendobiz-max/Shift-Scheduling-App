@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save } from 'lucide-react';
+import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -17,6 +17,7 @@ import { useShiftSelection } from '@/hooks/useShiftSelection';
 import { useShiftData } from '@/hooks/useShiftData';
 import { SwapConfirmDialog } from '@/components/shift-schedule/SwapConfirmDialog';
 import { CellPosition } from '@/types/shift';
+import { checkShiftRules, RuleViolation } from '@/utils/ruleChecker';
 
 interface ShiftData {
   id: string;
@@ -211,6 +212,9 @@ export default function ShiftSchedule() {
   const [periodViewMode, setPeriodViewMode] = useState<'employee' | 'business'>('employee');
   const [dailyViewMode, setDailyViewMode] = useState<'employee' | 'business'>('employee');
   const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [showRuleCheckDialog, setShowRuleCheckDialog] = useState(false);
+  const [ruleViolations, setRuleViolations] = useState<RuleViolation[]>([]);
+  const [isCheckingRules, setIsCheckingRules] = useState(false);
 
 
   const timeSlots = generateTimeSlots();
@@ -814,6 +818,41 @@ export default function ShiftSchedule() {
     }
   };
 
+  // ルールチェック関数
+  const handleRuleCheck = async () => {
+    setIsCheckingRules(true);
+    try {
+      console.log('🔍 [RULE_CHECK] Starting rule check...');
+      
+      // 現在表示されているシフトをチェック
+      const shiftsToCheck = activeTab === 'daily' ? shifts : periodShifts;
+      
+      if (shiftsToCheck.length === 0) {
+        toast.info('チェックするシフトがありません');
+        return;
+      }
+      
+      // ルールチェック実行
+      const result = await checkShiftRules(shiftsToCheck, selectedLocation !== 'all' ? selectedLocation : undefined);
+      
+      console.log('✅ [RULE_CHECK] Rule check completed:', result);
+      
+      setRuleViolations(result.violations);
+      setShowRuleCheckDialog(true);
+      
+      if (result.totalViolations === 0) {
+        toast.success('制約違反は見つかりませんでした');
+      } else {
+        toast.warning(`${result.errorCount}件のエラー、${result.warningCount}件の警告が見つかりました`);
+      }
+    } catch (error) {
+      console.error('❌ [RULE_CHECK] Error during rule check:', error);
+      toast.error('ルールチェック中にエラーが発生しました');
+    } finally {
+      setIsCheckingRules(false);
+    }
+  };
+
   const saveChanges = async () => {
     if (!hasChanges) return;
 
@@ -917,6 +956,10 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
+          <Button onClick={handleRuleCheck} disabled={isCheckingRules} variant="outline">
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            {isCheckingRules ? 'チェック中...' : 'ルールチェック'}
+          </Button>
           <Button onClick={() => setShowCopyDialog(true)} variant="outline">
             <Calendar className="h-4 w-4 mr-2" />
             シフトをコピー
@@ -1547,6 +1590,97 @@ export default function ShiftSchedule() {
       toast.success('シフトのコピーが完了しました');
     }}
   />
+  
+  {/* Rule Check Dialog */}
+  <Dialog open={showRuleCheckDialog} onOpenChange={setShowRuleCheckDialog}>
+    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5" />
+          ルールチェック結果
+        </DialogTitle>
+        <DialogDescription>
+          {ruleViolations.length === 0 ? (
+            'すべてのシフトが制約条件を満たしています。'
+          ) : (
+            `${ruleViolations.filter(v => v.severity === 'error').length}件のエラー、${ruleViolations.filter(v => v.severity === 'warning').length}件の警告が見つかりました。`
+          )}
+        </DialogDescription>
+      </DialogHeader>
+      
+      {ruleViolations.length > 0 && (
+        <div className="space-y-4 mt-4">
+          {/* エラー一覧 */}
+          {ruleViolations.filter(v => v.severity === 'error').length > 0 && (
+            <div>
+              <h3 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                エラー ({ruleViolations.filter(v => v.severity === 'error').length}件)
+              </h3>
+              <div className="space-y-2">
+                {ruleViolations.filter(v => v.severity === 'error').map((violation, index) => (
+                  <Alert key={index} variant="destructive">
+                    <AlertDescription>
+                      <div className="font-medium">
+                        {violation.date} - {violation.employeeName}
+                      </div>
+                      <div className="text-sm mt-1">
+                        <span className="font-semibold">{violation.description}</span>
+                        {violation.details && (
+                          <div className="mt-1 text-xs">{violation.details}</div>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* 警告一覧 */}
+          {ruleViolations.filter(v => v.severity === 'warning').length > 0 && (
+            <div>
+              <h3 className="font-semibold text-yellow-600 mb-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                警告 ({ruleViolations.filter(v => v.severity === 'warning').length}件)
+              </h3>
+              <div className="space-y-2">
+                {ruleViolations.filter(v => v.severity === 'warning').map((violation, index) => (
+                  <Alert key={index}>
+                    <AlertDescription>
+                      <div className="font-medium">
+                        {violation.date} - {violation.employeeName}
+                      </div>
+                      <div className="text-sm mt-1">
+                        <span className="font-semibold">{violation.description}</span>
+                        {violation.details && (
+                          <div className="mt-1 text-xs">{violation.details}</div>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {ruleViolations.length === 0 && (
+        <div className="text-center py-8">
+          <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          <p className="text-lg font-medium text-green-600">制約違反はありません</p>
+          <p className="text-sm text-gray-500 mt-2">すべてのシフトがルールに準拠しています。</p>
+        </div>
+      )}
+      
+      <DialogFooter>
+        <Button onClick={() => setShowRuleCheckDialog(false)}>
+          閉じる
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
   
   {/* Swap Confirm Dialog */}
   <SwapConfirmDialog
