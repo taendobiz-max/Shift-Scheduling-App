@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Clock, Save, AlertCircle } from 'lucide-react';
+import { Clock, Save, AlertCircle, Home } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useNavigate } from 'react-router-dom';
 
 export default function OvertimeRegistration() {
+  const navigate = useNavigate();
   const [offices, setOffices] = useState<string[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedOffice, setSelectedOffice] = useState('');
@@ -139,10 +141,21 @@ export default function OvertimeRegistration() {
       <div className="max-w-2xl mx-auto space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-6 w-6 text-purple-600" />
-              残業時間登録
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-6 w-6 text-purple-600" />
+                残業時間登録
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                ホーム
+              </Button>
+            </div>
             <CardDescription>
               管理者用：従業員の残業時間を登録・管理します
             </CardDescription>
