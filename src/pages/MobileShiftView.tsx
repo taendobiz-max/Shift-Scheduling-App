@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, TrendingUp, Award, Smartphone } from 'lucide-react';
+import { Clock, TrendingUp, Award, Smartphone, Home } from 'lucide-react';
 import { format, parse } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { ja } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ interface AllowanceData {
 
 
 export default function MobileShiftView() {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [selectedOffice, setSelectedOffice] = useState<string>('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
@@ -204,12 +206,23 @@ export default function MobileShiftView() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* ヘッダー */}
-        <div className="text-center py-6">
-          <div className="flex items-center justify-center mb-2">
-            <Smartphone className="h-8 w-8 text-blue-600 mr-2" />
-            <h1 className="text-3xl font-bold text-gray-900">シフト確認</h1>
+        <div className="py-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <Smartphone className="h-8 w-8 text-blue-600 mr-2" />
+              <h1 className="text-3xl font-bold text-gray-900">シフト確認</h1>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2"
+            >
+              <Home className="h-4 w-4" />
+              ホーム
+            </Button>
           </div>
-          <p className="text-gray-600">スマートフォンで簡単にシフトを確認</p>
+          <p className="text-gray-600 text-center">スマートフォンで簡単にシフトを確認</p>
         </div>
 
         {/* 営業所選択 */}
