@@ -3,7 +3,7 @@
  * 改善基準告示（2024年4月1日施行）に基づく分割休息ルールの実装
  */
 
-import { supabase } from './supabaseClient';
+import { supabase } from '@/lib/supabase';
 
 export interface RestPeriod {
   start: Date;

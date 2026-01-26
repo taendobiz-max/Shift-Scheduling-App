@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { ConstraintEngine } from './constraintEngine';
+import { validateSplitRest, checkMonthlySplitRestLimit } from './splitRestValidator';
 
 export interface RuleViolation {
   type: 'time_conflict' | 'rest_time' | 'consecutive_days' | 'split_rest' | 'constraint';
@@ -274,11 +275,109 @@ async function checkConsecutiveDays(shifts: any[]): Promise<RuleViolation[]> {
 
 /**
  * 分割休息チェック
+ * 
+ * ルール:
+ * 1. 連続休息11時間以上 → OK
+ * 2. 分割休息（2分割のみ）:
+ *    - 各休息期間は4時間以上
+ *    - 合計11時間以上
+ *    - 月間勤務回数の50%以下
+ * 3. 3分割以上は不可
  */
 async function checkSplitRest(shifts: any[]): Promise<RuleViolation[]> {
   const violations: RuleViolation[] = [];
-  // TODO: 分割休息のチェックロジックを実装
-  // 現時点では簡易実装
+  
+  // 従業員ごとにシフトをグループ化
+  const shiftsByEmployee = new Map<string, any[]>();
+  shifts.forEach(shift => {
+    const empId = shift.employee_id || shift.従業員ID;
+    if (!shiftsByEmployee.has(empId)) {
+      shiftsByEmployee.set(empId, []);
+    }
+    shiftsByEmployee.get(empId)!.push(shift);
+  });
+  
+  // 各従業員のシフトを日付順にソート
+  for (const [empId, empShifts] of shiftsByEmployee.entries()) {
+    const sortedShifts = empShifts.sort((a, b) => {
+      const dateA = a.shift_date || a.date;
+      const dateB = b.shift_date || b.date;
+      return dateA.localeCompare(dateB);
+    });
+    
+    // 連続する日のシフトをチェック
+    for (let i = 0; i < sortedShifts.length - 1; i++) {
+      const currentShift = sortedShifts[i];
+      const nextShift = sortedShifts[i + 1];
+      
+      const currentDate = currentShift.shift_date || currentShift.date;
+      const nextDate = nextShift.shift_date || nextShift.date;
+      
+      // 翌日のシフトかチェック
+      const currentDateObj = new Date(currentDate);
+      const nextDateObj = new Date(nextDate);
+      const dayDiff = (nextDateObj.getTime() - currentDateObj.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (dayDiff === 1) {
+        // 休息時間を計算
+        const currentEndTime = currentShift.end_time || currentShift.終了時間;
+        const nextStartTime = nextShift.start_time || nextShift.開始時間;
+        
+        if (currentEndTime && nextStartTime) {
+          const previousShiftEnd = new Date(`${currentDate}T${currentEndTime}`);
+          const nextShiftStart = new Date(`${nextDate}T${nextStartTime}`);
+          
+          // 分割休息のバリデーション
+          const validationResult = validateSplitRest(previousShiftEnd, nextShiftStart);
+          
+          if (!validationResult.isValid) {
+            const violationDetails = validationResult.violations?.join('、') || '休息時間が不足しています';
+            
+            violations.push({
+              type: 'split_rest',
+              severity: 'error',
+              date: nextDate,
+              employeeName: currentShift.employee_name || currentShift.従業員名 || empId,
+              employeeId: empId,
+              description: '分割休息ルール違反',
+              details: `${currentDate} ${currentEndTime} 〜 ${nextDate} ${nextStartTime}: ${violationDetails}`
+            });
+          } else if (validationResult.type === 'split') {
+            // 分割休息を使用している場合、月間使用回数をチェック
+            try {
+              const targetMonth = new Date(nextDate);
+              const monthlyCheck = await checkMonthlySplitRestLimit(empId, targetMonth);
+              
+              if (!monthlyCheck.isWithinLimit) {
+                violations.push({
+                  type: 'split_rest',
+                  severity: 'error',
+                  date: nextDate,
+                  employeeName: currentShift.employee_name || currentShift.従業員名 || empId,
+                  employeeId: empId,
+                  description: '分割休息の月間使用回数超過',
+                  details: `${targetMonth.getFullYear()}年${targetMonth.getMonth() + 1}月の使用回数: ${monthlyCheck.usageCount}回（上限: ${monthlyCheck.limitCount}回、総勤務回数の50%）`
+                });
+              }
+            } catch (error) {
+              console.error('❌ [RULE_CHECK] Failed to check monthly split rest limit:', error);
+              // エラー時は警告として記録
+              violations.push({
+                type: 'split_rest',
+                severity: 'warning',
+                date: nextDate,
+                employeeName: currentShift.employee_name || currentShift.従業員名 || empId,
+                employeeId: empId,
+                description: '分割休息の月間使用回数チェックエラー',
+                details: '月間使用回数の確認に失敗しました'
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  
   return violations;
 }
 
