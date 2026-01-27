@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -18,6 +18,7 @@ import { useShiftData } from '@/hooks/useShiftData';
 import { SwapConfirmDialog } from '@/components/shift-schedule/SwapConfirmDialog';
 import { CellPosition } from '@/types/shift';
 import { checkShiftRules, RuleViolation } from '@/utils/ruleChecker';
+import { AddSpotBusinessDialog } from '@/components/AddSpotBusinessDialog';
 
 interface ShiftData {
   id: string;
@@ -215,6 +216,10 @@ export default function ShiftSchedule() {
   const [showRuleCheckDialog, setShowRuleCheckDialog] = useState(false);
   const [ruleViolations, setRuleViolations] = useState<RuleViolation[]>([]);
   const [isCheckingRules, setIsCheckingRules] = useState(false);
+  const [showSpotBusinessDialog, setShowSpotBusinessDialog] = useState(false);
+  const [spotBusinessDate, setSpotBusinessDate] = useState<string>('');
+  const [spotBusinessEmployeeId, setSpotBusinessEmployeeId] = useState<string>('');
+  const [spotBusinessEmployeeName, setSpotBusinessEmployeeName] = useState<string>('');
 
 
   const timeSlots = generateTimeSlots();
@@ -956,6 +961,10 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setShowSpotBusinessDialog(true)} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            スポット業務登録
+          </Button>
           <Button onClick={handleRuleCheck} disabled={isCheckingRules} variant="outline">
             <CheckCircle2 className="h-4 w-4 mr-2" />
             {isCheckingRules ? 'チェック中...' : 'ルールチェック'}
@@ -1690,6 +1699,23 @@ export default function ShiftSchedule() {
     onConfirm={handleSwapConfirm}
     onCancel={handleSwapCancel}
     isLoading={isSwapping}
+  />
+  
+  {/* Spot Business Dialog */}
+  <AddSpotBusinessDialog
+    open={showSpotBusinessDialog}
+    onOpenChange={setShowSpotBusinessDialog}
+    selectedDate={spotBusinessDate}
+    selectedEmployeeId={spotBusinessEmployeeId}
+    selectedEmployeeName={spotBusinessEmployeeName}
+    office={selectedLocation}
+    onSuccess={() => {
+      if (activeTab === 'daily') {
+        loadShifts();
+      } else {
+        loadPeriodShifts();
+      }
+    }}
   />
   </div>
   );
