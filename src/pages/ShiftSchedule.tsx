@@ -1055,7 +1055,7 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setShowSpotBusinessDialog(true)} variant="outline">
+          <Button onClick={() => setShowSpotBusinessDialog(true)} className="bg-blue-500 hover:bg-blue-600 text-white">
             <Plus className="h-4 w-4 mr-2" />
             スポット業務登録
           </Button>
@@ -1100,11 +1100,6 @@ export default function ShiftSchedule() {
               <SelectItem value="川越">川越</SelectItem>
               <SelectItem value="東京">東京</SelectItem>
               <SelectItem value="川口">川口</SelectItem>
-              {locations.filter(loc => !['川越', '東京', '川口'].includes(loc)).map((loc) => (
-                <SelectItem key={loc} value={loc}>
-                  {loc}
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </CardContent>
