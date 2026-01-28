@@ -184,7 +184,7 @@ export default function ShiftSchedule() {
   const shiftsRef = useRef<ShiftData[]>([]);
   
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedLocation, setSelectedLocation] = useState('川越');
   const [isLoading, setIsLoading] = useState(false);
   const [locations, setLocations] = useState<string[]>([]);
   const [allEmployees, setAllEmployees] = useState<EmployeeData[]>([]);
@@ -661,7 +661,7 @@ export default function ShiftSchedule() {
         body: JSON.stringify({
           startDate: exportStartDate,
           endDate: exportEndDate,
-          location: selectedLocation === 'all' ? null : selectedLocation,
+          location: selectedLocation,
         }),
       });
 
@@ -750,9 +750,7 @@ export default function ShiftSchedule() {
         console.log('🔍 [DEBUG] Shifts enriched');
         
         console.log('🔍 [DEBUG] Filtering by location:', selectedLocation);
-        const filtered = selectedLocation === 'all' 
-          ? enrichedShifts 
-          : enrichedShifts.filter(s => s.location === selectedLocation);
+        const filtered = enrichedShifts.filter(s => s.location === selectedLocation);
         console.log('🔍 [DEBUG] Filtered to', filtered.length, 'shifts');
         
         console.log('🔍 [DEBUG] About to call setPeriodShifts with', filtered.length, 'shifts');
@@ -778,13 +776,9 @@ export default function ShiftSchedule() {
   };
 
   const filterShifts = () => {
-    if (selectedLocation === 'all') {
-      calculateUnassignedEmployees(shifts, allEmployees);
-    } else {
-      const filtered = shifts.filter(s => s.location === selectedLocation);
-      const filteredEmployees = allEmployees.filter(e => e.office === selectedLocation);
-      calculateUnassignedEmployees(filtered, filteredEmployees);
-    }
+    const filtered = shifts.filter(s => s.location === selectedLocation);
+    const filteredEmployees = allEmployees.filter(e => e.office === selectedLocation);
+    calculateUnassignedEmployees(filtered, filteredEmployees);
   };
 
   const calculateUnassignedEmployees = (shiftsData: ShiftData[], employeesData: EmployeeData[]) => {
@@ -964,7 +958,7 @@ export default function ShiftSchedule() {
         .from('shifts')
         .delete()
         .eq('date', selectedDate)
-        .eq('location', selectedLocation === 'all' ? undefined : selectedLocation);
+        .eq('location', selectedLocation);
 
       if (deleteError) {
         console.error('❌ Error deleting old shifts:', deleteError);
@@ -1096,7 +1090,6 @@ export default function ShiftSchedule() {
               <SelectValue placeholder="拠点を選択" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">すべて</SelectItem>
               <SelectItem value="川越">川越</SelectItem>
               <SelectItem value="東京">東京</SelectItem>
               <SelectItem value="川口">川口</SelectItem>
@@ -1502,7 +1495,7 @@ export default function ShiftSchedule() {
 
                 {/* Employee Rows */}
                 {allEmployees
-                  .filter(emp => selectedLocation === 'all' || emp.office === selectedLocation)
+                  .filter(emp => emp.office === selectedLocation)
                   .sort((a, b) => {
                     // Sort employees with roll call shifts to the top
                     const aHasRollCall = shifts.some(s => 
@@ -1599,7 +1592,7 @@ export default function ShiftSchedule() {
                     );
                   })}
                 
-                {allEmployees.filter(emp => selectedLocation === 'all' || emp.office === selectedLocation).length === 0 && (
+                {allEmployees.filter(emp => emp.office === selectedLocation).length === 0 && (
                   <div className="text-center text-gray-500 py-8">
                     従業員データがありません
                   </div>
