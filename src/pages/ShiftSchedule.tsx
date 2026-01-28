@@ -856,11 +856,18 @@ export default function ShiftSchedule() {
       setHasChanges(false);
       
       toast.success(`${shiftsToDelete.length}件のシフトを削除しました`);
+      
+      // データを再読み込み
+      if (activeTab === 'daily') {
+        await loadData();
+      } else {
+        await loadPeriodShifts();
+      }
     } catch (error) {
       console.error('❌ Error deleting shifts:', error);
       toast.error('シフトの削除に失敗しました');
     }
-  }, [selectedShiftIds, shifts, periodShifts, activeTab]);
+  }, [selectedShiftIds, shifts, periodShifts, activeTab, loadData, loadPeriodShifts]);
 
   const savePeriodChanges = async () => {
     if (!hasChanges) return;
