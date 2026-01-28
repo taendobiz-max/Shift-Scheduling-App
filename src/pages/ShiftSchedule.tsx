@@ -1228,11 +1228,42 @@ export default function ShiftSchedule() {
                                   >
                                     {businesses.length > 0 ? (
                                       <div className="space-y-1">
-                                        {businesses.map((business: any, idx: number) => (
-                                          <div key={idx} className="text-xs bg-blue-100 rounded px-1 py-0.5">
-                                            {business.name}
-                                          </div>
-                                        ))}  
+                                        {businesses.map((business: any, idx: number) => {
+                                          const shift = periodShifts.find(s => 
+                                            s.employee_name === employee && 
+                                            s.date === date && 
+                                            s.business_name === business.name
+                                          );
+                                          return (
+                                            <div 
+                                              key={idx} 
+                                              className={`text-xs rounded px-1 py-0.5 cursor-pointer hover:opacity-80 ${
+                                                shift?.is_spot_business ? 'bg-cyan-400' : 'bg-blue-100'
+                                              } ${
+                                                shift && selectedShiftIds.has(shift.id) ? 'ring-2 ring-orange-500' : ''
+                                              }`}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (shift && e.shiftKey) {
+                                                  const newSelected = new Set(selectedShiftIds);
+                                                  if (newSelected.has(shift.id)) {
+                                                    newSelected.delete(shift.id);
+                                                  } else {
+                                                    newSelected.add(shift.id);
+                                                  }
+                                                  setSelectedShiftIds(newSelected);
+                                                }
+                                              }}
+                                              onContextMenu={(e) => {
+                                                if (shift) {
+                                                  handleContextMenu(e, shift.id);
+                                                }
+                                              }}
+                                            >
+                                              {business.name}
+                                            </div>
+                                          );
+                                        })}  
                                       </div>
                                     ) : (
                                       <span className="text-gray-400">-</span>
@@ -1268,11 +1299,42 @@ export default function ShiftSchedule() {
                                 <td key={date} className="border p-2 text-center">
                                   {employees.length > 0 ? (
                                     <div className="space-y-1">
-                                      {employees.map((employee, idx) => (
-                                        <div key={idx} className="text-xs bg-green-100 rounded px-1 py-0.5">
-                                          {employee}
-                                        </div>
-                                      ))}
+                                      {employees.map((employee, idx) => {
+                                        const shift = periodShifts.find(s => 
+                                          s.business_name === business && 
+                                          s.date === date && 
+                                          s.employee_name === employee
+                                        );
+                                        return (
+                                          <div 
+                                            key={idx} 
+                                            className={`text-xs rounded px-1 py-0.5 cursor-pointer hover:opacity-80 ${
+                                              shift?.is_spot_business ? 'bg-cyan-400' : 'bg-green-100'
+                                            } ${
+                                              shift && selectedShiftIds.has(shift.id) ? 'ring-2 ring-orange-500' : ''
+                                            }`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (shift && e.shiftKey) {
+                                                const newSelected = new Set(selectedShiftIds);
+                                                if (newSelected.has(shift.id)) {
+                                                  newSelected.delete(shift.id);
+                                                } else {
+                                                  newSelected.add(shift.id);
+                                                }
+                                                setSelectedShiftIds(newSelected);
+                                              }
+                                            }}
+                                            onContextMenu={(e) => {
+                                              if (shift) {
+                                                handleContextMenu(e, shift.id);
+                                              }
+                                            }}
+                                          >
+                                            {employee}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   ) : (
                                     <span className="text-gray-400">-</span>
