@@ -420,10 +420,10 @@ export default function ShiftGenerator() {
 
       console.log(`👥 Filtered employees for location ${selectedLocation} (before exclusion):`, filteredEmployees);
 
-      // 除外従業員をフィルタリング
+      // 除外従業員をフィルタリング（点呼対応可能な従業員は除外しない）
       try {
-        const excludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIds(selectedLocation);
-        console.log(`🚫 Excluded employee IDs for ${selectedLocation}:`, excludedIds);
+        const excludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIdsForRegularShifts(selectedLocation);
+        console.log(`🚫 Excluded employee IDs for ${selectedLocation} (excluding roll call capable):`, excludedIds);
         
         const beforeCount = filteredEmployees.length;
         filteredEmployees = filteredEmployees.filter(emp => {
@@ -434,8 +434,8 @@ export default function ShiftGenerator() {
         const excludedCount = beforeCount - afterCount;
         
         if (excludedCount > 0) {
-          console.log(`✅ Excluded ${excludedCount} employees from shift generation`);
-          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名`);
+          console.log(`✅ Excluded ${excludedCount} employees from shift generation (excluding roll call capable)`);
+          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名（点呼対応可能な従業員を除く）`);
         }
       } catch (error) {
         console.warn('⚠️ Could not load excluded employees:', error);

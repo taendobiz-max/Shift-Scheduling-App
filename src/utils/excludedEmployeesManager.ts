@@ -12,6 +12,7 @@ export interface ExcludedEmployee {
   location: string;
   reason: string;
   is_active: boolean;
+  can_handle_roll_call: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -65,6 +66,28 @@ export class ExcludedEmployeesManager {
   }
 
   /**
+   * 通常業務で除外する従業員IDのリストを取得
+   * 点呼対応可能な従業員は除外しない
+   * @param location 拠点名
+   */
+  static async getExcludedEmployeeIdsForRegularShifts(location: string): Promise<string[]> {
+    const excluded = await this.getExcludedEmployees(location, true);
+    // 点呼対応可能な従業員は除外しない
+    return excluded
+      .filter(emp => !emp.can_handle_roll_call)
+      .map(emp => emp.employee_id);
+  }
+
+  /**
+   * 点呼対応可能な除外従業員を取得
+   * @param location 拠点名
+   */
+  static async getRollCallCapableExcludedEmployees(location: string): Promise<ExcludedEmployee[]> {
+    const excluded = await this.getExcludedEmployees(location, true);
+    return excluded.filter(emp => emp.can_handle_roll_call);
+  }
+
+  /**
    * 従業員が除外対象かどうかをチェック
    * @param employeeId 従業員ID
    * @param location 拠点名
@@ -91,7 +114,8 @@ export class ExcludedEmployeesManager {
           employee_name: employee.employee_name,
           location: employee.location,
           reason: employee.reason || '管理職・別業務',
-          is_active: employee.is_active !== undefined ? employee.is_active : true
+          is_active: employee.is_active !== undefined ? employee.is_active : true,
+          can_handle_roll_call: employee.can_handle_roll_call || false
         });
 
       if (error) {

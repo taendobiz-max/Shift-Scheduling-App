@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Dialog, 
@@ -57,7 +58,8 @@ export const ExcludedEmployeesManagement: React.FC = () => {
     employee_id: '',
     employee_name: '',
     location: '',
-    reason: '管理職・別業務'
+    reason: '管理職・別業務',
+    can_handle_roll_call: false
   });
 
   const locations = ['東京', '川越', '川口'];
@@ -143,7 +145,8 @@ export const ExcludedEmployeesManagement: React.FC = () => {
         employee_name: formData.employee_name,
         location: formData.location,
         reason: formData.reason,
-        is_active: true
+        is_active: true,
+        can_handle_roll_call: formData.can_handle_roll_call
       });
 
       if (result.success) {
@@ -153,7 +156,8 @@ export const ExcludedEmployeesManagement: React.FC = () => {
           employee_id: '',
           employee_name: '',
           location: '',
-          reason: '管理職・別業務'
+          reason: '管理職・別業務',
+          can_handle_roll_call: false
         });
         setSelectedLocation('');
         setEmployeeOptions([]);
@@ -311,6 +315,9 @@ export const ExcludedEmployeesManagement: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{employee.employee_name}</span>
                       <Badge variant="outline">{employee.location}</Badge>
+                      {employee.can_handle_roll_call && (
+                        <Badge className="bg-green-500">点呼対応可</Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
                       従業員ID: {employee.employee_id} | 理由: {employee.reason}
@@ -385,6 +392,18 @@ export const ExcludedEmployeesManagement: React.FC = () => {
                 onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
                 placeholder="管理職・別業務"
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="can_handle_roll_call"
+                checked={formData.can_handle_roll_call}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({ ...prev, can_handle_roll_call: checked as boolean }))
+                }
+              />
+              <Label htmlFor="can_handle_roll_call" className="cursor-pointer">
+                点呼対応可能（除外従業員でも点呼業務にアサインする）
+              </Label>
             </div>
           </div>
           <DialogFooter>
