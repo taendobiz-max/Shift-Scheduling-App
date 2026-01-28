@@ -811,7 +811,7 @@ export default function ShiftSchedule() {
       newSelected.add(shiftId);
     }
     
-    console.log('🖱️ New selectedShiftIds:', Array.from(newSelected));
+    console.log('🖘️ New selectedShiftIds:', Array.from(newSelected));
     setSelectedShiftIds(newSelected);
   };
 
@@ -819,15 +819,20 @@ export default function ShiftSchedule() {
   const handleDeleteSelectedShifts = useCallback(async () => {
     console.log('❌ Delete triggered, selectedShiftIds:', Array.from(selectedShiftIds));
     console.log('❌ selectedShiftIds.size:', selectedShiftIds.size);
+    console.log('❌ activeTab:', activeTab);
     if (selectedShiftIds.size === 0) {
       console.log('❌ No shifts selected, aborting delete');
       return;
     }
 
-    const shiftsToDelete = shifts.filter(s => selectedShiftIds.has(s.id));
+    // 現在のビューに応じて適切な配列を使用
+    const currentShifts = activeTab === 'daily' ? shifts : periodShifts;
+    console.log('❌ currentShifts.length:', currentShifts.length);
+    const shiftsToDelete = currentShifts.filter(s => selectedShiftIds.has(s.id));
+    console.log('❌ shiftsToDelete.length:', shiftsToDelete.length);
     const shiftNames = shiftsToDelete.map(s => s.business_name || '不明').join(', ');
 
-    if (!confirm(`選択した${selectedShiftIds.size}件のシフトを削除しますか？\n${shiftNames}`)) {
+    if (!confirm(`選択した${shiftsToDelete.length}件のシフトを削除しますか？\n${shiftNames}`)) {
       return;
     }
 
@@ -840,9 +845,15 @@ export default function ShiftSchedule() {
 
       if (error) throw error;
 
-      // Update local state
-      const updatedShifts = shifts.filter(s => !selectedShiftIds.has(s.id));
-      setShifts(updatedShifts);
+      // Update local state based on current view
+      if (activeTab === 'daily') {
+        const updatedShifts = shifts.filter(s => !selectedShiftIds.has(s.id));
+        setShifts(updatedShifts);
+      } else {
+        const updatedShifts = periodShifts.filter(s => !selectedShiftIds.has(s.id));
+        setPeriodShifts(updatedShifts);
+      }
+      
       setSelectedShiftIds(new Set());
       setHasChanges(false);
       
@@ -851,7 +862,7 @@ export default function ShiftSchedule() {
       console.error('❌ Error deleting shifts:', error);
       toast.error('シフトの削除に失敗しました');
     }
-  }, [selectedShiftIds, shifts]);
+  }, [selectedShiftIds, shifts, periodShifts, activeTab]);
 
   const savePeriodChanges = async () => {
     if (!hasChanges) return;
