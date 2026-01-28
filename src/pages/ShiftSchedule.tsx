@@ -260,7 +260,6 @@ export default function ShiftSchedule() {
           return { name, display_order: employee?.display_order || 9999 };
         })
         .sort((a, b) => a.display_order - b.display_order)
-        .slice(0, 5)  // 最初の5人のみを表示
         .map(e => e.name);
       console.log('🔍 [DEBUG] Limited employees:', employees);
       
