@@ -82,7 +82,9 @@ const ShiftBar = ({
   barStyle,
   isSelected,
   onClick,
-  colorScheme = 'blue'
+  onContextMenu,
+  colorScheme = 'blue',
+  isSpotBusiness = false
 }: { 
   employeeId: string; 
   employeeName: string;
@@ -94,8 +96,10 @@ const ShiftBar = ({
   endTime?: string;
   barStyle?: { left: string; width: string };
   isSelected?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   colorScheme?: 'blue' | 'green';
+  isSpotBusiness?: boolean;
 }) => {
   // デバッグログを追加
   console.log('🔍 [ShiftBar Debug]', {
@@ -115,10 +119,13 @@ const ShiftBar = ({
       <div
         style={{ left: barStyle.left, width: barStyle.width }}
         onClick={onClick}
+        onContextMenu={onContextMenu}
         className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-50 cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
-            : colorScheme === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
+            : isSpotBusiness 
+              ? 'bg-cyan-400 hover:bg-cyan-500' 
+              : colorScheme === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
         }`}
       >
         <span className="font-semibold">{employeeName}</span>
@@ -177,6 +184,7 @@ export default function ShiftSchedule() {
   const [unassignedEmployees, setUnassignedEmployees] = useState<EmployeeData[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [selectedShiftIds, setSelectedShiftIds] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; shiftId: string } | null>(null);
   
   // セル選択用のhooks
   const {
@@ -382,9 +390,27 @@ export default function ShiftSchedule() {
   }, [periodShifts]);
 
   // セル選択のハンドラー
-  const handleCellClick = (cell: CellPosition) => {
+  const handleCellClick = (cell: CellPosition, e?: React.MouseEvent) => {
     console.log('🟠 [DEBUG] handleCellClick called:', cell);
     console.log("🔍 [DEBUG] handleCellClick:", cell);
+    
+    // Shiftキーでの複数選択の場合、シフト削除用の選択を行う
+    if (e?.shiftKey && cell.shiftId) {
+      e.preventDefault();
+      e.stopPropagation();
+      const newSelected = new Set(selectedShiftIds);
+      if (newSelected.has(cell.shiftId)) {
+        newSelected.delete(cell.shiftId);
+      } else {
+        newSelected.add(cell.shiftId);
+      }
+      setSelectedShiftIds(newSelected);
+      return;
+    }
+    
+    // 通常のクリックはシフト入れ替え用
+    // 削除用の選択をクリア
+    setSelectedShiftIds(new Set());
     selectCell(cell);
   };
   
@@ -414,6 +440,23 @@ export default function ShiftSchedule() {
     clearSelection();
   };
 
+  // 右クリックメニューのハンドラー
+  const handleContextMenu = (e: React.MouseEvent, shiftId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, shiftId });
+    // 右クリックしたシフトを選択状態に追加
+    if (!selectedShiftIds.has(shiftId)) {
+      setSelectedShiftIds(new Set([shiftId]));
+    }
+  };
+
+  // 右クリックメニューからの削除
+  const handleDeleteFromContextMenu = async () => {
+    setContextMenu(null);
+    await handleDeleteSelectedShifts();
+  };
+
   useEffect(() => {
     // Set default date to today
     const today = new Date();
@@ -429,6 +472,15 @@ export default function ShiftSchedule() {
   useEffect(() => {
     filterShifts();
   }, [shifts, selectedLocation]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
 
   // Handle keyboard events for delete
   useEffect(() => {
@@ -550,12 +602,21 @@ export default function ShiftSchedule() {
             (b.業務id || b.id) === shift.business_master_id
           );
           
+          // スポット業務の場合、departure_timeとreturn_timeを使用
+          let startTime = business?.開始時間 || '09:00:00';
+          let endTime = business?.終了時間 || '17:00:00';
+          
+          if (shift.is_spot_business && shift.departure_time && shift.return_time) {
+            startTime = shift.departure_time;
+            endTime = shift.return_time;
+          }
+          
           return {
             ...shift,
             employee_name: employee?.name || shift.employee_id,
-            business_name: business?.業務名 || shift.business_master_id,
-            start_time: business?.開始時間 || '09:00:00',
-            end_time: business?.終了時間 || '17:00:00',
+            business_name: business?.業務名 || shift.business_name || shift.business_master_id,
+            start_time: startTime,
+            end_time: endTime,
           };
         });
         
@@ -663,12 +724,21 @@ export default function ShiftSchedule() {
           const employee = employeeMap.get(shift.employee_id);
           const business = businessMap.get(shift.business_master_id);
           
+          // スポット業務の場合、departure_timeとreturn_timeを使用
+          let startTime = business?.開始時間 || '09:00:00';
+          let endTime = business?.終了時間 || '17:00:00';
+          
+          if (shift.is_spot_business && shift.departure_time && shift.return_time) {
+            startTime = shift.departure_time;
+            endTime = shift.return_time;
+          }
+          
           return {
             ...shift,
             employee_name: employee?.name || shift.employee_id,
-            business_name: business?.業務名 || shift.business_master_id,
-            start_time: business?.開始時間 || '09:00:00',
-            end_time: business?.終了時間 || '17:00:00',
+            business_name: business?.業務名 || shift.business_name || shift.business_master_id,
+            start_time: startTime,
+            end_time: endTime,
           };
         });
         console.log('🔍 [DEBUG] Shifts enriched');
@@ -1423,20 +1493,22 @@ export default function ShiftSchedule() {
                                 startTime={shift.start_time}
                                 endTime={shift.end_time}
                                 barStyle={barStyle}
-                                isSelected={isCellSelected({
+                                isSelected={selectedShiftIds.has(shift.id) || isCellSelected({
                                   employeeId: shift.employee_id,
                                   businessId: shift.business_master_id,
                                   date: shift.date,
                                 })}
-                                onClick={() => handleCellClick({
+                                onClick={(e) => handleCellClick({
                                   employeeId: shift.employee_id,
                                   employeeName: shift.employee_name || employee.name,
                                   businessId: shift.business_master_id,
                                   businessName: shift.business_name,
                                   date: shift.date,
                                   shiftId: shift.id,
-                                })}
+                                }, e)}
+                                onContextMenu={(e) => handleContextMenu(e, shift.id)}
                                 colorScheme='blue'
+                                isSpotBusiness={shift.is_spot_business || false}
                               />
                             );
                           })}
@@ -1533,20 +1605,22 @@ export default function ShiftSchedule() {
                                 startTime={shift.start_time}
                                 endTime={shift.end_time}
                                 barStyle={barStyle}
-                                isSelected={isCellSelected({
+                                isSelected={selectedShiftIds.has(shift.id) || isCellSelected({
                                   employeeId: shift.employee_id,
                                   businessId: shift.business_master_id,
                                   date: shift.date,
                                 })}
-                                onClick={() => handleCellClick({
+                                onClick={(e) => handleCellClick({
                                   employeeId: shift.employee_id,
                                   employeeName: shift.employee_name,
                                   businessId: shift.business_master_id,
                                   businessName: shift.business_name,
                                   date: shift.date,
                                   shiftId: shift.id,
-                                })}
+                                }, e)}
+                                onContextMenu={(e) => handleContextMenu(e, shift.id)}
                                 colorScheme='green'
+                                isSpotBusiness={shift.is_spot_business || false}
                               />
                             );
                           })}
@@ -1711,12 +1785,34 @@ export default function ShiftSchedule() {
     office={selectedLocation}
     onSuccess={() => {
       if (activeTab === 'daily') {
-        loadShifts();
+        loadData();
       } else {
         loadPeriodShifts();
       }
     }}
   />
+
+  {/* Context Menu */}
+  {contextMenu && (
+    <div
+      style={{
+        position: 'fixed',
+        left: contextMenu.x,
+        top: contextMenu.y,
+        zIndex: 9999,
+      }}
+      className="bg-white shadow-lg rounded border border-gray-200 py-1 min-w-[120px]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+        onClick={handleDeleteFromContextMenu}
+      >
+        <span className="text-red-600">削除</span>
+        <span className="text-xs text-gray-500">(Delete)</span>
+      </button>
+    </div>
+  )}
   </div>
   );
 }

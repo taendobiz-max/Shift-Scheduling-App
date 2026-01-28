@@ -17,13 +17,20 @@ interface SpotBusinessMaster {
   memo: string | null;
 }
 
+interface Employee {
+  id: string;
+  employee_id: string;
+  name: string;
+  office: string;
+}
+
 interface AddSpotBusinessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate?: string;
   selectedEmployeeId?: string;
   selectedEmployeeName?: string;
-  office: string;
+  office?: string;
   onSuccess: () => void;
 }
 
@@ -39,6 +46,8 @@ export function AddSpotBusinessDialog({
   const [useMaster, setUseMaster] = useState(false);
   const [spotMasters, setSpotMasters] = useState<SpotBusinessMaster[]>([]);
   const [selectedMasterId, setSelectedMasterId] = useState<string>('');
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedOffice, setSelectedOffice] = useState<string>('川越');
   
   const [businessName, setBusinessName] = useState('');
   const [date, setDate] = useState(selectedDate || '');
@@ -49,12 +58,27 @@ export function AddSpotBusinessDialog({
   const [memo, setMemo] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Load spot business masters
+  // Reset form when dialog opens
   useEffect(() => {
-    if (open && office) {
-      loadSpotMasters();
+    if (open) {
+      console.log('[DEBUG] Dialog opened');
+      setBusinessName('');
+      setDepartureTime('');
+      setReturnTime('');
+      setMemo('');
+      setUseMaster(false);
+      setSelectedMasterId('');
     }
-  }, [open, office]);
+  }, [open]);
+
+  // Load spot business masters and employees
+  useEffect(() => {
+    if (open) {
+      console.log('[DEBUG] Loading data for office:', selectedOffice);
+      loadSpotMasters();
+      loadEmployees();
+    }
+  }, [open, selectedOffice]);
 
   // Update form when selected date/employee changes
   useEffect(() => {
@@ -68,7 +92,7 @@ export function AddSpotBusinessDialog({
       const { data, error } = await supabase
         .from('spot_business_master')
         .select('*')
-        .eq('office', office)
+        .eq('office', selectedOffice)
         .eq('is_active', true)
         .order('business_name');
 
@@ -77,6 +101,25 @@ export function AddSpotBusinessDialog({
     } catch (error) {
       console.error('Error loading spot business masters:', error);
       toast.error('スポット業務マスターの読み込みに失敗しました');
+    }
+  };
+
+  const loadEmployees = async () => {
+    try {
+      console.log('Loading employees for office:', selectedOffice);
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, employee_id, name, office')
+        .eq('office', selectedOffice)
+        .order('name');
+
+      if (error) throw error;
+      console.log('Employees loaded:', data?.length || 0, 'employees');
+      console.log('Employee data:', data);
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error loading employees:', error);
+      toast.error('従業員データの読み込みに失敗しました');
     }
   };
 
@@ -92,39 +135,69 @@ export function AddSpotBusinessDialog({
   };
 
   const handleSubmit = async () => {
+    console.log('[DEBUG] handleSubmit called');
+    console.log('[DEBUG] businessName:', businessName);
+    console.log('[DEBUG] date:', date);
+    console.log('[DEBUG] employeeId:', employeeId);
+    console.log('[DEBUG] departureTime:', departureTime);
+    console.log('[DEBUG] returnTime:', returnTime);
+    console.log('[DEBUG] selectedOffice:', selectedOffice);
+    
     if (!businessName || !date || !employeeId || !departureTime || !returnTime) {
+      console.log('[DEBUG] Validation failed');
       toast.error('必須項目を入力してください');
       return;
     }
 
     setLoading(true);
     try {
+      // employeeId (UUID) から employee_id (従業員番号) を取得
+      const selectedEmployee = employees.find(e => e.id === employeeId);
+      if (!selectedEmployee) {
+        toast.error('従業員が見つかりません');
+        setLoading(false);
+        return;
+      }
+      
       const shiftData = {
-        employee_id: employeeId,
-        business_master_id: 'SPOT',
+        employee_id: selectedEmployee.employee_id,  // 従業員番号を使用
+        business_master_id: null,
         business_name: businessName,
         date: date,
-        start_time: departureTime,
-        end_time: returnTime,
-        location: office,
+        location: selectedOffice,
         is_spot_business: true,
         spot_business_master_id: useMaster && selectedMasterId ? selectedMasterId : null,
-        memo: memo || null,
+        departure_time: departureTime,  // 出庫時間を追加
+        return_time: returnTime,  // 帰庫時間を追加
+        memo: memo || null,  // memoは別フィールドとして保存
         created_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
+      console.log('[DEBUG] Inserting shift data:', JSON.stringify(shiftData, null, 2));
+      const { data, error } = await supabase
         .from('shifts')
-        .insert([shiftData]);
+        .insert([shiftData])
+        .select();
 
-      if (error) throw error;
+      console.log('[DEBUG] Insert result - data:', JSON.stringify(data, null, 2));
+      console.log('[DEBUG] Insert result - error:', error);
+      console.log('[DEBUG] Error is null?', error === null);
+      console.log('[DEBUG] Data is truthy?', !!data);
+      
+      if (error) {
+        console.log('[DEBUG] Error detected, throwing...');
+        throw error;
+      }
+      
+      console.log('[DEBUG] No error, proceeding to success...');
 
       toast.success('スポット業務を登録しました');
       onSuccess();
       handleClose();
     } catch (error) {
-      console.error('Error adding spot business:', error);
-      toast.error('スポット業務の登録に失敗しました');
+      console.error('[DEBUG] Error adding spot business:', error);
+      const errorMsg = error?.message || '不明なエラー';
+      toast.error('スポット業務の登録に失敗しました: ' + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -185,7 +258,7 @@ export function AddSpotBusinessDialog({
                 <SelectTrigger>
                   <SelectValue placeholder="マスターを選択" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={5}>
                   {spotMasters.map((master) => (
                     <SelectItem key={master.id} value={master.id}>
                       {master.business_name}
@@ -217,14 +290,54 @@ export function AddSpotBusinessDialog({
             />
           </div>
 
+          {/* Office selection */}
+          <div>
+            <Label>営業所 *</Label>
+            <Select key={`office-${open}`} value={selectedOffice} onValueChange={(value) => {
+              console.log('[DEBUG] Office changed to:', value);
+              setSelectedOffice(value);
+              setEmployeeId('');
+              setEmployeeName('');
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="営業所を選択" />
+              </SelectTrigger>
+              <SelectContent position="popper" sideOffset={5}>
+                <SelectItem value="川越">川越</SelectItem>
+                <SelectItem value="東京">東京</SelectItem>
+                <SelectItem value="川口">川口</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Employee */}
           <div>
             <Label>従業員 *</Label>
-            <Input
-              value={employeeName || employeeId}
-              disabled
-              placeholder="従業員を選択してください"
-            />
+            {selectedEmployeeId ? (
+              <Input
+                value={employeeName || employeeId}
+                disabled
+                placeholder="従業員を選択してください"
+              />
+            ) : (
+              <Select key={`employee-${open}-${selectedOffice}`} value={employeeId} onValueChange={(value) => {
+                console.log('[DEBUG] Employee changed to:', value);
+                setEmployeeId(value);  // UUIDを保存
+                const emp = employees.find(e => e.id === value);
+                if (emp) setEmployeeName(emp.name);
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="従業員を選択してください" />
+                </SelectTrigger>
+                <SelectContent position="popper" sideOffset={5}>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Departure time */}
