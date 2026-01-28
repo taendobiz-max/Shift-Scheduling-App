@@ -84,7 +84,8 @@ const ShiftBar = ({
   onClick,
   onContextMenu,
   colorScheme = 'blue',
-  isSpotBusiness = false
+  isSpotBusiness = false,
+  viewMode = 'employee'
 }: { 
   employeeId: string; 
   employeeName: string;
@@ -100,6 +101,7 @@ const ShiftBar = ({
   onContextMenu?: (e: React.MouseEvent) => void;
   colorScheme?: 'blue' | 'green';
   isSpotBusiness?: boolean;
+  viewMode?: 'employee' | 'business';
 }) => {
   // デバッグログを追加
   console.log('🔍 [ShiftBar Debug]', {
@@ -115,12 +117,22 @@ const ShiftBar = ({
   // barStyleが提供されている場合は、シフトバーとしてレンダリング
   if (barStyle && businessName) {
     console.log('✅ [ShiftBar] Rendering as shift bar');
+    
+    // 表示モードに応じて表示内容を変更
+    const displayText = viewMode === 'employee' 
+      ? businessName // 運転士ごと → 業務名のみ
+      : employeeName; // 業務ごと → 名前のみ
+    
+    // ツールチップに全情報を表示
+    const tooltipText = `${employeeName} - ${businessName}\n${startTime?.substring(0, 5)} - ${endTime?.substring(0, 5)}`;
+    
     return (
       <div
         style={{ left: barStyle.left, width: barStyle.width }}
         onClick={onClick}
         onContextMenu={onContextMenu}
-        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-between text-white text-xs font-medium shadow-md transition-colors z-50 cursor-pointer ${
+        title={tooltipText}
+        className={`absolute top-2 bottom-2 rounded px-2 flex items-center justify-center text-white text-xs font-medium shadow-md transition-colors z-50 cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
             : isSpotBusiness 
@@ -128,11 +140,7 @@ const ShiftBar = ({
               : colorScheme === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
         }`}
       >
-        <span className="font-semibold">{employeeName}</span>
-        <span className="ml-2 truncate">{businessName}</span>
-        <span className="ml-2 text-xs opacity-75">
-          {startTime?.substring(0, 5)} - {endTime?.substring(0, 5)}
-        </span>
+        <span className="truncate">{displayText}</span>
       </div>
     );
   }
@@ -1587,6 +1595,7 @@ export default function ShiftSchedule() {
                                 onContextMenu={(e) => handleContextMenu(e, shift.id)}
                                 colorScheme='blue'
                                 isSpotBusiness={shift.is_spot_business || false}
+                                viewMode={dailyViewMode}
                               />
                             );
                           })}
@@ -1699,6 +1708,7 @@ export default function ShiftSchedule() {
                                 onContextMenu={(e) => handleContextMenu(e, shift.id)}
                                 colorScheme='green'
                                 isSpotBusiness={shift.is_spot_business || false}
+                                viewMode={dailyViewMode}
                               />
                             );
                           })}
