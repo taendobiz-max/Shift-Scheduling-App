@@ -243,10 +243,9 @@ export default function ShiftSchedule() {
     }
     
     try {
-      // 日付を最初の7日間に制限
-      const allDates = [...new Set(periodShifts.map(s => s.date))].sort();
-      const dates = allDates.slice(0, 7);
-      console.log('🔍 [DEBUG] Limited dates to first 7 days:', dates);
+      // すべての日付を表示
+      const dates = [...new Set(periodShifts.map(s => s.date))].sort();
+      console.log('🔍 [DEBUG] All dates:', dates);
       
       // 対象日付のシフトのみを処理
       const limitedShifts = periodShifts.filter(s => dates.includes(s.date));
