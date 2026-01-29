@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { ConstraintEngine } from './constraintEngine';
 import { validateSplitRest, checkMonthlySplitRestLimit } from './splitRestValidator';
 
 export interface RuleViolation {
@@ -46,9 +45,9 @@ export async function checkShiftRules(
   const splitRestViolations = await checkSplitRest(shifts);
   violations.push(...splitRestViolations);
   
-  // 5. 制約エンジンによるチェック
-  const constraintViolations = await checkConstraints(shifts, location);
-  violations.push(...constraintViolations);
+  // 5. 制約エンジンによるチェック (統合シフトルール管理に移行済み)
+  // const constraintViolations = await checkConstraints(shifts, location);
+  // violations.push(...constraintViolations);
   
   const errorCount = violations.filter(v => v.severity === 'error').length;
   const warningCount = violations.filter(v => v.severity === 'warning').length;
@@ -382,21 +381,10 @@ async function checkSplitRest(shifts: any[]): Promise<RuleViolation[]> {
 }
 
 /**
- * 制約エンジンによるチェック
+ * 制約エンジンを使用した制約チェック (統合シフトルール管理に移行済み)
+ * このレガシー関数は削除予定
  */
-async function checkConstraints(shifts: any[], location?: string): Promise<RuleViolation[]> {
-  const violations: RuleViolation[] = [];
-  
-  try {
-    const engine = new ConstraintEngine();
-    await engine.loadConstraints(location);
-    
-    // TODO: 制約エンジンを使用した詳細なチェック
-    // 現時点では簡易実装
-    
-  } catch (error) {
-    console.error('❌ [RULE_CHECK] Failed to check constraints:', error);
-  }
-  
-  return violations;
-}
+// async function checkConstraints(shifts: any[], location?: string): Promise<RuleViolation[]> {
+//   const violations: RuleViolation[] = [];
+//   return violations;
+// }

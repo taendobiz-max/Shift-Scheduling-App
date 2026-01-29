@@ -37,17 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabaseClient';
-import { ConstraintManager } from '@/utils/constraintManager';
-import { 
-  EnhancedConstraint, 
-  ConstraintFormData, 
-  CONSTRAINT_CATEGORIES, 
-  CONSTRAINT_TYPES, 
-  ENFORCEMENT_LEVELS,
-  PRIORITY_LEVELS
-} from '@/types/constraint';
 import { loadEmployeesFromExcel } from '@/utils/employeeExcelLoader';
-import ConstraintGroupManagement from './ConstraintGroupManagement';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SpotBusinessMasterManagement } from '@/components/SpotBusinessMasterManagement';
 
@@ -100,13 +90,6 @@ interface BusinessMasterForm {
   方向: string;
 }
 
-interface ConstraintStatistics {
-  total: number;
-  byCategory: Record<string, number>;
-  byEnforcement: Record<string, number>;
-  byStatus: { active: number; inactive: number };
-  byPriority: { mandatory: number; high: number; medium: number; low: number };
-}
 
 export default function MasterDataManagement() {
   // Business Groups state
@@ -145,24 +128,8 @@ export default function MasterDataManagement() {
     方向: 'none',
   });
 
-  // Enhanced Constraints state
-  const [constraints, setConstraints] = useState<EnhancedConstraint[]>([]);
-  const [isConstraintLoading, setIsConstraintLoading] = useState(true);
-  const [isConstraintEditing, setIsConstraintEditing] = useState(false);
-  const [editingConstraintId, setEditingConstraintId] = useState<string | null>(null);
-  const [constraintForm, setConstraintForm] = useState<ConstraintFormData>({
-    constraint_name: '',
-    constraint_category: 'その他',
-    constraint_value: 0,
-    constraint_description: '',
-    applicable_locations: [],
-    priority_level: PRIORITY_LEVELS.MEDIUM,
-    is_active: true,
-  });
-
   // Available locations from employee data
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
-  const [constraintStats, setConstraintStats] = useState<ConstraintStatistics | null>(null);
   const [activeTab, setActiveTab] = useState('business-groups');
   const [officeFilter, setOfficeFilter] = useState<string>('すべて');
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -198,7 +165,6 @@ export default function MasterDataManagement() {
     await Promise.all([
       loadBusinessGroups(),
       loadBusinessMasters(),
-      loadConstraints(),
       loadAvailableLocations()
     ]);
   };
@@ -502,143 +468,19 @@ export default function MasterDataManagement() {
   };
 
   // Enhanced Constraints functions
-  const loadConstraints = async () => {
-    setIsConstraintLoading(true);
-    try {
-      // Check if table exists first
-      const tableExists = await ConstraintManager.checkTableExists();
-      if (!tableExists) {
-        console.log('⚠️ Enhanced constraints table does not exist, creating sample data...');
-        // You might want to create sample constraints here
-        setConstraints([]);
-        setConstraintStats(null);
-        return;
-      }
 
-      const constraintsData = await ConstraintManager.getAllConstraints();
-      setConstraints(constraintsData);
-      
-      // Load statistics
-      const stats = await ConstraintManager.getConstraintStatistics();
-      setConstraintStats(stats);
-      
-      console.log('✅ Loaded enhanced constraints:', constraintsData.length);
-      if (constraintsData.length > 0) {
-        toast.success(`${constraintsData.length}件の制約条件を読み込みました`);
-      }
-    } catch (error) {
-      console.error('Error loading constraints:', error);
-      toast.error(`制約条件の読み込みに失敗しました: ${(error as Error).message}`);
-      setConstraints([]);
-      setConstraintStats(null);
-    } finally {
-      setIsConstraintLoading(false);
-    }
-  };
 
-  const handleConstraintSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
 
-    if (!constraintForm.constraint_name) {
-      toast.error('制約名は必須です');
-      return;
-    }
 
-    if (constraintForm.applicable_locations.length === 0) {
-      toast.error('適用拠点を最低1つ選択してください');
-      return;
-    }
 
-    try {
-      if (editingConstraintId) {
-        // Update existing constraint
-        await ConstraintManager.updateConstraint(editingConstraintId, constraintForm);
-        toast.success('制約条件を更新しました');
-      } else {
-        // Create new constraint
-        await ConstraintManager.createConstraint(constraintForm);
-        toast.success('制約条件を作成しました');
-      }
-
-      resetConstraintForm();
-      await loadConstraints();
-    } catch (error) {
-      console.error('Error saving constraint:', error);
-      toast.error(`制約条件の保存に失敗しました: ${(error as Error).message}`);
-    }
-  };
-
-  const handleConstraintEdit = (constraint: EnhancedConstraint) => {
-    setConstraintForm({
-      constraint_name: constraint.constraint_name,
-      constraint_category: constraint.constraint_category,
-      constraint_value: constraint.constraint_value,
-      constraint_description: constraint.constraint_description,
-      applicable_locations: constraint.applicable_locations,
-      priority_level: constraint.priority_level,
-      is_active: constraint.is_active,
-    });
-    setEditingConstraintId(constraint.id);
-    setIsConstraintEditing(true);
-  };
-
-  const handleConstraintDelete = async (id: string) => {
-    if (!confirm('この制約条件を削除しますか？')) {
-      return;
-    }
-
-    try {
-      await ConstraintManager.deleteConstraint(id);
-      toast.success('制約条件を削除しました');
-      await loadConstraints();
-    } catch (error) {
-      console.error('Error deleting constraint:', error);
-      toast.error(`制約条件の削除に失敗しました: ${(error as Error).message}`);
-    }
-  };
-
-  const handleConstraintToggleActive = async (id: string, isActive: boolean) => {
-    try {
-      await ConstraintManager.toggleConstraintStatus(id, isActive);
-      toast.success(`制約条件を${isActive ? '有効' : '無効'}にしました`);
-      await loadConstraints();
-    } catch (error) {
-      console.error('Error toggling constraint:', error);
-      toast.error(`制約条件の更新に失敗しました: ${(error as Error).message}`);
-    }
-  };
-
-  const resetConstraintForm = () => {
-    setConstraintForm({
-      constraint_name: '',
-      constraint_category: 'その他',
-      constraint_value: 0,
-      constraint_description: '',
-      applicable_locations: [],
-      priority_level: PRIORITY_LEVELS.MEDIUM,
-      is_active: true,
-    });
-    setEditingConstraintId(null);
-    setIsConstraintEditing(false);
-  };
 
   // Helper functions
-  const getConstraintTypeLabel = (type: string) => {
-    const found = CONSTRAINT_TYPES.find(ct => ct.value === type);
-    return found ? found.label : type;
-  };
 
   const getEnforcementLevelInfo = (level: string) => {
     const found = ENFORCEMENT_LEVELS.find(el => el.value === level);
     return found || { value: level, label: level, description: '', color: 'text-gray-600' };
   };
 
-  const getPriorityLevelLabel = (level: number) => {
-    if (level === 0) return '必須';
-    if (level <= 20) return '高';
-    if (level <= 50) return '中';
-    return '低';
-  };
 
   const getPriorityLevelColor = (level: number) => {
     if (level === 0) return 'text-red-600 bg-red-50';
@@ -700,7 +542,7 @@ export default function MasterDataManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">マスタデータ管理</h1>
-          <p className="text-muted-foreground mt-2">業務グループ・業務マスタ・制約条件の管理</p>
+          <p className="text-muted-foreground mt-2">業務グループ・業務マスタの管理</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={loadAllData} variant="outline">
@@ -758,22 +600,6 @@ export default function MasterDataManagement() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center">
-              <Settings className="h-4 w-4 mr-2" />
-              制約条件数
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{constraints.length}</div>
-            {constraintStats && (
-              <div className="text-xs text-muted-foreground mt-1">
-                有効: {constraintStats.byStatus?.active || 0}件
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
               <Clock className="h-4 w-4 mr-2" />
               拘束時間業務
             </CardTitle>
@@ -789,7 +615,7 @@ export default function MasterDataManagement() {
       {/* Tabs for Business Groups, Business Masters and Enhanced Constraints */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center gap-4 mb-6">
-          <TabsList className="grid grid-cols-5 flex-1 max-w-5xl">
+          <TabsList className="grid grid-cols-3 flex-1 max-w-5xl">
           <TabsTrigger value="business-groups" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             業務グループ
@@ -801,14 +627,6 @@ export default function MasterDataManagement() {
           <TabsTrigger value="spot-business" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             スポット業務
-          </TabsTrigger>
-          <TabsTrigger value="constraints" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            制約条件
-          </TabsTrigger>
-          <TabsTrigger value="constraint-groups" className="flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            制約グループ
           </TabsTrigger>
         </TabsList>
         <div className="w-48">
@@ -981,353 +799,6 @@ export default function MasterDataManagement() {
         </TabsContent>
 
         {/* Enhanced Constraints Tab */}
-        <TabsContent value="constraints" className="space-y-6">
-          {/* Deprecation Warning */}
-          <Card className="border-yellow-500 bg-yellow-50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-800">
-                <AlertCircle className="h-5 w-5" />
-                この機能は非推奨となりました
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-yellow-800">
-                制約条件の管理機能は<strong>「シフトルール管理」画面</strong>に統合されました。
-                今後は統合ルール管理システムをご利用ください。
-              </p>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => window.location.href = '/unified-rules'} 
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                  シフトルール管理画面へ移動
-                </Button>
-              </div>
-              <div className="mt-4 p-3 bg-white rounded border border-yellow-200">
-                <p className="text-xs text-gray-600">
-                  <strong>統合ルール管理システムの利点:</strong>
-                </p>
-                <ul className="text-xs text-gray-600 mt-2 space-y-1 list-disc list-inside">
-                  <li>制約条件、フィルター、割り当てロジック、検証、最適化ルールを一元管理</li>
-                  <li>より柔軟なルール設定（JSON形式でカスタマイズ可能）</li>
-                  <li>拠点別のルール適用が容易</li>
-                  <li>ルールの優先度と強制レベルの明確な管理</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Constraint Statistics */}
-          {constraintStats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center">
-                    <Shield className="h-4 w-4 mr-2 text-red-600" />
-                    法令遵守
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{constraintStats.byCategory?.['法令遵守'] || 0}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center">
-                    <Target className="h-4 w-4 mr-2 text-blue-600" />
-                    その他
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{constraintStats.byCategory?.['その他'] || 0}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center">
-                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                    有効制約
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{constraintStats.byStatus?.active || 0}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-2 text-red-600" />
-                    必須制約
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{constraintStats.byPriority?.mandatory || 0}</div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Add/Edit Enhanced Constraint Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {isConstraintEditing ? <Edit2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                {isConstraintEditing ? '制約条件を編集' : '新しい制約条件を追加'}
-              </CardTitle>
-              <CardDescription>
-                シフト自動生成で使用する制約条件を設定してください。優先度0が最高優先度（必須条件）です。
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleConstraintSubmit} className="space-y-6">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="constraint_name">制約名 *</Label>
-                    <Input
-                      id="constraint_name"
-                      value={constraintForm.constraint_name}
-                      onChange={(e) => setConstraintForm({ ...constraintForm, constraint_name: e.target.value })}
-                      placeholder="例: 労働基準法 - 最大連続出勤日数"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="constraint_category">制約カテゴリ *</Label>
-                    <Select
-                      value={constraintForm.constraint_category}
-                      onValueChange={(value: '法令遵守' | 'その他') => setConstraintForm({ ...constraintForm, constraint_category: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="カテゴリを選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CONSTRAINT_CATEGORIES.map(category => (
-                          <SelectItem key={category.value} value={category.value}>
-                            <div className="flex items-center gap-2">
-                              {category.value === '法令遵守' ? (
-                                <Shield className="h-4 w-4 text-red-600" />
-                              ) : (
-                                <Target className="h-4 w-4 text-blue-600" />
-                              )}
-                              <div>
-                                <div className="font-medium">{category.label}</div>
-                                <div className="text-xs text-muted-foreground">{category.description}</div>
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                  <div className="space-y-2">
-                    <Label htmlFor="constraint_value">制約値</Label>
-                    <Input
-                      id="constraint_value"
-                      type="number"
-                      min="0"
-                      value={constraintForm.constraint_value}
-                      onChange={(e) => setConstraintForm({ ...constraintForm, constraint_value: parseInt(e.target.value) || 0 })}
-                      placeholder="例: 6"
-                    />
-                  </div>
-                </div>
-
-                {/* Priority Level */}
-                <div className="space-y-4">
-                  <Label>優先度設定</Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">優先度: {constraintForm.priority_level}</span>
-                      <Badge className={getPriorityLevelColor(constraintForm.priority_level)}>
-                        {getPriorityLevelLabel(constraintForm.priority_level)}
-                      </Badge>
-                    </div>
-                    <Slider
-                      value={[constraintForm.priority_level]}
-                      onValueChange={(value) => setConstraintForm({ ...constraintForm, priority_level: value[0] })}
-                      max={100}
-                      min={0}
-                      step={1}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>0: 必須</span>
-                      <span>50: 中優先度</span>
-                      <span>100: 低優先度</span>
-                    </div>
-                  </div>
-                </div>
-
-
-                {/* Applicable Locations */}
-                <div className="space-y-3">
-                  <Label>適用拠点 *</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {availableLocations.map((location) => (
-                      <div key={location} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`location-${location}`}
-                          checked={constraintForm.applicable_locations.includes(location)}
-                          onCheckedChange={(checked) => handleLocationChange(location, checked as boolean)}
-                        />
-                        <Label htmlFor={`location-${location}`} className="text-sm">
-                          {location}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {constraintForm.applicable_locations.length === 0 && (
-                    <p className="text-sm text-red-600">適用拠点を最低1つ選択してください</p>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="constraint_description">説明</Label>
-                  <Textarea
-                    id="constraint_description"
-                    value={constraintForm.constraint_description}
-                    onChange={(e) => setConstraintForm({ ...constraintForm, constraint_description: e.target.value })}
-                    placeholder="制約条件の詳細説明を入力してください"
-                    rows={3}
-                  />
-                </div>
-
-                {/* Active Status */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_active"
-                    checked={constraintForm.is_active}
-                    onCheckedChange={(checked) => setConstraintForm({ ...constraintForm, is_active: checked })}
-                  />
-                  <Label htmlFor="is_active" className="text-sm">
-                    {constraintForm.is_active ? '有効' : '無効'}
-                  </Label>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit">
-                    <Save className="h-4 w-4 mr-2" />
-                    {isConstraintEditing ? '更新' : '作成'}
-                  </Button>
-                  {isConstraintEditing && (
-                    <Button type="button" variant="outline" onClick={resetConstraintForm}>
-                      <X className="h-4 w-4 mr-2" />
-                      キャンセル
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Enhanced Constraints List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>制約条件一覧</CardTitle>
-              <CardDescription>
-                {constraints.length > 0 
-                  ? `${constraints.length}件の制約条件が登録されています`
-                  : '制約条件が登録されていません'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {constraints.length === 0 ? (
-                <div className="text-center py-8">
-                  <Settings className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-muted-foreground">制約条件が登録されていません</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    上記のフォームから制約条件を追加してください
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {constraints
-                    .sort((a, b) => a.priority_level - b.priority_level) // Sort by priority
-                    .map((constraint) => {
-
-                      return (
-                        <div key={constraint.id} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                {constraint.constraint_category === '法令遵守' ? (
-                                  <Shield className="h-4 w-4 text-red-600" />
-                                ) : (
-                                  <Target className="h-4 w-4 text-blue-600" />
-                                )}
-                                <h4 className="font-medium">{constraint.constraint_name}</h4>
-                              </div>
-                              <Badge 
-                                variant={constraint.is_active ? "default" : "secondary"}
-                                className={constraint.is_active ? "" : "opacity-60"}
-                              >
-                                {constraint.is_active ? "有効" : "無効"}
-                              </Badge>
-                              <Badge 
-                                variant="outline"
-                                className={constraint.constraint_category === '法令遵守' ? 'border-red-200 text-red-700' : 'border-blue-200 text-blue-700'}
-                              >
-                                {constraint.constraint_category}
-                              </Badge>
-                              <Badge className={getPriorityLevelColor(constraint.priority_level)}>
-                                優先度: {constraint.priority_level}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={constraint.is_active}
-                                onCheckedChange={(checked) => handleConstraintToggleActive(constraint.id, checked)}
-                              />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleConstraintEdit(constraint)}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleConstraintDelete(constraint.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          
-                          <div className="text-sm space-y-2">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <p><strong>制約値:</strong> {constraint.constraint_value}</p>
-                              </div>
-                              <div>
-                                <p><strong>適用拠点:</strong> {constraint.applicable_locations.join(', ')}</p>
-                                <p><strong>優先度:</strong> {constraint.priority_level} ({getPriorityLevelLabel(constraint.priority_level)})</p>
-                                <p><strong>作成日:</strong> {new Date(constraint.created_at).toLocaleDateString('ja-JP')}</p>
-                              </div>
-                            </div>
-                            {constraint.constraint_description && (
-                              <div className="mt-2 p-2 bg-gray-50 rounded">
-                                <p><strong>説明:</strong> {constraint.constraint_description}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Spot Business Master Tab */}
         <TabsContent value="spot-business" className="space-y-6">
@@ -1335,9 +806,6 @@ export default function MasterDataManagement() {
         </TabsContent>
 
         {/* Constraint Groups Tab */}
-        <TabsContent value="constraint-groups" className="space-y-6">
-          <ConstraintGroupManagement />
-        </TabsContent>
       </Tabs>
 
       {/* Business Group Modal */}
