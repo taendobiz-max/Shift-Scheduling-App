@@ -618,7 +618,7 @@ export default function MasterDataManagement() {
                   <CardTitle>業務グループ一覧</CardTitle>
                   <CardDescription>登録されている業務グループの一覧</CardDescription>
                 </div>
-                <Button onClick={handleBusinessGroupAdd}>
+                <Button onClick={handleBusinessGroupAdd} className="bg-cyan-500 hover:bg-cyan-600 text-white">
                   <Plus className="h-4 w-4 mr-2" />
                   新規作成
                 </Button>
@@ -658,8 +658,8 @@ export default function MasterDataManagement() {
                               <Button variant="ghost" size="sm" onClick={() => handleBusinessGroupEdit(group)}>
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleBusinessGroupDelete(group.id)}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                              <Button variant="outline" size="sm" onClick={() => handleBusinessGroupDelete(group.id)} className="border-red-500 text-red-500 hover:bg-red-50">
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -686,7 +686,7 @@ export default function MasterDataManagement() {
                     }
                   </CardDescription>
                 </div>
-                <Button onClick={handleBusinessMasterAdd}>
+                <Button onClick={handleBusinessMasterAdd} className="bg-cyan-500 hover:bg-cyan-600 text-white">
                   <Plus className="h-4 w-4 mr-2" />
                   新規作成
                 </Button>
@@ -730,6 +730,7 @@ export default function MasterDataManagement() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleBusinessMasterDelete(master.業務id || '')}
+                            className="border-red-500 text-red-500 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

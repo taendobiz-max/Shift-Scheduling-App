@@ -637,13 +637,13 @@ export default function EmployeeManagement() {
                             編集
                           </Button>
                           <Button 
-                            variant="outline" 
                             size="sm"
                             onClick={() => handleDeleteEmployee(employee.employee_id || '', employee.name || '不明')}
                             disabled={isSaving}
                             title="削除"
+                            className="bg-red-500 hover:bg-red-600 text-white"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>

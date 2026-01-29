@@ -20,12 +20,14 @@ import { CellPosition } from '@/types/shift';
 import { checkShiftRules, RuleViolation } from '@/utils/ruleChecker';
 import { AddSpotBusinessDialog } from '@/components/AddSpotBusinessDialog';
 import DeleteShiftsModal from '@/components/DeleteShiftsModal';
+import { AssignEmployeeDialog } from '@/components/AssignEmployeeDialog';
 
 interface ShiftData {
   id: string;
   date: string;
   employee_id: string;
   employee_name?: string;
+  employee_group?: string; // 従業員の班（東京のみ）
   business_master_id: string;
   business_name?: string;
   start_time?: string;
@@ -44,6 +46,7 @@ interface EmployeeData {
   employee_id: string;
   name: string;
   office?: string;
+  "班（東京のみ）"?: string; // 従業員の班情報
 }
 
 interface BusinessMaster {
@@ -194,6 +197,11 @@ export default function ShiftSchedule() {
   const [hasChanges, setHasChanges] = useState(false);
   const [selectedShiftIds, setSelectedShiftIds] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; shiftId: string } | null>(null);
+  
+  // 未アサインポップアップの状態管理
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [selectedBusiness, setSelectedBusiness] = useState<{name: string; key: string} | null>(null);
+  const [availableEmployees, setAvailableEmployees] = useState<Array<{employee: EmployeeData; hasVacation: boolean}>>([]);
   
   // セル選択用のhooks
   const {
@@ -564,7 +572,7 @@ export default function ShiftSchedule() {
       // Load employees
       const { data: employeesData, error: employeesError } = await supabase
         .from('employees')
-        .select('employee_id, name, office');
+        .select('employee_id, name, office, "班（東京のみ）"');
       
       if (employeesError) {
         console.error('❌ Error loading employees:', employeesError);
@@ -622,6 +630,7 @@ export default function ShiftSchedule() {
           return {
             ...shift,
             employee_name: employee?.name || shift.employee_id,
+            employee_group: employee?.["班（東京のみ）"] || undefined,
             business_name: business?.業務名 || shift.business_name || shift.business_master_id,
             start_time: startTime,
             end_time: endTime,
@@ -744,6 +753,7 @@ export default function ShiftSchedule() {
           return {
             ...shift,
             employee_name: employee?.name || shift.employee_id,
+            employee_group: employee?.["班（東京のみ）"] || undefined,
             business_name: business?.業務名 || shift.business_name || shift.business_master_id,
             start_time: startTime,
             end_time: endTime,
@@ -788,6 +798,95 @@ export default function ShiftSchedule() {
     const unassigned = employeesData.filter(e => !assignedEmployeeIds.has(e.employee_id));
     setUnassignedEmployees(unassigned);
     console.log('🔍 Unassigned employees:', unassigned.length);
+  };
+
+  // 未アサイン業務クリックのハンドラー
+  const handleUnassignedBusinessClick = async (businessName: string, businessKey: string) => {
+    console.log('👥 Unassigned business clicked:', businessName);
+    setSelectedBusiness({ name: businessName, key: businessKey });
+    
+    // 出勤可能な従業員と休暇登録済み従業員を取得
+    try {
+      // 当日の休暇登録を取得
+      const { data: vacations, error: vacationError } = await supabase
+        .from('vacation_master')
+        .select('employee_id, employee_name')
+        .eq('vacation_date', selectedDate)
+        .eq('office', selectedLocation);
+      
+      if (vacationError) {
+        console.error('❌ Error loading vacations:', vacationError);
+        toast.error('休暇情報の読み込みに失敗しました');
+        return;
+      }
+      
+      const vacationEmployeeIds = new Set((vacations || []).map(v => v.employee_id));
+      
+      // 当該業務に既にアサインされている従業員を除外
+      const assignedEmployeeIds = new Set(
+        shifts
+          .filter(s => s.business_name === businessName.replace(/ \(.*班\)$/, '')) // 班名を除外して比較
+          .map(s => s.employee_id)
+      );
+      
+      // 利用可能な従業員リストを作成（出勤可能+休暇登録済み）
+      const locationEmployees = allEmployees.filter(e => e.office === selectedLocation);
+      const available = locationEmployees
+        .filter(e => !assignedEmployeeIds.has(e.employee_id))
+        .map(employee => ({
+          employee,
+          hasVacation: vacationEmployeeIds.has(employee.employee_id)
+        }));
+      
+      setAvailableEmployees(available);
+      setShowAssignDialog(true);
+    } catch (error) {
+      console.error('❌ Error loading available employees:', error);
+      toast.error('従業員情報の読み込みに失敗しました');
+    }
+  };
+
+  // 従業員をアサインするハンドラー
+  const handleAssignEmployee = async (employeeId: string) => {
+    if (!selectedBusiness) return;
+    
+    try {
+      // 業務名から班情報を除外
+      const businessName = selectedBusiness.name.replace(/ \(.*班\)$/, '');
+      
+      // business_masterから業務情報を取得
+      const business = businessMasters.find(b => b.業務名 === businessName);
+      if (!business) {
+        toast.error('業務情報が見つかりません');
+        return;
+      }
+      
+      // シフトを追加
+      const { error } = await supabase
+        .from('shifts')
+        .insert({
+          date: selectedDate,
+          employee_id: employeeId,
+          business_master_id: business.業務id || business.id,
+          location: selectedLocation,
+        });
+      
+      if (error) {
+        console.error('❌ Error assigning employee:', error);
+        toast.error('アサインに失敗しました');
+        return;
+      }
+      
+      toast.success('アサインしました');
+      setShowAssignDialog(false);
+      setSelectedBusiness(null);
+      
+      // データを再読み込み
+      await loadData();
+    } catch (error) {
+      console.error('❌ Error assigning employee:', error);
+      toast.error('アサイン中にエラーが発生しました');
+    }
   };
 
   // ドラッグ＆ドロップ機能を削除し、セル選択方式に変更
@@ -1069,7 +1168,7 @@ export default function ShiftSchedule() {
               変更を保存
             </Button>
           )}
-          <Button onClick={() => setShowDeleteShiftsModal(true)} variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+          <Button onClick={() => setShowDeleteShiftsModal(true)} size="sm" className="bg-red-500 hover:bg-red-600 text-white">
             <Trash2 className="h-4 w-4 mr-2" />
             シフト削除
           </Button>
@@ -1630,21 +1729,68 @@ export default function ShiftSchedule() {
 
                 {/* Business Rows */}
                 {(() => {
-                  const businesses = [...new Set(shifts.map(s => s.business_name))]
-                    .sort((a, b) => {
-                      // 点呼業務を一番上に表示
-                      const aIsRollCall = a.includes('点呼');
-                      const bIsRollCall = b.includes('点呼');
-                      if (aIsRollCall && !bIsRollCall) return -1;
-                      if (!aIsRollCall && bIsRollCall) return 1;
-                      return a.localeCompare(b);
-                    });
+                  // 東京の夜行バスの場合、班ごとに分けて表示
+                  const businessGroups: Array<{key: string; name: string; shifts: ShiftData[]}> = [];
+                  const processedBusinesses = new Set<string>();
+                  
+                  shifts.forEach(shift => {
+                    const businessName = shift.business_name || '';
+                    const isTokyoOvernightBus = shift.location === '東京' && 
+                      (businessName.includes('夜行バス') || businessName.includes('往路') || businessName.includes('復路'));
+                    
+                    if (isTokyoOvernightBus && shift.employee_group) {
+                      // 東京の夜行バスで班情報がある場合
+                      const groupKey = `${businessName}_${shift.employee_group}`;
+                      if (!processedBusinesses.has(groupKey)) {
+                        processedBusinesses.add(groupKey);
+                        const groupShifts = shifts.filter(s => 
+                          s.business_name === businessName && s.employee_group === shift.employee_group
+                        );
+                        businessGroups.push({
+                          key: groupKey,
+                          name: `${businessName} (${shift.employee_group}班)`,
+                          shifts: groupShifts
+                        });
+                      }
+                    } else {
+                      // 通常の業務
+                      if (!processedBusinesses.has(businessName)) {
+                        processedBusinesses.add(businessName);
+                        const businessShifts = shifts.filter(s => s.business_name === businessName);
+                        businessGroups.push({
+                          key: businessName,
+                          name: businessName,
+                          shifts: businessShifts
+                        });
+                      }
+                    }
+                  });
+                  
+                  // ソート：点呼業務を一番上に、次にAube班、その次にGalaxy班
+                  businessGroups.sort((a, b) => {
+                    const aIsRollCall = a.name.includes('点呼');
+                    const bIsRollCall = b.name.includes('点呼');
+                    if (aIsRollCall && !bIsRollCall) return -1;
+                    if (!aIsRollCall && bIsRollCall) return 1;
+                    
+                    // Aube班をGalaxy班より先に
+                    const aIsAube = a.name.includes('Aube班');
+                    const bIsAube = b.name.includes('Aube班');
+                    const aIsGalaxy = a.name.includes('Galaxy班');
+                    const bIsGalaxy = b.name.includes('Galaxy班');
+                    
+                    if (aIsAube && bIsGalaxy) return -1;
+                    if (aIsGalaxy && bIsAube) return 1;
+                    
+                    return a.name.localeCompare(b.name);
+                  });
 
-                  return businesses.map((business) => {
-                    const businessShifts = shifts.filter(s => s.business_name === business);
+                  return businessGroups.map((businessGroup) => {
+                    const businessShifts = businessGroup.shifts;
+                    const business = businessGroup.name;
                     
                     return (
-                      <div key={business} className="flex border-b border-gray-200 hover:bg-gray-50">
+                      <div key={businessGroup.key} className="flex border-b border-gray-200 hover:bg-gray-50">
                         {/* Business Name Column */}
                         <div className="w-40 p-2 border-r-2 border-gray-300 font-medium flex items-center">
                           {business}
@@ -1656,10 +1802,13 @@ export default function ShiftSchedule() {
                           <div className="absolute inset-0 flex">
                             {timeSlots.map((slot, index) => (
                               <div
-                                key={`${business}-${index}`}
+                                key={`${businessGroup.key}-${index}`}
                                 className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
-                                  // 空セルをクリックした場合の処理
+                                  // 未アサイン業務をクリックした場合、従業員選択ポップアップを表示
+                                  if (businessShifts.length === 0) {
+                                    handleUnassignedBusinessClick(business, businessGroup.key);
+                                  }
                                 }}
                               >
                                 {/* Empty cell */}
@@ -1887,6 +2036,18 @@ export default function ShiftSchedule() {
     }}
     locations={locations}
     currentLocation={selectedLocation}
+  />
+  
+  {/* Assign Employee Dialog */}
+  <AssignEmployeeDialog
+    isOpen={showAssignDialog}
+    onClose={() => {
+      setShowAssignDialog(false);
+      setSelectedBusiness(null);
+    }}
+    businessName={selectedBusiness?.name || ''}
+    availableEmployees={availableEmployees}
+    onAssign={handleAssignEmployee}
   />
 
   {/* Context Menu */}

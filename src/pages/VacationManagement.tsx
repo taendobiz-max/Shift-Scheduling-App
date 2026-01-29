@@ -512,7 +512,7 @@ export default function VacationManagement() {
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="flex-1"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white"
               >
                 {isSubmitting ? (
                   <>
@@ -591,9 +591,8 @@ export default function VacationManagement() {
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
                             onClick={() => handleDelete(vacation)}
-                            className="text-red-600 hover:text-red-700"
+                            className="bg-red-500 hover:bg-red-600 text-white"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
