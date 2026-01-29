@@ -171,43 +171,7 @@ export default function Index() {
             </Card>
           </Link>
 
-          <Link to="/excluded-employees">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-orange-200 hover:border-orange-400">
-              <CardHeader>
-                <CardTitle className="flex items-center text-orange-700">
-                  <UserMinus className="h-6 w-6 mr-2" />
-                  除外従業員管理
-                </CardTitle>
-                <CardDescription>
-                  管理職・別業務メンバーの除外設定
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  管理職や別業務を持つメンバーをシフト自動生成時に除外する設定を管理します。拠点ごとに除外対象を指定できます。
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
 
-          <Link to="/incompatible-pairs">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-purple-200 hover:border-purple-400">
-              <CardHeader>
-                <CardTitle className="flex items-center text-purple-700">
-                  <UserX className="h-6 w-6 mr-2" />
-                  相性ペア管理
-                </CardTitle>
-                <CardDescription>
-                  相性の悪い従業員ペアの登録
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  相性の悪い従業員ペアを登録し、シフト自動生成時に同じ時間帯への配置を避けます。重要度を設定できます。
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
           <Link to="/overtime-registration">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-purple-200 hover:border-purple-400">
               <CardHeader>
