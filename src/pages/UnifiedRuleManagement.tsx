@@ -120,13 +120,13 @@ const UnifiedRuleManagement: React.FC = () => {
 
     // ルールタイプでフィルタリング
     if (selectedRuleType !== 'all') {
-      filtered = filtered.filter(rule => rule.type === selectedRuleType);
+      filtered = filtered.filter(rule => rule.rule_type === selectedRuleType);
     }
 
     // 拠点でフィルタリング
     if (selectedLocations.length > 0) {
       filtered = filtered.filter(rule =>
-        selectedLocations.some(loc => rule.locations.includes(loc))
+        selectedLocations.some(loc => rule.applicable_locations?.includes(loc))
       );
     }
 
@@ -332,25 +332,25 @@ const UnifiedRuleManagement: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {ruleTypeLabels[rule.type]}
+                          {ruleTypeLabels[rule.rule_type]}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {rule.locations.join(', ')}
+                          {rule.applicable_locations?.join(', ') || '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          rule.enforcementLevel === 'mandatory' ? 'bg-red-100 text-red-800' :
-                          rule.enforcementLevel === 'recommended' ? 'bg-yellow-100 text-yellow-800' :
+                          rule.enforcement_level === 'mandatory' ? 'bg-red-100 text-red-800' :
+                          rule.enforcement_level === 'recommended' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {enforcementLabels[rule.enforcementLevel]}
+                          {enforcementLabels[rule.enforcement_level]}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {rule.isActive ? (
+                        {rule.is_active ? (
                           <span className="flex items-center text-green-600">
                             <CheckCircle className="w-4 h-4 mr-1" />
                             有効
@@ -373,10 +373,10 @@ const UnifiedRuleManagement: React.FC = () => {
                           </button>
                           <button
                             onClick={() => handleToggleActive(rule.id)}
-                            className={rule.isActive ? "text-gray-600 hover:text-gray-900" : "text-green-600 hover:text-green-900"}
-                            title={rule.isActive ? "無効化" : "有効化"}
+                            className={rule.is_active ? "text-gray-600 hover:text-gray-900" : "text-green-600 hover:text-green-900"}
+                            title={rule.is_active ? "無効化" : "有効化"}
                           >
-                            {rule.isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                            {rule.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                           </button>
                           <button
                             onClick={() => handleDelete(rule.id)}

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2, Plus } from 'lucide-react';
+import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -19,6 +19,7 @@ import { SwapConfirmDialog } from '@/components/shift-schedule/SwapConfirmDialog
 import { CellPosition } from '@/types/shift';
 import { checkShiftRules, RuleViolation } from '@/utils/ruleChecker';
 import { AddSpotBusinessDialog } from '@/components/AddSpotBusinessDialog';
+import DeleteShiftsModal from '@/components/DeleteShiftsModal';
 
 interface ShiftData {
   id: string;
@@ -236,6 +237,7 @@ export default function ShiftSchedule() {
   const [spotBusinessDate, setSpotBusinessDate] = useState<string>('');
   const [spotBusinessEmployeeId, setSpotBusinessEmployeeId] = useState<string>('');
   const [spotBusinessEmployeeName, setSpotBusinessEmployeeName] = useState<string>('');
+  const [showDeleteShiftsModal, setShowDeleteShiftsModal] = useState(false);
 
 
   const timeSlots = generateTimeSlots();
@@ -1067,6 +1069,10 @@ export default function ShiftSchedule() {
               変更を保存
             </Button>
           )}
+          <Button onClick={() => setShowDeleteShiftsModal(true)} variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+            <Trash2 className="h-4 w-4 mr-2" />
+            シフト削除
+          </Button>
           <Link to="/">
             <Button variant="outline" size="sm">
               <Home className="h-4 w-4 mr-2" />
@@ -1866,6 +1872,21 @@ export default function ShiftSchedule() {
         loadPeriodShifts();
       }
     }}
+  />
+  
+  {/* Delete Shifts Modal */}
+  <DeleteShiftsModal
+    isOpen={showDeleteShiftsModal}
+    onClose={() => setShowDeleteShiftsModal(false)}
+    onSuccess={() => {
+      if (activeTab === 'daily') {
+        loadData();
+      } else {
+        loadPeriodShifts();
+      }
+    }}
+    locations={locations}
+    currentLocation={selectedLocation}
   />
 
   {/* Context Menu */}
