@@ -49,6 +49,8 @@ export const ExcludedEmployeesManagement: React.FC = () => {
   const [excludedEmployees, setExcludedEmployees] = useState<ExcludedEmployee[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<ExcludedEmployee | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [filterLocation, setFilterLocation] = useState<string>('all');
   const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
@@ -173,6 +175,56 @@ export const ExcludedEmployeesManagement: React.FC = () => {
     } catch (error) {
       console.error('Error adding excluded employee:', error);
       toast.error('除外従業員の追加に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (employee: ExcludedEmployee) => {
+    setEditingEmployee(employee);
+    setFormData({
+      employee_id: employee.employee_id,
+      employee_name: employee.employee_name,
+      location: employee.location,
+      reason: employee.reason,
+      can_handle_roll_call: employee.can_handle_roll_call || false
+    });
+    setSelectedLocation(employee.location);
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateExcludedEmployee = async () => {
+    if (!editingEmployee || !formData.location) {
+      toast.error('必要な情報が不足しています');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await ExcludedEmployeesManager.updateExcludedEmployee(editingEmployee.id!, {
+        reason: formData.reason,
+        can_handle_roll_call: formData.can_handle_roll_call
+      });
+
+      if (result.success) {
+        toast.success('除外従業員を更新しました');
+        setShowEditDialog(false);
+        setEditingEmployee(null);
+        setFormData({
+          employee_id: '',
+          employee_name: '',
+          location: '',
+          reason: '管理職・別業務',
+          can_handle_roll_call: false
+        });
+        setSelectedLocation('');
+        await loadExcludedEmployees();
+      } else {
+        toast.error(`更新に失敗しました: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating excluded employee:', error);
+      toast.error('除外従業員の更新に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -325,6 +377,14 @@ export const ExcludedEmployeesManagement: React.FC = () => {
                   </div>
                   <div className="flex gap-2">
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(employee)}
+                      disabled={loading}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDelete(employee.id!, employee.employee_name)}
@@ -413,6 +473,61 @@ export const ExcludedEmployeesManagement: React.FC = () => {
             <Button onClick={handleAddExcludedEmployee} disabled={loading}>
               <CheckCircle className="w-4 h-4 mr-2" />
               追加
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 編集ダイアログ */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>除外従業員を編集</DialogTitle>
+            <DialogDescription>
+              除外理由と点呼対応可否を変更できます
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>拠点</Label>
+              <Input value={formData.location} disabled className="bg-gray-100" />
+            </div>
+            <div>
+              <Label>従業員</Label>
+              <Input value={`${formData.employee_name} (${formData.employee_id})`} disabled className="bg-gray-100" />
+            </div>
+            <div>
+              <Label htmlFor="edit_reason">除外理由</Label>
+              <Input
+                id="edit_reason"
+                value={formData.reason}
+                onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder="管理職・別業務"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit_can_handle_roll_call"
+                checked={formData.can_handle_roll_call}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({ ...prev, can_handle_roll_call: checked as boolean }))
+                }
+              />
+              <Label htmlFor="edit_can_handle_roll_call" className="cursor-pointer">
+                点呼対応可能（除外従業員でも点呼業務にアサインする）
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowEditDialog(false);
+              setEditingEmployee(null);
+            }}>
+              キャンセル
+            </Button>
+            <Button onClick={handleUpdateExcludedEmployee} disabled={loading}>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              更新
             </Button>
           </DialogFooter>
         </DialogContent>
