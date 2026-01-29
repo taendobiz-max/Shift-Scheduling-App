@@ -571,7 +571,7 @@ export default function ShiftSchedule() {
       
       // Load employees
       const { data: employeesData, error: employeesError } = await supabase
-        .from('employees')
+        .from('employee_master')
         .select('employee_id, name, office, "班（東京のみ）"');
       
       if (employeesError) {
@@ -632,6 +632,7 @@ export default function ShiftSchedule() {
             employee_name: employee?.name || shift.employee_id,
             employee_group: employee?.["班（東京のみ）"] || undefined,
             business_name: business?.業務名 || shift.business_name || shift.business_master_id,
+            location: business?.営業所 || undefined,
             start_time: startTime,
             end_time: endTime,
           };
@@ -755,6 +756,7 @@ export default function ShiftSchedule() {
             employee_name: employee?.name || shift.employee_id,
             employee_group: employee?.["班（東京のみ）"] || undefined,
             business_name: business?.業務名 || shift.business_name || shift.business_master_id,
+            location: business?.営業所 || undefined,
             start_time: startTime,
             end_time: endTime,
           };

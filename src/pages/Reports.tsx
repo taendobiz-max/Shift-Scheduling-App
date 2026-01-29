@@ -282,7 +282,7 @@ const Reports: React.FC = () => {
               />
             </div>
             <div className="flex gap-2 items-end">
-              <Button onClick={generateReport} disabled={isLoading}>
+              <Button onClick={generateReport} disabled={isLoading} className="bg-cyan-600 hover:bg-cyan-700 text-white">
                 <TrendingUp className="h-4 w-4 mr-2" />
                 {isLoading ? '生成中...' : 'レポート生成'}
               </Button>
