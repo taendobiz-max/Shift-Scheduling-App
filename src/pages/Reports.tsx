@@ -45,6 +45,7 @@ interface EmployeeReport {
   work_days: number;
   work_hours: number;
   leave_days: number;
+  overtime_hours: number;
   allowance_count: number;
 }
 
@@ -100,6 +101,15 @@ const Reports: React.FC = () => {
 
       if (bmError) throw bmError;
 
+      // Fetch overtime registrations
+      const { data: overtimeData, error: overtimeError } = await supabase
+        .from('manual_overtime')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (overtimeError) throw overtimeError;
+
       // Create business master map
       const businessMap = new Map<string, BusinessMaster>();
       (businessMasters || []).forEach((bm: BusinessMaster) => {
@@ -151,6 +161,12 @@ const Reports: React.FC = () => {
         // Calculate leave days
         const leaveDays = empLeaves.length;
 
+        // Calculate overtime hours from manual_overtime table only
+        const empOvertimes = (overtimeData || []).filter((o: any) => o.employee_id === emp.employee_id);
+        const overtimeHours = empOvertimes.reduce((sum: number, o: any) => {
+          return sum + (parseFloat(o.overtime_hours) || 0);
+        }, 0);
+
         // Calculate allowance count (shifts with allowances)
         const allowanceCount = empShifts.filter((s: ShiftRecord) => {
           const business = businessMap.get(s.business_master_id);
@@ -165,6 +181,7 @@ const Reports: React.FC = () => {
           work_days: workDays,
           work_hours: Math.round(workHours * 10) / 10,
           leave_days: leaveDays,
+          overtime_hours: Math.round(overtimeHours * 10) / 10,
           allowance_count: allowanceCount
         };
       });
@@ -185,7 +202,7 @@ const Reports: React.FC = () => {
       return;
     }
 
-    const headers = ['従業員ID', '従業員名', '拠点', '勤務日数', '勤務時間', '休暇日数', '手当回数'];
+    const headers = ['従業員ID', '従業員名', '拠点', '勤務日数', '勤務時間', '休暇日数', '残業時間', '手当回数'];
     const rows = reports.map(r => [
       r.employee_id,
       r.employee_name,
@@ -193,6 +210,7 @@ const Reports: React.FC = () => {
       r.work_days,
       r.work_hours,
       r.leave_days,
+      r.overtime_hours,
       r.allowance_count
     ]);
 
@@ -355,6 +373,7 @@ const Reports: React.FC = () => {
                     <TableHead className="text-right">勤務日数</TableHead>
                     <TableHead className="text-right">勤務時間</TableHead>
                     <TableHead className="text-right">休暇日数</TableHead>
+                    <TableHead className="text-right">残業時間</TableHead>
                     <TableHead className="text-right">手当回数</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -366,6 +385,7 @@ const Reports: React.FC = () => {
                       <TableCell className="text-right">{report.work_days}日</TableCell>
                       <TableCell className="text-right">{report.work_hours}時間</TableCell>
                       <TableCell className="text-right">{report.leave_days}日</TableCell>
+                      <TableCell className="text-right">{report.overtime_hours}時間</TableCell>
                       <TableCell className="text-right">{report.allowance_count}回</TableCell>
                     </TableRow>
                   ))}

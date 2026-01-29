@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, 
   Edit2, 
@@ -32,6 +33,7 @@ import type { UnifiedRule, RuleType } from '../types/unifiedRule';
 
 const UnifiedRuleManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('rules');
+  const { toast } = useToast();
   const [rules, setRules] = useState<UnifiedRule[]>([]);
   const [filteredRules, setFilteredRules] = useState<UnifiedRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,11 +138,19 @@ const UnifiedRuleManagement: React.FC = () => {
   const handleToggleActive = async (ruleId: string) => {
     try {
       await UnifiedRuleManager.toggleRuleActive(ruleId);
+      toast({
+        title: '成功',
+        description: 'ルールの有効/無効を切り替えました'
+      });
       await loadRules();
       await loadStatistics();
     } catch (error) {
       console.error('ルール有効/無効切り替えエラー:', error);
-      alert('ルールの有効/無効切り替えに失敗しました');
+      toast({
+        title: 'エラー',
+        description: 'ルールの有効/無効切り替えに失敗しました',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -151,18 +161,52 @@ const UnifiedRuleManagement: React.FC = () => {
 
     try {
       await UnifiedRuleManager.deleteRule(ruleId);
+      toast({
+        title: '成功',
+        description: 'ルールを削除しました'
+      });
       await loadRules();
       await loadStatistics();
     } catch (error) {
       console.error('ルール削除エラー:', error);
-      alert('ルールの削除に失敗しました');
+      toast({
+        title: 'エラー',
+        description: 'ルールの削除に失敗しました',
+        variant: 'destructive'
+      });
     }
   };
 
-  const handleSaveRule = async () => {
-    await loadRules();
-    await loadStatistics();
-    setEditingRule(null);
+  const handleSaveRule = async (updatedRule: UnifiedRule) => {
+    try {
+      if (updatedRule.id) {
+        // 既存ルールの更新
+        await UnifiedRuleManager.updateRule(updatedRule.id, updatedRule);
+        toast({
+          title: '成功',
+          description: 'ルールを更新しました'
+        });
+      } else {
+        // 新規ルールの作成
+        await UnifiedRuleManager.createRule(updatedRule);
+        toast({
+          title: '成功',
+          description: 'ルールを作成しました'
+        });
+      }
+      
+      await loadRules();
+      await loadStatistics();
+      setEditingRule(null);
+    } catch (error) {
+      console.error('ルール保存エラー:', error);
+      toast({
+        title: 'エラー',
+        description: 'ルールの保存に失敗しました',
+        variant: 'destructive'
+      });
+      throw error;  // EditRuleModalでエラーハンドリングできるように
+    }
   };
 
   if (loading && activeTab === 'rules') {

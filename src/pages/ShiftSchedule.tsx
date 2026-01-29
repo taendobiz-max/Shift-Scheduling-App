@@ -1051,7 +1051,7 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setShowSpotBusinessDialog(true)} className="bg-blue-500 hover:bg-blue-600 text-white">
+          <Button onClick={() => setShowSpotBusinessDialog(true)} className="bg-cyan-500 hover:bg-cyan-600 text-white">
             <Plus className="h-4 w-4 mr-2" />
             スポット業務登録
           </Button>
@@ -1190,7 +1190,7 @@ export default function ShiftSchedule() {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10">従業員名</th>
+                           <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10 whitespace-nowrap">従業員名</th>
                           {periodEmployeeViewData.dates.map(date => (
                             <th key={date} className="border p-2 text-center min-w-[120px]">{date}</th>
                           ))}
@@ -1201,7 +1201,7 @@ export default function ShiftSchedule() {
                           const employeeSets = periodEmployeeViewData.employeeMultiDaySets.get(employee) || new Map();
                           return (
                             <tr key={employee} className="hover:bg-gray-50">
-                              <td className="border p-2 font-medium sticky left-0 bg-white z-10">{employee}</td>
+                              <td className="border p-2 font-medium sticky left-0 bg-white z-10 whitespace-nowrap">{employee}</td>
                               {periodEmployeeViewData.dates.map((date, dateIdx) => {
                                 let skipCell = false;
                                 employeeSets.forEach((set: any) => {
@@ -1301,7 +1301,7 @@ export default function ShiftSchedule() {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10">業務名</th>
+                           <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10 whitespace-nowrap">業務名</th>
                           {periodBusinessViewData.dates.map(date => (
                             <th key={date} className="border p-2 text-center min-w-[120px]">{date}</th>
                           ))}
@@ -1310,7 +1310,7 @@ export default function ShiftSchedule() {
                       <tbody>
                         {periodBusinessViewData.businesses.map(business => (
                           <tr key={business} className="hover:bg-gray-50">
-                            <td className="border p-2 font-medium sticky left-0 bg-white z-10">{business}</td>
+                            <td className="border p-2 font-medium sticky left-0 bg-white z-10 whitespace-nowrap">{business}</td>
                             {periodBusinessViewData.dates.map(date => {
                               const employees = periodBusinessViewData.shiftMap.get(business)?.get(date) || [];
                               return (
@@ -1482,7 +1482,7 @@ export default function ShiftSchedule() {
               <div className="min-w-[1200px]">
                 {/* Time Header */}
                 <div className="flex border-b-2 border-gray-300 bg-gray-100 sticky top-0 z-10">
-                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center">
+                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center whitespace-nowrap">
                     従業員名
                   </div>
                   <div className="flex-1 relative">
@@ -1611,7 +1611,7 @@ export default function ShiftSchedule() {
               <div className="min-w-[1200px]">
                 {/* Time Header */}
                 <div className="flex border-b-2 border-gray-300 bg-gray-100 sticky top-0 z-10">
-                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center">
+                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center whitespace-nowrap">
                     業務名
                   </div>
                   <div className="flex-1 relative">

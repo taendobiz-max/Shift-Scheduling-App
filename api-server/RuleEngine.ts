@@ -225,6 +225,117 @@ export class RuleEngine {
   }
 
   /**
+   * 夜行バスの排他制御チェック
+   */
+  checkOvernightBusExclusion(
+    employeeId: string,
+    newBusiness: any,
+    currentShifts: Shift[],
+    targetDate: string,
+    allBusinessMasters?: any[]
+  ): RuleEvaluationResult {
+    // ルール設定を取得
+    const rule = this.rules.find(r => 
+      r.rule_config?.constraint_type === 'overnight_bus_exclusion'
+    );
+    
+    if (!rule || !rule.is_active) {
+      return { passed: true, rule_name: '夜行バスの排他制御' };
+    }
+    
+    const config = rule.rule_config;
+    const businessTypes = config.business_types || ['夜行バス（往路）', '夜行バス（復路）'];
+    
+    // 新しい業務が夜行バスかチェック
+    const isNewBusinessOvernight = this.isOvernightBusiness(newBusiness, businessTypes);
+    const businessName = newBusiness.業務名 || newBusiness.name || 'Unknown';
+    
+    // 同じ日の同じ従業員のシフトを取得
+    const employeeShifts = currentShifts.filter(s => 
+      s.employee_id === employeeId && s.shift_date === targetDate
+    );
+    
+    // 新しい業務が夜行バスの場合、既存シフトがあれば不可
+    if (isNewBusinessOvernight && employeeShifts.length > 0) {
+      console.log(`🌙 [OVERNIGHT] ${employeeId} - Cannot assign overnight business: already has ${employeeShifts.length} shift(s) on ${targetDate}`);
+      return {
+        passed: false,
+        rule_name: '夜行バスの排他制御',
+        message: `${employeeId}は${targetDate}に既に${employeeShifts.length}件のシフトがあるため、夜行バス${businessName}を割り当てられません`,
+        details: { 
+          businessName, 
+          existingShiftsCount: employeeShifts.length,
+          reason: '夜行バスは単独で割り当てる必要があります'
+        }
+      };
+    }
+    
+    // 既存シフトに夜行バスがある場合、新しい業務を割り当て不可
+    for (const shift of employeeShifts) {
+      if (this.isOvernightShift(shift, allBusinessMasters, businessTypes)) {
+        const existingName = shift.business_name || shift.business_group || 'Unknown';
+        console.log(`🌙 [OVERNIGHT] ${employeeId} - Cannot assign business: already has overnight shift ${existingName} on ${targetDate}`);
+        return {
+          passed: false,
+          rule_name: '夜行バスの排他制御',
+          message: `${employeeId}は${targetDate}に夜行バス${existingName}が割り当てられているため、${businessName}を割り当てられません`,
+          details: { 
+            businessName, 
+            existingOvernightBus: existingName,
+            reason: '夜行バスの日は他の業務を割り当てられません'
+          }
+        };
+      }
+    }
+    
+    return {
+      passed: true,
+      rule_name: '夜行バスの排他制御'
+    };
+  }
+
+  /**
+   * 業務が夜行バスかチェック
+   */
+  private isOvernightBusiness(
+    business: any, 
+    businessTypes: string[]
+  ): boolean {
+    const businessName = business.業務名 || business.name || '';
+    const businessType = business.業務タイプ || business.business_type || '';
+    
+    // 業務タイプベースの判定
+    if (businessTypes.includes(businessType)) {
+      console.log(`🌙 [OVERNIGHT] Detected overnight business by type: ${businessName} (${businessType})`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * シフトが夜行バスかチェック
+   */
+  private isOvernightShift(
+    shift: Shift,
+    allBusinessMasters: any[] | undefined,
+    businessTypes: string[]
+  ): boolean {
+    // business_masterから業務情報を取得
+    if (allBusinessMasters) {
+      const business = allBusinessMasters.find(b => 
+        (b.業務id === shift.business_master_id || b.id === shift.business_master_id) ||
+        (b.業務名 === shift.business_name || b.name === shift.business_name)
+      );
+      if (business) {
+        return this.isOvernightBusiness(business, businessTypes);
+      }
+    }
+    
+    return false;
+  }
+
+  /**
    * 排他的業務チェック
    */
   checkExclusiveAssignment(
@@ -275,7 +386,8 @@ export class RuleEngine {
     employeeId: string,
     newBusiness: any,
     currentShifts: Shift[],
-    targetDate: string
+    targetDate: string,
+    allBusinessMasters?: any[]
   ): Promise<RuleEvaluationResult[]> {
     const results: RuleEvaluationResult[] = [];
     const businessName = newBusiness.業務名 || newBusiness.name || 'Unknown';
@@ -283,6 +395,9 @@ export class RuleEngine {
     // 休暇チェック（最優先）
     const vacationResult = await this.checkVacation(employeeId, targetDate);
     results.push(vacationResult);
+
+    // 夜行バスの排他制御チェック（高優先度）
+    results.push(this.checkOvernightBusExclusion(employeeId, newBusiness, currentShifts, targetDate, allBusinessMasters));
 
     // 1日の最大労働時間チェック
     results.push(this.checkDailyWorkHours(employeeId, newBusiness, currentShifts, targetDate));
@@ -300,9 +415,10 @@ export class RuleEngine {
     employeeId: string,
     newBusiness: any,
     currentShifts: Shift[],
-    targetDate: string
+    targetDate: string,
+    allBusinessMasters?: any[]
   ): Promise<{ canAssign: boolean; violations: RuleEvaluationResult[] }> {
-    const results = await this.checkAllConstraints(employeeId, newBusiness, currentShifts, targetDate);
+    const results = await this.checkAllConstraints(employeeId, newBusiness, currentShifts, targetDate, allBusinessMasters);
     const violations = results.filter(r => !r.passed);
 
     return {

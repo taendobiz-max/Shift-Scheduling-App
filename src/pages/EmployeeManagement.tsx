@@ -355,7 +355,7 @@ export default function EmployeeManagement() {
           <p className="text-gray-600 mt-2">従業員情報の確認・編集を行います</p>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={() => setIsAddModalOpen(true)} disabled={isLoading}>
+          <Button onClick={() => setIsAddModalOpen(true)} disabled={isLoading} className="bg-cyan-500 hover:bg-cyan-600 text-white">
             <Plus className="w-4 h-4 mr-2" />
             新規登録
           </Button>
@@ -418,14 +418,6 @@ export default function EmployeeManagement() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="従業員名、ID、営業所で検索..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
             <div className="md:w-48">
               <Select value={selectedOffice} onValueChange={setSelectedOffice}>
                 <SelectTrigger>
@@ -439,7 +431,14 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
             </div>
-
+            <div className="flex-1">
+              <Input
+                placeholder="従業員名で検索..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -644,7 +643,7 @@ export default function EmployeeManagement() {
                             disabled={isSaving}
                             title="削除"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>
                         </div>
                       </div>

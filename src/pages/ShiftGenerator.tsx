@@ -12,6 +12,7 @@ import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoa
 import { loadBusinessMasterFromSupabase, BusinessMaster } from '@/utils/businessMasterLoader';
 import { VacationManager } from '@/utils/vacationManager';
 import { ExcludedEmployeesManager } from '@/utils/excludedEmployeesManager';
+import { checkShiftRules } from '@/utils/ruleChecker';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -287,6 +288,7 @@ export default function ShiftGenerator() {
         convertedEmployees
           .map(emp => emp.location)
           .filter(location => location && location.trim() !== '')
+          .filter(location => location !== '本社')
       )];
       
       console.log('📍 Extracted locations:', uniqueLocations);
@@ -586,8 +588,25 @@ export default function ShiftGenerator() {
         let message = `シフト生成が完了しました。期間: ${startDate} ～ ${endDate} (${dateRange.length}日間)\n`;
         message += `✅ アサイン成功: ${totalAssigned}件\n`;
         if (totalUnassigned > 0) {
-          message += `⚠️ アサイン失敗: ${totalUnassigned}件（制約条件または従業員不足）`;
+          message += `⚠️ アサイン失敗: ${totalUnassigned}件（制約条件または従業員不足）\n`;
         }
+        
+        // ルールチェックを実行（特に点呼対応者チェック）
+        try {
+          const ruleCheckResult = await checkShiftRules(allShiftResults, selectedLocation);
+          const rollCallViolations = ruleCheckResult.violations.filter(v => v.type === 'roll_call_missing');
+          
+          if (rollCallViolations.length > 0) {
+            message += `\n⚠️ 点呼対応者未アサイン: ${rollCallViolations.length}日\n`;
+            message += '法令上、点呼対応者は必須です。以下の日付に点呼対応者を追加してください：\n';
+            rollCallViolations.forEach(v => {
+              message += `  - ${v.date}\n`;
+            });
+          }
+        } catch (error) {
+          console.error('ルールチェックエラー:', error);
+        }
+        
         setGenerationResult(message);
         setShowResults(true);
       } else {

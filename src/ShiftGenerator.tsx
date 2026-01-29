@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+// 本社を拠点選択から除外（2026-01-29）
 // import { generateShifts } from '@/utils/shiftGenerator'; // Not used - using API server instead
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 import { loadBusinessMasterFromSupabase, BusinessMaster } from '@/utils/businessMasterLoader';

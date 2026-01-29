@@ -292,6 +292,88 @@ function calculatePairDiversityScore(
   return score;
 }
 
+// Helper function to get shifts for a specific date
+function getEmployeeShiftsForDate(employeeId: string, date: string, shifts: Shift[]): Shift[] {
+  return shifts.filter(s => s.employee_id === employeeId && s.shift_date === date);
+}
+
+// Helper function to get previous date
+function getPreviousDate(date: string): string {
+  const d = new Date(date);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
+// Helper function to get next date
+function getNextDate(date: string): string {
+  const d = new Date(date);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+}
+
+// Helper function to get latest end time from shifts
+function getLatestEndTime(shifts: Shift[]): string {
+  if (shifts.length === 0) return '00:00:00';
+  return shifts.reduce((latest, shift) => {
+    return shift.end_time > latest ? shift.end_time : latest;
+  }, shifts[0].end_time);
+}
+
+// Helper function to get earliest start time from shifts
+function getEarliestStartTime(shifts: Shift[]): string {
+  if (shifts.length === 0) return '23:59:59';
+  return shifts.reduce((earliest, shift) => {
+    return shift.start_time < earliest ? shift.start_time : earliest;
+  }, shifts[0].start_time);
+}
+
+// Helper function to calculate rest hours between two shifts
+function calculateRestHours(date1: string, time1: string, date2: string, time2: string): number {
+  const dt1 = new Date(`${date1}T${time1}`);
+  const dt2 = new Date(`${date2}T${time2}`);
+  return (dt2.getTime() - dt1.getTime()) / (1000 * 60 * 60);
+}
+
+// Helper function to check rest time with previous and next day shifts
+function checkRestTime(employeeId: string, business: any, currentDate: string, allShifts: Shift[]): boolean {
+  const MIN_REST_HOURS = 11;
+  const newStartTime = business.開始時間 || business.start_time || '09:00:00';
+  const newEndTime = business.終了時間 || business.end_time || '17:00:00';
+  const businessName = business.業務名 || business.name || 'Unknown';
+  
+  // Check rest time with previous day's shifts
+  const previousDate = getPreviousDate(currentDate);
+  const previousDayShifts = getEmployeeShiftsForDate(employeeId, previousDate, allShifts);
+  
+  if (previousDayShifts.length > 0) {
+    const latestEndTime = getLatestEndTime(previousDayShifts);
+    const restHours = calculateRestHours(previousDate, latestEndTime, currentDate, newStartTime);
+    
+    if (restHours < MIN_REST_HOURS) {
+      console.log(`⚠️ [REST_TIME] ${employeeId} - Insufficient rest from previous day: ${restHours.toFixed(1)}h < ${MIN_REST_HOURS}h (${previousDate} ${latestEndTime} -> ${currentDate} ${newStartTime} for ${businessName})`);
+      return false;
+    }
+    console.log(`✅ [REST_TIME] ${employeeId} - Sufficient rest from previous day: ${restHours.toFixed(1)}h >= ${MIN_REST_HOURS}h`);
+  }
+  
+  // Check rest time with next day's shifts
+  const nextDate = getNextDate(currentDate);
+  const nextDayShifts = getEmployeeShiftsForDate(employeeId, nextDate, allShifts);
+  
+  if (nextDayShifts.length > 0) {
+    const earliestStartTime = getEarliestStartTime(nextDayShifts);
+    const restHours = calculateRestHours(currentDate, newEndTime, nextDate, earliestStartTime);
+    
+    if (restHours < MIN_REST_HOURS) {
+      console.log(`⚠️ [REST_TIME] ${employeeId} - Insufficient rest to next day: ${restHours.toFixed(1)}h < ${MIN_REST_HOURS}h (${currentDate} ${newEndTime} -> ${nextDate} ${earliestStartTime} for ${businessName})`);
+      return false;
+    }
+    console.log(`✅ [REST_TIME] ${employeeId} - Sufficient rest to next day: ${restHours.toFixed(1)}h >= ${MIN_REST_HOURS}h`);
+  }
+  
+  return true;
+}
+
 // Helper function to check if a business can be assigned to an employee (time-wise)
 function canAssignBusiness(employeeId: string, business: any, currentShifts: Shift[], allBusinessMasters?: any[]): boolean {
   const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
@@ -720,8 +802,11 @@ async function generateShiftsForSingleDate(
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
-        // Check rule engine constraints (daily work hours, exclusive assignments, vacation)
-        const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
+        // Check rest time with previous and next day shifts
+        if (!checkRestTime(empId, business, normalizedTargetDate, shifts)) continue;
+        
+        // Check rule engine constraints (daily work hours, exclusive assignments, vacation, overnight bus exclusion)
+        const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate, businessMasters);
         if (!ruleCheck.canAssign) {
           console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
           ruleCheck.violations.forEach(v => {
@@ -849,6 +934,29 @@ async function generateShiftsForSingleDate(
         }
         
         if (hasTimeConflict) continue;
+        
+        // Check rest time for all businesses in the group
+        let hasRestTimeViolation = false;
+        for (const business of businessGroup) {
+          if (!checkRestTime(empId, business, normalizedTargetDate, shifts)) {
+            hasRestTimeViolation = true;
+            break;
+          }
+        }
+        
+        if (hasRestTimeViolation) continue;
+        
+        // Check rule engine constraints for all businesses in the group (including overnight bus exclusion)
+        let hasRuleViolation = false;
+        for (const business of businessGroup) {
+          const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate, businessMasters);
+          if (!ruleCheck.canAssign) {
+            hasRuleViolation = true;
+            break;
+          }
+        }
+        
+        if (hasRuleViolation) continue;
         
         // Check time conflicts within the business group itself
         if (businessGroup.length > 1) {
@@ -1054,8 +1162,11 @@ async function generateShiftsForSingleDate(
         // Check time conflicts
         if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
         
-        // Check rule engine constraints (daily work hours, exclusive assignments, vacation)
-        const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate);
+        // Check rest time with previous and next day shifts
+        if (!checkRestTime(empId, business, normalizedTargetDate, shifts)) continue;
+        
+        // Check rule engine constraints (daily work hours, exclusive assignments, vacation, overnight bus exclusion)
+        const ruleCheck = await ruleEngine.canAssign(empId, business, shifts as any, normalizedTargetDate, businessMasters);
         if (!ruleCheck.canAssign) {
           console.log(`⛔ [RULE_ENGINE] ${emp.name || empId} cannot be assigned: ${ruleCheck.violations.map(v => v.message).join(', ')}`);
           ruleCheck.violations.forEach(v => {

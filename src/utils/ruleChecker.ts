@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { validateSplitRest, checkMonthlySplitRestLimit } from './splitRestValidator';
 
 export interface RuleViolation {
-  type: 'time_conflict' | 'rest_time' | 'consecutive_days' | 'split_rest' | 'constraint';
+  type: 'time_conflict' | 'rest_time' | 'consecutive_days' | 'split_rest' | 'constraint' | 'roll_call_missing';
   severity: 'error' | 'warning';
   date: string;
   employeeName: string;
@@ -45,7 +45,11 @@ export async function checkShiftRules(
   const splitRestViolations = await checkSplitRest(shifts);
   violations.push(...splitRestViolations);
   
-  // 5. 制約エンジンによるチェック (統合シフトルール管理に移行済み)
+  // 5. 点呼対応者チェック
+  const rollCallViolations = await checkRollCallAssignment(shifts);
+  violations.push(...rollCallViolations);
+  
+  // 6. 制約エンジンによるチェック (統合シフトルール管理に移行済み)
   // const constraintViolations = await checkConstraints(shifts, location);
   // violations.push(...constraintViolations);
   
@@ -388,3 +392,54 @@ async function checkSplitRest(shifts: any[]): Promise<RuleViolation[]> {
 //   const violations: RuleViolation[] = [];
 //   return violations;
 // }
+
+/**
+ * 点呼対応者チェック
+ * 各日に点呼業務（roll_call=true）が割り当てられているかを確認
+ */
+async function checkRollCallAssignment(shifts: any[]): Promise<RuleViolation[]> {
+  const violations: RuleViolation[] = [];
+  
+  console.log('📞 [ROLL_CALL_CHECK] Starting roll call assignment check');
+  
+  // 日付ごとにシフトをグループ化
+  const shiftsByDate = new Map<string, any[]>();
+  for (const shift of shifts) {
+    const date = shift.date || shift.日付;
+    if (!date) continue;
+    
+    if (!shiftsByDate.has(date)) {
+      shiftsByDate.set(date, []);
+    }
+    shiftsByDate.get(date)!.push(shift);
+  }
+  
+  // 各日付で点呼業務がアサインされているかチェック
+  for (const [date, dayShifts] of shiftsByDate.entries()) {
+    const hasRollCall = dayShifts.some(shift => {
+      const businessId = shift.business_id || shift.業務id;
+      return shift.roll_call === true || shift.点呼 === true;
+    });
+    
+    if (!hasRollCall) {
+      // 点呼業務がアサインされていない場合、エラーとして記録
+      violations.push({
+        type: 'roll_call_missing',
+        severity: 'error',
+        date: date,
+        employeeName: '（未アサイン）',
+        employeeId: '',
+        description: '点呼対応者未アサイン',
+        details: `${date}に点呼対応者が割り当てられていません。法令上、点呼対応者は必須です。`
+      });
+      
+      console.log(`❌ [ROLL_CALL_CHECK] Missing roll call assignment on ${date}`);
+    } else {
+      console.log(`✅ [ROLL_CALL_CHECK] Roll call assigned on ${date}`);
+    }
+  }
+  
+  console.log(`📞 [ROLL_CALL_CHECK] Check completed: ${violations.length} violations found`);
+  
+  return violations;
+}
