@@ -1614,7 +1614,7 @@ export default function ShiftGenerator() {
                 <SelectValue placeholder="拠点を選択してください" />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((location) => (
+                {locations.filter(location => location !== '本社').map((location) => (
                   <SelectItem key={location} value={location}>
                     {location}
                   </SelectItem>
