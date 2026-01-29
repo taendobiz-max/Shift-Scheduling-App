@@ -467,42 +467,7 @@ export default function MasterDataManagement() {
     setIsBusinessMasterEditing(false);
   };
 
-  // Enhanced Constraints functions
-
-
-
-
-
-
   // Helper functions
-
-  const getEnforcementLevelInfo = (level: string) => {
-    const found = ENFORCEMENT_LEVELS.find(el => el.value === level);
-    return found || { value: level, label: level, description: '', color: 'text-gray-600' };
-  };
-
-
-  const getPriorityLevelColor = (level: number) => {
-    if (level === 0) return 'text-red-600 bg-red-50';
-    if (level <= 20) return 'text-orange-600 bg-orange-50';
-    if (level <= 50) return 'text-blue-600 bg-blue-50';
-    return 'text-gray-600 bg-gray-50';
-  };
-
-  // Handle location checkbox changes
-  const handleLocationChange = (location: string, checked: boolean) => {
-    if (checked) {
-      setConstraintForm(prev => ({
-        ...prev,
-        applicable_locations: [...prev.applicable_locations, location]
-      }));
-    } else {
-      setConstraintForm(prev => ({
-        ...prev,
-        applicable_locations: prev.applicable_locations.filter(loc => loc !== location)
-      }));
-    }
-  };
 
   // Group business masters by business group for hierarchical display
   const getGroupedBusinessMasters = () => {
@@ -522,7 +487,7 @@ export default function MasterDataManagement() {
     }));
   };
 
-  const isLoading = isBusinessGroupLoading || isBusinessMasterLoading || isConstraintLoading;
+  const isLoading = isBusinessGroupLoading || isBusinessMasterLoading;
 
   if (isLoading) {
     return (
@@ -612,7 +577,7 @@ export default function MasterDataManagement() {
         </Card>
       </div>
 
-      {/* Tabs for Business Groups, Business Masters and Enhanced Constraints */}
+      {/* Tabs for Business Groups, Business Masters and Spot Business */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center gap-4 mb-6">
           <TabsList className="grid grid-cols-3 flex-1 max-w-5xl">
@@ -798,14 +763,12 @@ export default function MasterDataManagement() {
           </Card>
         </TabsContent>
 
-        {/* Enhanced Constraints Tab */}
-
         {/* Spot Business Master Tab */}
         <TabsContent value="spot-business" className="space-y-6">
           <SpotBusinessMasterManagement />
         </TabsContent>
 
-        {/* Constraint Groups Tab */}
+
       </Tabs>
 
       {/* Business Group Modal */}
