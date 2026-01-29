@@ -151,7 +151,7 @@ const DeleteShiftsModal: React.FC<DeleteShiftsModalProps> = ({
                   disabled={isChecking}
                 >
                   <option value="">選択してください</option>
-                  {locations.map(location => (
+                  {locations.filter(location => location !== '本社').map(location => (
                     <option key={location} value={location}>
                       {location}
                     </option>
@@ -195,7 +195,7 @@ const DeleteShiftsModal: React.FC<DeleteShiftsModalProps> = ({
                     <p className="font-medium mb-1">注意事項</p>
                     <ul className="list-disc list-inside space-y-1">
                       <li>削除されたシフトは復元できません</li>
-                      <li>削除前に必ずバックアップを取得してください</li>
+                      <li>削除して問題が無いかよく確認してください</li>
                     </ul>
                   </div>
                 </div>
@@ -235,10 +235,10 @@ const DeleteShiftsModal: React.FC<DeleteShiftsModalProps> = ({
               </button>
               <button
                 onClick={checkShiftCount}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-white text-red-600 border-2 border-red-600 rounded-md hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isChecking || !selectedLocation || !fromDate || !toDate}
               >
-                {isChecking ? '確認中...' : '削除ボタン'}
+                {isChecking ? '確認中...' : '削除'}
               </button>
             </>
           ) : (
