@@ -161,22 +161,26 @@ export default function MobileShiftView() {
           setShifts(formattedShifts);
         }
 
-        // 残業時間を取得（当月）
+        // 残業時間をmanual_overtimeテーブルから取得（当月）
         const date = parse(selectedDate, 'yyyy-MM-dd', new Date());
         const monthStart = format(new Date(date.getFullYear(), date.getMonth(), 1), 'yyyy-MM-dd');
         const monthEnd = format(new Date(date.getFullYear(), date.getMonth() + 1, 0), 'yyyy-MM-dd');
         
         const { data: overtimeData } = await supabase
-          .from('shifts')
-          .select('*')
+          .from('manual_overtime')
+          .select('overtime_hours')
           .eq('employee_id', selectedEmployee)
           .gte('date', monthStart)
           .lte('date', monthEnd);
 
         if (overtimeData) {
-          // 残業時間の計算ロジック（仮実装）
-          const totalOvertime = overtimeData.length * 2; // 仮の計算
+          // manual_overtimeテーブルから残業時間を合計
+          const totalOvertime = overtimeData.reduce((sum: number, record: any) => {
+            return sum + (parseFloat(record.overtime_hours) || 0);
+          }, 0);
           setOvertime(totalOvertime);
+        } else {
+          setOvertime(0);
         }
 
         // 手当回数を取得（当月）
