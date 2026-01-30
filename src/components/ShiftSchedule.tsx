@@ -49,7 +49,6 @@ interface EmployeeData {
   employee_id: string;
   name: string;
   office?: string;
-  team?: string;
 }
 
 interface BusinessMaster {
@@ -341,7 +340,7 @@ export default function ShiftSchedule() {
       // Load employees
       const { data: employeesData, error: employeesError } = await supabase
         .from('employees')
-        .select('employee_id, name, office, team');
+        .select('employee_id, name, office');
       
       if (employeesError) {
         console.error('❌ Error loading employees:', employeesError);
@@ -1391,26 +1390,6 @@ export default function ShiftSchedule() {
                   .map((businessName) => {
                     const businessShifts = shifts.filter(s => s.business_name === businessName);
                     
-                    // 東京営業所の夜行バス業務（往路/復路）の場合、班でグループ化してソート
-                    let sortedShifts = businessShifts;
-                    if (selectedLocation === '東京' && (businessName.includes('往路') || businessName.includes('復路'))) {
-                      sortedShifts = [...businessShifts].sort((a, b) => {
-                        const aEmployee = allEmployees.find(e => e.employee_id === a.employee_id);
-                        const bEmployee = allEmployees.find(e => e.employee_id === b.employee_id);
-                        const aTeam = aEmployee?.team || 'その他';
-                        const bTeam = bEmployee?.team || 'その他';
-                        
-                        // 班の優先順位: Aube → Galaxy → その他
-                        const teamOrder = { 'Aube': 1, 'Galaxy': 2, 'その他': 3 };
-                        const aOrder = teamOrder[aTeam] || 3;
-                        const bOrder = teamOrder[bTeam] || 3;
-                        
-                        if (aOrder !== bOrder) return aOrder - bOrder;
-                        // 同じ班内では従業員名でソート
-                        return (a.employee_name || '').localeCompare(b.employee_name || '');
-                      });
-                    }
-                    
                     return (
                       <div key={businessName} className="flex border-b border-gray-200 hover:bg-gray-50">
                         {/* Business Name Column */}
@@ -1434,7 +1413,7 @@ export default function ShiftSchedule() {
                           </div>
                           
                           {/* Shift Bars */}
-                          {sortedShifts.map((shift) => {
+                          {businessShifts.map((shift) => {
                             const barStyle = getTimeBarStyle(
                               shift.start_time || '09:00:00',
                               shift.end_time || '17:00:00'
