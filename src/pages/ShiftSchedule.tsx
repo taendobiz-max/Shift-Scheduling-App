@@ -46,7 +46,6 @@ interface EmployeeData {
   employee_id: string;
   name: string;
   office?: string;
-  team?: string; // 従業員の班情報
 }
 
 interface BusinessMaster {
@@ -572,7 +571,7 @@ export default function ShiftSchedule() {
       // Load employees
       const { data: employeesData, error: employeesError } = await supabase
         .from('employees')
-        .select('employee_id, name, office, team');
+        .select('employee_id, name, office');
       
       if (employeesError) {
         console.error('❌ Error loading employees:', employeesError);
@@ -630,7 +629,7 @@ export default function ShiftSchedule() {
           return {
             ...shift,
             employee_name: employee?.name || shift.employee_id,
-            employee_group: employee?.[team] || undefined,
+            employee_group: undefined,
             business_name: business?.業務名 || shift.business_name || shift.business_master_id,
             location: business?.営業所 || undefined,
             start_time: startTime,
@@ -754,7 +753,7 @@ export default function ShiftSchedule() {
           return {
             ...shift,
             employee_name: employee?.name || shift.employee_id,
-            employee_group: employee?.[team] || undefined,
+            employee_group: undefined,
             business_name: business?.業務名 || shift.business_name || shift.business_master_id,
             location: business?.営業所 || undefined,
             start_time: startTime,

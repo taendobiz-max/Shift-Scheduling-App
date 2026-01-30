@@ -22,7 +22,6 @@ export interface Employee {
   monthlyHourLimit?: number;
   specialNotes?: string;
   isActive?: boolean;
-  team?: string; // 班情報
 }
 
 export interface ShiftType {
