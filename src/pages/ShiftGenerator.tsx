@@ -1654,7 +1654,7 @@ export default function ShiftGenerator() {
           <Button 
             onClick={handleGenerateShifts} 
             disabled={isGenerating || !selectedLocation || !startDate || !endDate}
-            className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
+            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
           >
             {isGenerating ? (
               <>

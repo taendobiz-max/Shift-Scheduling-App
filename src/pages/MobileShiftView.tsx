@@ -183,17 +183,39 @@ export default function MobileShiftView() {
           setOvertime(0);
         }
 
-        // 手当回数を取得（当月）
-        const { data: allowanceData } = await supabase
-          .from('allowances')
-          .select('allowance_type, count')
+        // 手当回数を計算（当月のシフトから）
+        const { data: businessMasters } = await supabase
+          .from('business_master')
+          .select('業務id, 業務名, 早朝手当, 深夜手当');
+        
+        const businessMap = new Map((businessMasters || []).map(b => [b.業務id, b]));
+        
+        const { data: monthShifts } = await supabase
+          .from('shifts')
+          .select('business_master_id')
           .eq('employee_id', selectedEmployee)
-          .gte('month', monthStart)
-          .lte('month', monthEnd);
-
-        if (allowanceData) {
-          setAllowances(allowanceData);
-        }
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+        
+        const allowanceTypes: {[key: string]: number} = {};
+        (monthShifts || []).forEach((shift: any) => {
+          const business = businessMap.get(shift.business_master_id);
+          if (business) {
+            if (business.早朝手当 === 'true') {
+              allowanceTypes['早朝手当'] = (allowanceTypes['早朝手当'] || 0) + 1;
+            }
+            if (business.深夜手当 === 'true') {
+              allowanceTypes['深夜手当'] = (allowanceTypes['深夜手当'] || 0) + 1;
+            }
+          }
+        });
+        
+        const allowanceData = Object.entries(allowanceTypes).map(([type, count]) => ({
+          allowance_type: type,
+          count: count
+        }));
+        
+        setAllowances(allowanceData);
       } catch (error) {
         console.error('Error fetching shift data:', error);
       } finally {

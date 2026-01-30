@@ -618,7 +618,7 @@ export default function MasterDataManagement() {
                   <CardTitle>業務グループ一覧</CardTitle>
                   <CardDescription>登録されている業務グループの一覧</CardDescription>
                 </div>
-                <Button onClick={handleBusinessGroupAdd} className="bg-cyan-500 hover:bg-cyan-600 text-white">
+                <Button onClick={handleBusinessGroupAdd} className="bg-cyan-600 hover:bg-cyan-700 text-white">
                   <Plus className="h-4 w-4 mr-2" />
                   新規作成
                 </Button>
@@ -686,7 +686,7 @@ export default function MasterDataManagement() {
                     }
                   </CardDescription>
                 </div>
-                <Button onClick={handleBusinessMasterAdd} className="bg-cyan-500 hover:bg-cyan-600 text-white">
+                <Button onClick={handleBusinessMasterAdd} className="bg-cyan-600 hover:bg-cyan-700 text-white">
                   <Plus className="h-4 w-4 mr-2" />
                   新規作成
                 </Button>

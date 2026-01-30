@@ -252,7 +252,7 @@ export default function OvertimeRegistration() {
             <Button 
               onClick={handleSaveOvertime} 
               disabled={isLoading || !selectedOffice || !selectedEmployee}
-              className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
+              className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
             >
               <Save className="mr-2 h-4 w-4" />
               {isLoading ? '保存中...' : existingData ? '更新' : '登録'}

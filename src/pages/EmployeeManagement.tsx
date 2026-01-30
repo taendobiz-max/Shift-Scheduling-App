@@ -355,7 +355,7 @@ export default function EmployeeManagement() {
           <p className="text-gray-600 mt-2">従業員情報の確認・編集を行います</p>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={() => setIsAddModalOpen(true)} disabled={isLoading} className="bg-cyan-500 hover:bg-cyan-600 text-white">
+          <Button onClick={() => setIsAddModalOpen(true)} disabled={isLoading} className="bg-cyan-600 hover:bg-cyan-700 text-white">
             <Plus className="w-4 h-4 mr-2" />
             新規登録
           </Button>

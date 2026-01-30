@@ -512,7 +512,7 @@ export default function VacationManagement() {
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white"
+                className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white"
               >
                 {isSubmitting ? (
                   <>
