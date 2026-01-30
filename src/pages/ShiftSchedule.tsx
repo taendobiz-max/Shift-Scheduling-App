@@ -1290,7 +1290,10 @@ export default function ShiftSchedule() {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="bg-gray-100">
-                           <th className="border p-2 text-left sticky left-0 bg-gray-100 z-10 whitespace-nowrap">従業員名</th>
+                          {selectedLocation === '東京' && (
+                            <th className="border p-2 text-left sticky left-0 bg-gray-100 z-20 whitespace-nowrap">班</th>
+                          )}
+                          <th className={`border p-2 text-left bg-gray-100 z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>従業員名</th>
                           {periodEmployeeViewData.dates.map(date => (
                             <th key={date} className="border p-2 text-center min-w-[120px]">{date}</th>
                           ))}
@@ -1299,9 +1302,14 @@ export default function ShiftSchedule() {
                       <tbody>
                         {periodEmployeeViewData.employees.map(employee => {
                           const employeeSets = periodEmployeeViewData.employeeMultiDaySets.get(employee) || new Map();
+                          const employeeData = allEmployees.find(e => e.name === employee);
+                          const team = employeeData?.team || '無し';
                           return (
                             <tr key={employee} className="hover:bg-gray-50">
-                              <td className="border p-2 font-medium sticky left-0 bg-white z-10 whitespace-nowrap">{employee}</td>
+                              {selectedLocation === '東京' && (
+                                <td className="border p-2 sticky left-0 bg-white z-20 whitespace-nowrap text-center">{team}</td>
+                              )}
+                              <td className={`border p-2 font-medium bg-white z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>{employee}</td>
                               {periodEmployeeViewData.dates.map((date, dateIdx) => {
                                 let skipCell = false;
                                 employeeSets.forEach((set: any) => {
