@@ -1152,7 +1152,7 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setShowSpotBusinessDialog(true)} className="bg-cyan-500 hover:bg-cyan-600 text-white">
+          <Button onClick={() => setShowSpotBusinessDialog(true)} className="bg-cyan-600 hover:bg-cyan-700 text-white">
             <Plus className="h-4 w-4 mr-2" />
             スポット業務登録
           </Button>

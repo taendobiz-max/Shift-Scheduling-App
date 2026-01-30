@@ -310,7 +310,7 @@ const UnifiedRuleManagement: React.FC = () => {
               {/* 新規作成ボタン */}
               <button
                 onClick={() => setEditingRule({} as UnifiedRule)}
-                className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
                 <span>新規作成</span>
