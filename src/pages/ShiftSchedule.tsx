@@ -571,7 +571,7 @@ export default function ShiftSchedule() {
       // Load employees
       const { data: employeesData, error: employeesError } = await supabase
         .from('employees')
-        .select('employee_id, name, office');
+        .select('employee_id, name, office, team, display_order');
       
       if (employeesError) {
         console.error('❌ Error loading employees:', employeesError);
@@ -1335,8 +1335,8 @@ export default function ShiftSchedule() {
                                   <td 
                                     key={date} 
                                     colSpan={colspan} 
-                                    className={`border p-2 text-center cursor-pointer hover:bg-blue-50 transition-colors ${
-                                      multiDayBusiness ? 'bg-purple-50' : ''
+                                    className={`border p-2 text-center cursor-pointer hover:bg-purple-50 transition-colors ${
+                                      multiDayBusiness ? 'bg-purple-100' : ''
                                     }`}
                                     onClick={() => {
                                       const employeeShift = periodShifts.find(s => s.employee_name === employee);
@@ -1364,7 +1364,7 @@ export default function ShiftSchedule() {
                                             <div 
                                               key={idx} 
                                               className={`text-xs rounded px-1 py-0.5 cursor-pointer hover:opacity-80 ${
-                                                shift?.is_spot_business ? 'bg-cyan-400' : 'bg-blue-100'
+                                                shift?.is_spot_business ? 'bg-cyan-400' : 'bg-purple-200'
                                               } ${
                                                 shift && selectedShiftIds.has(shift.id) ? 'ring-2 ring-orange-500' : ''
                                               }`}
