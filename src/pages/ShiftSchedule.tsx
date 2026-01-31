@@ -1308,8 +1308,8 @@ export default function ShiftSchedule() {
                             <tr key={employee} className="hover:bg-gray-50">
                               {selectedLocation === '東京' && (
                                 <td className={`border p-2 sticky left-0 bg-white z-20 whitespace-nowrap text-center ${
-                                  team === 'Galaxy' ? 'text-purple-700 font-bold' : 
-                                  team === 'Aube' ? 'text-blue-700 font-bold' : ''
+                                  team === 'Galaxy' ? 'text-purple-900 font-bold' : 
+                                  team === 'Aube' ? 'text-blue-900 font-bold' : ''
                                 }`}>{team}</td>
                               )}
                               <td className={`border p-2 font-medium bg-white z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>{employee}</td>
@@ -1363,19 +1363,19 @@ export default function ShiftSchedule() {
                                             s.date === date && 
                                             s.business_name === business.name
                                           );
-                                          // 夜行バス業務かどうかを判定
-                                          const isOvernightBus = business.name.includes('往路') || business.name.includes('復路');
-                                          // 背景色を決定
-                                          let bgColor = 'bg-blue-200'; // デフォルトは青（夜行バス以外）
-                                          if (shift?.is_spot_business) {
-                                            bgColor = 'bg-cyan-400'; // スポット業務はシアン
-                                          } else if (isOvernightBus && team === 'Aube') {
-                                            bgColor = 'bg-blue-100'; // Aube班の夜行バスは薄い青
-                                          } else if (isOvernightBus && team === 'Galaxy') {
-                                            bgColor = 'bg-purple-100'; // Galaxy班の夜行バスは薄い紫
-                                          } else if (isOvernightBus) {
-                                            bgColor = 'bg-purple-100'; // その他の夜行バスは薄い紫
-                                          }
+                          // 夜行バス業務かどうかを判定
+                          const isOvernightBus = business.name.includes('往路') || business.name.includes('復路');
+                          // 背景色を決定
+                          let bgColor = 'bg-blue-200'; // デフォルトは青（夜行バス以外）
+                          if (shift?.is_spot_business) {
+                            bgColor = 'bg-cyan-400'; // スポット業務はシアン
+                          } else if (isOvernightBus && team === 'Aube') {
+                            bgColor = 'bg-blue-100'; // Aube班の夜行バスは薄い青
+                          } else if (isOvernightBus && team === 'Galaxy') {
+                            bgColor = 'bg-purple-100'; // Galaxy班の夜行バスは薄い紫
+                          } else if (isOvernightBus) {
+                            bgColor = 'bg-white'; // 班未設定の夜行バスは白背景
+                          }
                                           return (
                                             <div 
                                               key={idx} 
