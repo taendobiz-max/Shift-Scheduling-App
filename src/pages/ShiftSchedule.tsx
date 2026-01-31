@@ -1308,8 +1308,8 @@ export default function ShiftSchedule() {
                             <tr key={employee} className="hover:bg-gray-50">
                               {selectedLocation === '東京' && (
                                 <td className={`border p-2 sticky left-0 bg-white z-20 whitespace-nowrap text-center ${
-                                  team === 'Galaxy' ? 'text-purple-600 font-semibold' : 
-                                  team === 'Aube' ? 'text-blue-600 font-semibold' : ''
+                                  team === 'Galaxy' ? 'text-purple-700 font-bold' : 
+                                  team === 'Aube' ? 'text-blue-700 font-bold' : ''
                                 }`}>{team}</td>
                               )}
                               <td className={`border p-2 font-medium bg-white z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>{employee}</td>
@@ -1370,9 +1370,11 @@ export default function ShiftSchedule() {
                                           if (shift?.is_spot_business) {
                                             bgColor = 'bg-cyan-400'; // スポット業務はシアン
                                           } else if (isOvernightBus && team === 'Aube') {
-                                            bgColor = 'bg-blue-200'; // Aube班の夜行バスは青
+                                            bgColor = 'bg-blue-100'; // Aube班の夜行バスは薄い青
+                                          } else if (isOvernightBus && team === 'Galaxy') {
+                                            bgColor = 'bg-purple-100'; // Galaxy班の夜行バスは薄い紫
                                           } else if (isOvernightBus) {
-                                            bgColor = 'bg-purple-200'; // その他の夜行バスは紫
+                                            bgColor = 'bg-purple-100'; // その他の夜行バスは薄い紫
                                           }
                                           return (
                                             <div 
