@@ -1307,7 +1307,10 @@ export default function ShiftSchedule() {
                           return (
                             <tr key={employee} className="hover:bg-gray-50">
                               {selectedLocation === '東京' && (
-                                <td className="border p-2 sticky left-0 bg-white z-20 whitespace-nowrap text-center">{team}</td>
+                                <td className={`border p-2 sticky left-0 bg-white z-20 whitespace-nowrap text-center ${
+                                  team === 'Galaxy' ? 'text-purple-600 font-semibold' : 
+                                  team === 'Aube' ? 'text-blue-600 font-semibold' : ''
+                                }`}>{team}</td>
                               )}
                               <td className={`border p-2 font-medium bg-white z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>{employee}</td>
                               {periodEmployeeViewData.dates.map((date, dateIdx) => {
@@ -1360,12 +1363,21 @@ export default function ShiftSchedule() {
                                             s.date === date && 
                                             s.business_name === business.name
                                           );
+                                          // 夜行バス業務かどうかを判定
+                                          const isOvernightBus = business.name.includes('往路') || business.name.includes('復路');
+                                          // 背景色を決定
+                                          let bgColor = 'bg-blue-200'; // デフォルトは青（夜行バス以外）
+                                          if (shift?.is_spot_business) {
+                                            bgColor = 'bg-cyan-400'; // スポット業務はシアン
+                                          } else if (isOvernightBus && team === 'Aube') {
+                                            bgColor = 'bg-blue-200'; // Aube班の夜行バスは青
+                                          } else if (isOvernightBus) {
+                                            bgColor = 'bg-purple-200'; // その他の夜行バスは紫
+                                          }
                                           return (
                                             <div 
                                               key={idx} 
-                                              className={`text-xs rounded px-1 py-0.5 cursor-pointer hover:opacity-80 ${
-                                                shift?.is_spot_business ? 'bg-cyan-400' : 'bg-purple-200'
-                                              } ${
+                                              className={`text-xs rounded px-1 py-0.5 cursor-pointer hover:opacity-80 ${bgColor} ${
                                                 shift && selectedShiftIds.has(shift.id) ? 'ring-2 ring-orange-500' : ''
                                               }`}
                                               onClick={(e) => {
