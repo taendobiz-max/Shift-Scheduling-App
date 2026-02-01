@@ -54,6 +54,7 @@ interface BusinessMaster {
   開始時間?: string;
   終了時間?: string;
   業務グループ?: string;
+  業務タイプ?: string;
 }
 
 interface TimeSlot {
@@ -1363,8 +1364,9 @@ export default function ShiftSchedule() {
                                             s.date === date && 
                                             s.business_name === business.name
                                           );
-                          // 夜行バス業務かどうかを判定
-                          const isOvernightBus = business.name.includes('往路') || business.name.includes('復路');
+                          // 夜行バス業務かどうかを判定（業務マスタの業務タイプで判定）
+                          const businessMaster = businessMasters.find(bm => bm.業務名 === business.name);
+                          const isOvernightBus = businessMaster?.業務タイプ === '夜行バス（往路）' || businessMaster?.業務タイプ === '夜行バス（復路）';
                           // 背景色を決定
                           let bgColor = 'bg-blue-200'; // デフォルトは青（夜行バス以外）
                           if (shift?.is_spot_business) {
