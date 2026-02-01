@@ -261,9 +261,11 @@ export default function ShiftSchedule() {
     }
     
     try {
-      // すべての日付を表示
-      const dates = [...new Set(periodShifts.map(s => s.date))].sort();
-      console.log('🔍 [DEBUG] All dates:', dates);
+      // 期間内の日付のみを表示
+      const dates = [...new Set(periodShifts.map(s => s.date))]
+        .filter(date => date >= periodStartDate && date <= periodEndDate)
+        .sort();
+      console.log('🔍 [DEBUG] Filtered dates:', dates);
       
       // 対象日付のシフトのみを処理
       const limitedShifts = periodShifts.filter(s => dates.includes(s.date));
@@ -363,7 +365,10 @@ export default function ShiftSchedule() {
     if (periodViewMode !== 'business' || periodShifts.length === 0) return null;
     
     try {
-      const dates = [...new Set(periodShifts.map(s => s.date))].sort();
+      // 期間内の日付のみを表示
+      const dates = [...new Set(periodShifts.map(s => s.date))]
+        .filter(date => date >= periodStartDate && date <= periodEndDate)
+        .sort();
       const businesses = [...new Set(periodShifts.map(s => s.business_name))]
         .sort((a, b) => {
           // 点呼業務を一番上に表示
