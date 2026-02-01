@@ -274,8 +274,11 @@ export default function ShiftSchedule() {
         .map(name => {
           const shift = limitedShifts.find(s => s.employee_name === name);
           const employee = allEmployees.find(e => e.employee_id === shift?.employee_id);
-          return { name, display_order: employee?.display_order || 9999 };
+          // employeesテーブルに存在しない従業員は除外
+          if (!employee) return null;
+          return { name, display_order: employee.display_order || 9999 };
         })
+        .filter(e => e !== null) // nullを除外
         .sort((a, b) => a.display_order - b.display_order)
         .map(e => e.name);
       console.log('🔍 [DEBUG] Limited employees:', employees);
@@ -373,6 +376,10 @@ export default function ShiftSchedule() {
       
       const shiftMap = new Map();
       periodShifts.forEach(shift => {
+        // employeesテーブルに存在しない従業員のシフトは除外
+        const employee = allEmployees.find(e => e.employee_id === shift.employee_id);
+        if (!employee) return;
+        
         if (!shiftMap.has(shift.business_name)) {
           shiftMap.set(shift.business_name, new Map());
         }
