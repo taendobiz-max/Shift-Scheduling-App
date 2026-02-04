@@ -307,6 +307,44 @@ export default function ShiftSchedule() {
         }
       });
       
+      // 複数日業務セットの開始日を期間内に調整
+      console.log('🔍 [DEBUG] Adjusting multiDaySets to period range');
+      console.log('🔍 [DEBUG] dates:', dates);
+      console.log('🔍 [DEBUG] multiDaySets before adjustment:', Array.from(multiDaySets.values()));
+      
+      multiDaySets.forEach(set => {
+        console.log('🔍 [DEBUG] Processing set:', {
+          employeeName: set.employeeName,
+          startDate: set.startDate,
+          totalDays: set.totalDays,
+          businessName: set.businessName
+        });
+        console.log('🔍 [DEBUG] dates.includes(set.startDate):', dates.includes(set.startDate));
+        // 開始日が期間外の場合、期間の最初の日付に調整
+        if (!dates.includes(set.startDate)) {
+          console.log('🔍 [DEBUG] startDate not in dates:', set.startDate);
+          const periodStartIdx = dates.findIndex((d: string) => d > set.startDate);
+          if (periodStartIdx !== -1) {
+            console.log('🔍 [DEBUG] Adjusting startDate from', set.startDate, 'to', dates[periodStartIdx]);
+            set.startDate = dates[periodStartIdx];
+          } else if (dates.length > 0) {
+            console.log('🔍 [DEBUG] Adjusting startDate from', set.startDate, 'to', dates[0]);
+            set.startDate = dates[0];
+          }
+        }
+        // totalDaysを期間内の日数に制限
+        const startIdx = dates.indexOf(set.startDate);
+        if (startIdx !== -1) {
+          const remainingDays = dates.length - startIdx;
+          if (set.totalDays > remainingDays) {
+            console.log('🔍 [DEBUG] Adjusting totalDays from', set.totalDays, 'to', remainingDays);
+            set.totalDays = remainingDays;
+          }
+        }
+      });
+      
+      console.log('🔍 [DEBUG] multiDaySets after adjustment:', Array.from(multiDaySets.values()));
+      
       // 従業員ごとの複数日業務セットマップ
       const employeeMultiDaySets = new Map<string, Map<string, any>>();
       multiDaySets.forEach(set => {
@@ -318,8 +356,17 @@ export default function ShiftSchedule() {
       
       // 通常のシフトマップ（制限されたシフトのみ）
       const shiftMap = new Map();
-      limitedShifts.forEach(shift => {
-        if (shift.multi_day_set_id && shift.multi_day_info && shift.multi_day_info.day > 1) {
+      limitedShifts.forEach((shift) => {
+        if (!shift.employee_name) {
+          return;
+        }
+        // 期間外のシフトをスキップ
+        if (!dates.includes(shift.date)) {
+          console.log('🚫 [DEBUG] Skipping shift outside period:', {
+            employeeName: shift.employee_name,
+            businessName: shift.business_name,
+            date: shift.date
+          });
           return;
         }
         if (!shiftMap.has(shift.employee_name)) {
@@ -333,10 +380,23 @@ export default function ShiftSchedule() {
           const set = multiDaySets.get(shift.multi_day_set_id);
           if (set) {
             const baseName = (shift.business_name || '').replace(/[（(]往路[）)]/, '').replace(/[（(]復路[）)]/, '').trim();
+            // colspanを期間内に強制的に制限
+            const dateIndex = dates.indexOf(shift.date);
+            const remainingDays = dates.length - dateIndex;
+            const actualColspan = Math.min(set.totalDays, remainingDays);
+            console.log('🔍 [DEBUG] Calculating colspan:', {
+              employeeName: shift.employee_name,
+              businessName: baseName,
+              date: shift.date,
+              dateIndex,
+              remainingDays,
+              originalTotalDays: set.totalDays,
+              actualColspan
+            });
             employeeShifts.get(shift.date).push({
               name: baseName,
               isMultiDay: true,
-              colspan: set.totalDays,
+              colspan: actualColspan,
               setId: shift.multi_day_set_id
             });
           }
@@ -347,8 +407,7 @@ export default function ShiftSchedule() {
             colspan: 1
           });
         }
-      });
-      
+      });    
       console.log('🔍 [DEBUG] periodEmployeeViewData computed:');
       console.log('  - dates:', dates.length);
       console.log('  - employees:', employees.length, employees);
@@ -1299,16 +1358,16 @@ export default function ShiftSchedule() {
               <CardContent>
                 {periodViewMode === 'employee' && periodEmployeeViewData ? (
                   /* Employee View: Employees x Dates (Multi-day support) */
-                  <div className="overflow-x-auto">
+                  <div className="overflow-auto max-h-[calc(100vh-300px)]">
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="bg-gray-100">
                           {selectedLocation === '東京' && (
-                            <th className="border p-2 text-left sticky left-0 bg-gray-100 z-20 whitespace-nowrap">班</th>
+                            <th className="border p-2 text-left sticky left-0 top-0 bg-gray-100 z-30 whitespace-nowrap">班</th>
                           )}
-                          <th className={`border p-2 text-left bg-gray-100 z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>従業員名</th>
+                          <th className={`border p-2 text-left bg-gray-100 whitespace-nowrap sticky top-0 ${selectedLocation === '東京' ? 'left-[60px] z-20' : 'left-0 z-30'}`}>従業員名</th>
                           {periodEmployeeViewData.dates.map(date => (
-                            <th key={date} className="border p-2 text-center min-w-[120px]">{date}</th>
+                            <th key={date} className="border p-2 text-center min-w-[120px] sticky top-0 bg-gray-100 z-10">{date}</th>
                           ))}
                         </tr>
                       </thead>
@@ -1327,30 +1386,16 @@ export default function ShiftSchedule() {
                               )}
                               <td className={`border p-2 font-medium bg-white z-10 whitespace-nowrap ${selectedLocation === '東京' ? 'sticky left-[60px]' : 'sticky left-0'}`}>{employee}</td>
                               {periodEmployeeViewData.dates.map((date, dateIdx) => {
-                                let skipCell = false;
-                                employeeSets.forEach((set: any) => {
-                                  const startIdx = periodEmployeeViewData.dates.indexOf(set.startDate);
-                                  const endIdx = startIdx + set.totalDays - 1;
-                                  if (dateIdx > startIdx && dateIdx <= endIdx) {
-                                    skipCell = true;
-                                  }
-                                });
-                                if (skipCell) return null;
-                                
                                 const businesses = periodEmployeeViewData.shiftMap.get(employee)?.get(date) || [];
-                                let colspan = 1;
-                                const multiDayBusiness = businesses.find((b: any) => b.isMultiDay);
-                                if (multiDayBusiness) {
-                                  colspan = multiDayBusiness.colspan;
-                                }
                                 
                                 const employeeShift = periodShifts.find(s => s.employee_name === employee);
                                 const cellId = `period-cell-${employeeShift?.employee_id || employee.replace(/\s/g, '_')}-${date}`;
                                 
+                                const multiDayBusiness = businesses.find((b: any) => b.isMultiDay);
+                                
                                 return (
                                   <td 
                                     key={date} 
-                                    colSpan={colspan} 
                                     className={`border p-2 text-center cursor-pointer hover:bg-purple-50 transition-colors ${
                                       multiDayBusiness ? 'bg-purple-100' : ''
                                     }`}
