@@ -246,6 +246,16 @@ export default function ShiftSchedule() {
   const [spotBusinessEmployeeId, setSpotBusinessEmployeeId] = useState<string>('');
   const [spotBusinessEmployeeName, setSpotBusinessEmployeeName] = useState<string>('');
   const [showDeleteShiftsModal, setShowDeleteShiftsModal] = useState(false);
+  
+  // ポップアップアサイン機能のstate
+  const [showAssignPopup, setShowAssignPopup] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<{
+    employeeId?: string;
+    employeeName?: string;
+    businessId?: string;
+    businessName?: string;
+    date: string;
+  } | null>(null);
 
 
   const timeSlots = generateTimeSlots();
@@ -501,6 +511,96 @@ export default function ShiftSchedule() {
     selectCell(cell);
   };
   
+  // ポップアップアサイン機能のハンドラー
+  const handleAssignPopupOpen = (
+    date: string,
+    employeeId?: string,
+    employeeName?: string,
+    businessId?: string,
+    businessName?: string
+  ) => {
+    console.log('🟠 [DEBUG] handleAssignPopupOpen called:', { date, employeeId, employeeName, businessId, businessName });
+    setAssignTarget({ date, employeeId, employeeName, businessId, businessName });
+    setShowAssignPopup(true);
+  };
+  
+  const handleAssignBusiness = async (business: BusinessMaster) => {
+    if (!assignTarget) return;
+    
+    console.log('🟠 [DEBUG] handleAssignBusiness called:', { assignTarget, business });
+    
+    try {
+      // APIサーバー経由でアサイン
+      const response = await fetch('http://localhost:3001/api/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: assignTarget.employeeId,
+          business_master_id: business.業務id,
+          date: assignTarget.date,
+          start_time: business.開始時間,
+          end_time: business.終了時間,
+        }),
+      });
+      
+      if (response.ok) {
+        toast.success('アサインしました');
+        setShowAssignPopup(false);
+        setAssignTarget(null);
+        // データ再読み込み
+        loadData();
+      } else {
+        const error = await response.json();
+        toast.error(`アサインに失敗しました: ${error.error || '不明なエラー'}`);
+      }
+    } catch (error) {
+      console.error('Error assigning business:', error);
+      toast.error('アサインに失敗しました');
+    }
+  };
+  
+  const handleAssignEmployee = async (employee: { employee_id: string; employee_name: string }) => {
+    if (!assignTarget || !assignTarget.businessId) return;
+    
+    console.log('🟠 [DEBUG] handleAssignEmployee called:', { assignTarget, employee });
+    
+    try {
+      // 業務マスタから業務情報を取得
+      const business = businessMasters.find(b => b.業務id === assignTarget.businessId);
+      if (!business) {
+        toast.error('業務情報が見つかりません');
+        return;
+      }
+      
+      // APIサーバー経由でアサイン
+      const response = await fetch('http://localhost:3001/api/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: employee.employee_id,
+          business_master_id: assignTarget.businessId,
+          date: assignTarget.date,
+          start_time: business.開始時間,
+          end_time: business.終了時間,
+        }),
+      });
+      
+      if (response.ok) {
+        toast.success('アサインしました');
+        setShowAssignPopup(false);
+        setAssignTarget(null);
+        // データ再読み込み
+        loadData();
+      } else {
+        const error = await response.json();
+        toast.error(`アサインに失敗しました: ${error.error || '不明なエラー'}`);
+      }
+    } catch (error) {
+      console.error('Error assigning employee:', error);
+      toast.error('アサインに失敗しました');
+    }
+  };
+  
   // スワップ確認ダイアログのハンドラー
   const handleSwapConfirm = async () => {
     const operation = getSwapOperation();
@@ -513,11 +613,7 @@ export default function ShiftSchedule() {
       toast.success('シフトを入れ替えました');
       clearSelection();
       // データを再読み込み
-      if (activeTab === 'daily') {
-        loadData();
-      } else {
-        loadPeriodData();
-      }
+      loadData();
     } else {
       toast.error('シフトの入れ替えに失敗しました');
     }
@@ -667,6 +763,8 @@ export default function ShiftSchedule() {
       } else if (businessData) {
         setBusinessMasters(businessData);
         console.log('📋 Loaded business masters:', businessData.length);
+        console.log('🔍 [DEBUG] Sample business master:', businessData[0]);
+        console.log('🔍 [DEBUG] Business master field names:', businessData[0] ? Object.keys(businessData[0]) : 'No data');
       }
       
       // Load shifts for selected date
@@ -919,48 +1017,7 @@ export default function ShiftSchedule() {
     }
   };
 
-  // 従業員をアサインするハンドラー
-  const handleAssignEmployee = async (employeeId: string) => {
-    if (!selectedBusiness) return;
-    
-    try {
-      // 業務名から班情報を除外
-      const businessName = selectedBusiness.name.replace(/ \(.*班\)$/, '');
-      
-      // business_masterから業務情報を取得
-      const business = businessMasters.find(b => b.業務名 === businessName);
-      if (!business) {
-        toast.error('業務情報が見つかりません');
-        return;
-      }
-      
-      // シフトを追加
-      const { error } = await supabase
-        .from('shifts')
-        .insert({
-          date: selectedDate,
-          employee_id: employeeId,
-          business_master_id: business.業務id || business.id,
-          location: selectedLocation,
-        });
-      
-      if (error) {
-        console.error('❌ Error assigning employee:', error);
-        toast.error('アサインに失敗しました');
-        return;
-      }
-      
-      toast.success('アサインしました');
-      setShowAssignDialog(false);
-      setSelectedBusiness(null);
-      
-      // データを再読み込み
-      await loadData();
-    } catch (error) {
-      console.error('❌ Error assigning employee:', error);
-      toast.error('アサイン中にエラーが発生しました');
-    }
-  };
+  // 既存のhandleAssignEmployee関数は566行目に移動済み
 
   // ドラッグ＆ドロップ機能を削除し、セル選択方式に変更
 
@@ -1402,14 +1459,8 @@ export default function ShiftSchedule() {
                                     onClick={() => {
                                       const employeeShift = periodShifts.find(s => s.employee_name === employee);
                                       if (employeeShift) {
-                                        const businessNames = businesses.map((b: any) => b.name).join(', ');
-                                        handleCellClick({
-                                          employeeId: employeeShift.employee_id,
-                                          employeeName: employee,
-                                          businessId: '', // Period viewでは業務IDは不要
-                                          businessName: businessNames || '未割り当て',
-                                          date: date,
-                                        });
+                                        // ポップアップアサイン機能を開く
+                                        handleAssignPopupOpen(date, employeeShift.employee_id, employee);
                                       }
                                     }}
                                   >
@@ -2153,6 +2204,106 @@ export default function ShiftSchedule() {
       </button>
     </div>
   )}
+  
+  {/* ポップアップアサイン機能 */}
+  <Dialog open={showAssignPopup} onOpenChange={setShowAssignPopup}>
+    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>
+          {assignTarget?.employeeId ? '業務アサイン' : '従業員アサイン'}
+        </DialogTitle>
+        <DialogDescription>
+          {assignTarget?.employeeId 
+            ? `${assignTarget.employeeName} - ${assignTarget.date}`
+            : `${assignTarget?.businessName} - ${assignTarget?.date}`
+          }
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid grid-cols-2 gap-2 mt-4">
+        {(() => {
+          console.log('🔍 [DEBUG] Popup data:', {
+            assignTarget,
+            selectedLocation,
+            businessMastersCount: businessMasters.length,
+            allEmployeesCount: allEmployees.length
+          });
+          return null;
+        })()}
+        {assignTarget?.employeeId ? (
+          // 従業員が選択されている場合：業務一覧を表示
+          (() => {
+            const filteredBusinesses = businessMasters.filter(business => business.営業所 === selectedLocation);
+            console.log('🔍 [DEBUG] Filtered businesses:', {
+              totalBusinesses: businessMasters.length,
+              selectedLocation,
+              filteredCount: filteredBusinesses.length,
+              sampleBusiness: filteredBusinesses[0]
+            });
+            return filteredBusinesses.map((business) => {
+            // 既にアサインされているか確認
+            const isAssigned = assignTarget && periodShifts.some(shift => 
+              shift.employee_id === assignTarget.employeeId && 
+              shift.date === assignTarget.date && 
+              shift.business_name === business.業務名
+            );
+            
+            return (
+            <Button
+              key={business.業務id}
+              variant="outline"
+              className={`h-auto py-3 px-4 text-left justify-start ${
+                isAssigned ? 'bg-gray-100' : ''
+              }`}
+              onClick={() => handleAssignBusiness(business)}
+            >
+              <div className="flex flex-col gap-1">
+                <div className="font-semibold">
+                  {business.業務名}
+                  {isAssigned && <span className="ml-2 text-xs text-gray-500">(アサイン済)</span>}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {business.開始時間} - {business.終了時間}
+                </div>
+              </div>
+            </Button>
+            );
+          });
+          })()
+        ) : (
+          // 業務が選択されている場合：その日にアサインされていない従業員を表示
+          allEmployees
+            .filter(emp => emp.office === selectedLocation)
+            .filter(emp => {
+              // その日にアサインされていない従業員をフィルター
+              return !periodShifts.some(shift => 
+                shift.employee_id === emp.employee_id && 
+                shift.date === assignTarget?.date
+              );
+            })
+            .map((emp) => (
+              <Button
+                key={emp.employee_id}
+                variant="outline"
+                className="h-auto py-3 px-4 text-left justify-start"
+                onClick={() => handleAssignEmployee({ employee_id: emp.employee_id, employee_name: emp.name })}
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="font-semibold">{emp.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {emp.team || '班なし'}
+                  </div>
+                </div>
+              </Button>
+            ))
+        )}
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setShowAssignPopup(false)}>
+          キャンセル
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
   </div>
   );
 }
