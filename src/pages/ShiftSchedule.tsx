@@ -2218,6 +2218,11 @@ export default function ShiftSchedule() {
             : `${assignTarget?.businessName} - ${assignTarget?.date}`
           }
         </DialogDescription>
+        {assignTarget?.employeeId && (
+          <div className="mt-2 text-sm text-gray-600">
+            まだ割り当てられていない業務を白で表示しています
+          </div>
+        )}
       </DialogHeader>
       <div className="grid grid-cols-2 gap-2 mt-4">
         {(() => {
@@ -2252,9 +2257,10 @@ export default function ShiftSchedule() {
               key={business.業務id}
               variant="outline"
               className={`h-auto py-3 px-4 text-left justify-start ${
-                isAssigned ? 'bg-gray-100' : ''
+                isAssigned ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white hover:bg-gray-50'
               }`}
-              onClick={() => handleAssignBusiness(business)}
+              onClick={() => !isAssigned && handleAssignBusiness(business)}
+              disabled={isAssigned}
             >
               <div className="flex flex-col gap-1">
                 <div className="font-semibold">
