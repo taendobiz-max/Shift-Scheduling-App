@@ -531,15 +531,14 @@ export default function ShiftSchedule() {
     
     try {
       // APIサーバー経由でアサイン
-      const response = await fetch('http://localhost:3001/api/shifts', {
+      const response = await fetch('/api/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_id: assignTarget.employeeId,
-          business_master_id: business.業務id,
+          business_id: business.業務id,
           date: assignTarget.date,
-          start_time: business.開始時間,
-          end_time: business.終了時間,
+          location: selectedLocation,
         }),
       });
       
@@ -573,15 +572,14 @@ export default function ShiftSchedule() {
       }
       
       // APIサーバー経由でアサイン
-      const response = await fetch('http://localhost:3001/api/shifts', {
+      const response = await fetch('/api/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_id: employee.employee_id,
-          business_master_id: assignTarget.businessId,
+          business_id: assignTarget.businessId,
           date: assignTarget.date,
-          start_time: business.開始時間,
-          end_time: business.終了時間,
+          location: selectedLocation,
         }),
       });
       
