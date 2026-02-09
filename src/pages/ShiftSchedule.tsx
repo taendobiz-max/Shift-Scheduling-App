@@ -547,7 +547,11 @@ export default function ShiftSchedule() {
         setShowAssignPopup(false);
         setAssignTarget(null);
         // データ再読み込み
-        loadData();
+        if (activeTab === 'daily') {
+          await loadData();
+        } else {
+          await loadPeriodShifts();
+        }
       } else {
         const error = await response.json();
         toast.error(`アサインに失敗しました: ${error.error || '不明なエラー'}`);
@@ -588,7 +592,11 @@ export default function ShiftSchedule() {
         setShowAssignPopup(false);
         setAssignTarget(null);
         // データ再読み込み
-        loadData();
+        if (activeTab === 'daily') {
+          await loadData();
+        } else {
+          await loadPeriodShifts();
+        }
       } else {
         const error = await response.json();
         toast.error(`アサインに失敗しました: ${error.error || '不明なエラー'}`);
