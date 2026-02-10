@@ -395,17 +395,51 @@ async function checkSplitRest(shifts: any[]): Promise<RuleViolation[]> {
 
 /**
  * 点呼対応者チェック
- * 各日に点呼業務（roll_call=true）が割り当てられているかを確認
+ * 各日に点呼業務が割り当てられているか、および点呼スキルを持つ従業員がアサインされているかを確認
  */
 async function checkRollCallAssignment(shifts: any[]): Promise<RuleViolation[]> {
   const violations: RuleViolation[] = [];
   
   console.log('📞 [ROLL_CALL_CHECK] Starting roll call assignment check');
   
+  // business_masterテーブルから点呼業務を取得
+  const { data: businessMasters, error: businessError } = await supabase
+    .from('business_master')
+    .select('業務id, 業務名');
+  
+  if (businessError) {
+    console.error('❌ [ROLL_CALL_CHECK] Failed to fetch business_master:', businessError);
+    return violations;
+  }
+  
+  // 点呼業務のIDセットを作成（業務名に「点呼」が含まれるもの）
+  const rollCallBusinessIds = new Set(
+    businessMasters
+      ?. filter(b => b.業務名?. includes('点呼'))
+      .map(b => b.業務id) || []  // shifts.business_idはbusiness_master.業務id (文字列コード)を参照している
+  );
+  
+  console.log(`📞 [ROLL_CALL_CHECK] Found ${rollCallBusinessIds.size} roll call businesses`);
+  
+  // employeesテーブルから従業員情報を取得
+  const { data: employees, error: employeeError } = await supabase
+    .from('employees')
+    .select('employee_id, name, roll_call_capable');
+  
+  if (employeeError) {
+    console.error('❌ [ROLL_CALL_CHECK] Failed to fetch employees:', employeeError);
+    return violations;
+  }
+  
+  // 従業員IDから従業員情報へのマップを作成
+  const employeeMap = new Map(
+    employees?.map(e => [e.employee_id, e]) || []
+  );
+  
   // 日付ごとにシフトをグループ化
   const shiftsByDate = new Map<string, any[]>();
   for (const shift of shifts) {
-    const date = shift.date || shift.日付;
+    const date = shift.shift_date || shift.date || shift.日付;
     if (!date) continue;
     
     if (!shiftsByDate.has(date)) {
@@ -416,12 +450,13 @@ async function checkRollCallAssignment(shifts: any[]): Promise<RuleViolation[]> 
   
   // 各日付で点呼業務がアサインされているかチェック
   for (const [date, dayShifts] of shiftsByDate.entries()) {
-    const hasRollCall = dayShifts.some(shift => {
-      const businessId = shift.business_id || shift.業務id;
-      return shift.roll_call === true || shift.点呼 === true;
+    // 点呼業務のシフトを抽出
+    const rollCallShifts = dayShifts.filter(shift => {
+      const businessId = shift.business_id || shift.business_master_id || shift.業務id;
+      return rollCallBusinessIds.has(businessId);
     });
     
-    if (!hasRollCall) {
+    if (rollCallShifts.length === 0) {
       // 点呼業務がアサインされていない場合、エラーとして記録
       violations.push({
         type: 'roll_call_missing',
@@ -436,6 +471,36 @@ async function checkRollCallAssignment(shifts: any[]): Promise<RuleViolation[]> 
       console.log(`❌ [ROLL_CALL_CHECK] Missing roll call assignment on ${date}`);
     } else {
       console.log(`✅ [ROLL_CALL_CHECK] Roll call assigned on ${date}`);
+      
+      // 点呼業務にアサインされた従業員のスキルをチェック
+      for (const shift of rollCallShifts) {
+        const employeeId = shift.employee_id;
+        const employee = employeeMap.get(employeeId);
+        
+        if (!employee) {
+          console.warn(`⚠️ [ROLL_CALL_CHECK] Employee ${employeeId} not found`);
+          continue;
+        }
+        
+        // 点呼スキルがない場合、エラーとして記録
+        if (!employee.roll_call_capable) {
+          const businessName = businessMasters?.find(b => b.業務id === (shift.business_id || shift.business_master_id || shift.業務id))?.業務名 || '不明な業務';
+          
+          violations.push({
+            type: 'roll_call_skill_missing',
+            severity: 'error',
+            date: date,
+            employeeName: employee.name,
+            employeeId: employeeId,
+            description: '点呼スキル不足',
+            details: `${employee.name}さんは点呼業務「${businessName}」にアサインされていますが、点呼スキルを持っていません。`
+          });
+          
+          console.log(`❌ [ROLL_CALL_CHECK] Employee ${employee.name} (${employeeId}) lacks roll call skill on ${date}`);
+        } else {
+          console.log(`✅ [ROLL_CALL_CHECK] Employee ${employee.name} (${employeeId}) has roll call skill on ${date}`);
+        }
+      }
     }
   }
   
