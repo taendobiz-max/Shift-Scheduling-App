@@ -1593,7 +1593,25 @@ export default function ShiftSchedule() {
                                       })}
                                     </div>
                                   ) : (
-                                    <span className="text-gray-400">-</span>
+                                    <button
+                                      className="text-gray-400 hover:bg-blue-50 w-full h-full min-h-[30px] cursor-pointer"
+                                      onClick={() => {
+                                        // 業務ごと表示で空欄セルをクリックした場合、従業員一覧を表示
+                                        const businessMaster = businessMasters.find(bm => bm.業務名 === business);
+                                        if (businessMaster) {
+                                          setAssignTarget({
+                                            date: date,
+                                            businessId: businessMaster.業務id,
+                                            businessName: business,
+                                            employeeId: '', // 空欄なので従業員IDは空
+                                            employeeName: '', // 空欄なので従業員名は空
+                                          });
+                                          setShowAssignPopup(true);
+                                        }
+                                      }}
+                                    >
+                                      -
+                                    </button>
                                   )}
                                 </td>
                               );
@@ -2224,11 +2242,12 @@ export default function ShiftSchedule() {
             : `${assignTarget?.businessName} - ${assignTarget?.date}`
           }
         </DialogDescription>
-        {assignTarget?.employeeId && (
-          <div className="mt-2 text-sm text-gray-600">
-            まだ割り当てられていない業務を白で表示しています
-          </div>
-        )}
+        <div className="mt-2 text-sm text-gray-600">
+          {assignTarget?.employeeId 
+            ? 'まだ割り当てられていない業務を白で表示しています'
+            : 'まだ割り当てられていない従業員を白で表示しています'
+          }
+        </div>
       </DialogHeader>
       <div className="grid grid-cols-2 gap-2 mt-4">
         {(() => {
@@ -2282,31 +2301,45 @@ export default function ShiftSchedule() {
           });
           })()
         ) : (
-          // 業務が選択されている場合：その日にアサインされていない従業員を表示
-          allEmployees
-            .filter(emp => emp.office === selectedLocation)
-            .filter(emp => {
-              // その日にアサインされていない従業員をフィルター
-              return !periodShifts.some(shift => 
+          // 業務が選択されている場合：従業員一覧を表示
+          (() => {
+            const filteredEmployees = allEmployees.filter(emp => emp.office === selectedLocation);
+            console.log('🔍 [DEBUG] Filtered employees:', {
+              totalEmployees: allEmployees.length,
+              selectedLocation,
+              filteredCount: filteredEmployees.length
+            });
+            return filteredEmployees.map((emp) => {
+              // 既にその業務にアサインされているか確認
+              const isAssigned = assignTarget && periodShifts.some(shift => 
                 shift.employee_id === emp.employee_id && 
-                shift.date === assignTarget?.date
+                shift.date === assignTarget.date && 
+                shift.business_name === assignTarget.businessName
               );
-            })
-            .map((emp) => (
-              <Button
-                key={emp.employee_id}
-                variant="outline"
-                className="h-auto py-3 px-4 text-left justify-start"
-                onClick={() => handleAssignEmployee({ employee_id: emp.employee_id, employee_name: emp.name })}
-              >
-                <div className="flex flex-col gap-1">
-                  <div className="font-semibold">{emp.name}</div>
-                  <div className="text-xs text-gray-500">
-                    {emp.team || '班なし'}
+              
+              return (
+                <Button
+                  key={emp.employee_id}
+                  variant="outline"
+                  className={`h-auto py-3 px-4 text-left justify-start ${
+                    isAssigned ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white hover:bg-gray-50'
+                  }`}
+                  onClick={() => !isAssigned && handleAssignEmployee({ employee_id: emp.employee_id, employee_name: emp.name })}
+                  disabled={isAssigned}
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="font-semibold">
+                      {emp.name}
+                      {isAssigned && <span className="ml-2 text-xs text-gray-500">(アサイン済)</span>}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {emp.team || '班なし'}
+                    </div>
                   </div>
-                </div>
-              </Button>
-            ))
+                </Button>
+              );
+            });
+          })()
         )}
       </div>
       <DialogFooter>
