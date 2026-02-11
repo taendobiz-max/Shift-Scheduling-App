@@ -283,19 +283,12 @@ export default function ShiftSchedule() {
       const limitedShifts = periodShifts.filter(s => dates.includes(s.date));
       console.log('🔍 [DEBUG] Limited shifts count:', limitedShifts.length);
       
-      const employeeNames = [...new Set(limitedShifts.map(s => s.employee_name))];
-      const employees = employeeNames
-        .map(name => {
-          const shift = limitedShifts.find(s => s.employee_name === name);
-          const employee = allEmployees.find(e => e.employee_id === shift?.employee_id);
-          // employeesテーブルに存在しない従業員は除外
-          if (!employee) return null;
-          return { name, display_order: employee.display_order || 9999 };
-        })
-        .filter(e => e !== null) // nullを除外
-        .sort((a, b) => a.display_order - b.display_order)
+      // 選択拠点の全従業員を取得（シフトの有無に関わらず）
+      const employees = allEmployees
+        .filter(e => e.office === selectedLocation)
+        .sort((a, b) => (a.display_order || 9999) - (b.display_order || 9999))
         .map(e => e.name);
-      console.log('🔍 [DEBUG] Limited employees:', employees);
+      console.log('🔍 [DEBUG] All employees for location:', employees);
       
       // 複数日業務セットを構築（制限されたシフトのみ）
       const multiDaySets = new Map<string, any>();
@@ -433,16 +426,18 @@ export default function ShiftSchedule() {
   
   // 期間勤務割確認のBusiness ViewデータをuseMemoでキャッシュ
   const periodBusinessViewData = React.useMemo(() => {
-    if (periodViewMode !== 'business' || periodShifts.length === 0) return null;
+    if (periodViewMode !== 'business') return null;
     
     try {
       // 期間内の日付のみを表示
       const dates = [...new Set(periodShifts.map(s => s.date))]
         .filter(date => date >= periodStartDate && date <= periodEndDate)
         .sort();
-      // business_masterから業務リストを取得（シフトの有無に関わらず全業務を表示）
+      // business_masterから業務リストを取得
+      // 選択拠点の全業務を表示（is_active = trueのみ）
       const businesses = businessMasters
         .filter(b => b.営業所 === selectedLocation)
+        .filter(b => b.is_active || periodShifts.some(s => s.業務名 === b.業務名)) // アクティブな業務 + シフトがある非アクティブ業務
         .map(b => b.業務名)
         .sort((a, b) => {
           // 点呼業務を一番上に表示
@@ -764,11 +759,10 @@ export default function ShiftSchedule() {
         setLocations(uniqueLocations);
       }
 
-      // Load business masters
+      // Load business masters (including inactive ones)
       const { data: businessData, error: businessError } = await supabase
         .from('business_master')
-        .select('*')
-        .eq('is_active', true);
+        .select('*');
       
       if (businessError) {
         console.error('❌ Error loading business masters:', businessError);
