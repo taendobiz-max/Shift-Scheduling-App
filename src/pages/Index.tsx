@@ -62,6 +62,7 @@ export default function Index() {
 
           )}
 
+          {getCurrentUser()?.role >= 2 && (
 
           <Link to="/shift-schedule">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -81,6 +82,7 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
+          )}
 
           {/* 権限レベル2以上のみ表示 */}
 
