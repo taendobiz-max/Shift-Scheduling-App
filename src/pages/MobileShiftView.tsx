@@ -97,6 +97,7 @@ export default function MobileShiftView() {
       
       if (!error && data) {
         setEmployees(data);
+    setSelectedEmployee(""); // 営業所変更時に従業員選択をリセット
       }
     };
     fetchEmployees();
@@ -242,6 +243,27 @@ export default function MobileShiftView() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <Card>
           <CardHeader>
+        <Card>
+          <CardHeader>
+            <CardTitle>営業所選択</CardTitle>
+            <CardDescription>確認したい営業所を選択してください</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedOffice} onValueChange={setSelectedOffice}>
+              <SelectTrigger>
+                <SelectValue placeholder="営業所を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {offices.map((office) => (
+                  <SelectItem key={office.id} value={office.id}>
+                    {office.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
             <CardTitle>従業員選択</CardTitle>
             <CardDescription>確認したい従業員を選択してください</CardDescription>
           </CardHeader>
