@@ -69,6 +69,7 @@ interface BusinessMaster {
   スキルマップ項目名?: string;
   ペア業務id?: string;
   created_at?: string;
+  is_active?: boolean;       // 業務の有効/無効
   [key: string]: unknown;        // その他の日本語カラム
 }
 
@@ -311,7 +312,7 @@ export default function MasterDataManagement() {
       
       const { data, error } = await supabase
         .from('business_master')
-        .select('*')  // 全ての日本語カラムを取得
+        .select('*')  // 全ての日本語カラムを取得（有効/無効を問わず）
         .order('業務id', { ascending: true });
 
       if (error) {
@@ -428,6 +429,23 @@ export default function MasterDataManagement() {
     setEditingBusinessMasterId(null);
     setIsBusinessMasterEditing(false);
     setIsBusinessMasterModalOpen(true);
+  };
+
+  const handleBusinessMasterToggleActive = async (id: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('business_master')
+        .update({ is_active: isActive })
+        .eq('業務id', id);
+
+      if (error) throw error;
+
+      toast.success(`業務マスタを${isActive ? '有効' : '無効'}化しました`);
+      await loadBusinessMasters();
+    } catch (error) {
+      console.error('Error toggling business master active status:', error);
+      toast.error(`業務マスタの状態変更に失敗しました: ${(error as Error).message}`);
+    }
   };
 
   const handleBusinessMasterDelete = async (id: string) => {
@@ -704,13 +722,20 @@ export default function MasterDataManagement() {
               ) : (
                 <div className="space-y-4">
                   {businessMasters.filter(master => officeFilter === "すべて" || master.営業所 === officeFilter).map((master) => (
-                    <div key={master.業務id} className="border rounded-lg p-4">
+                    <div key={master.業務id} className={`border rounded-lg p-4 ${
+                      master.is_active === false ? 'bg-gray-50 opacity-60' : ''
+                    }`}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <h4 className="font-medium">{master.業務名}</h4>
+                          <h4 className={`font-medium ${
+                            master.is_active === false ? 'text-gray-400' : ''
+                          }`}>{master.業務名}</h4>
                           <Badge variant="outline">
                             {master.業務グループ || '未分類'}
                           </Badge>
+                          {master.is_active === false && (
+                            <Badge variant="destructive">無効</Badge>
+                          )}
                           {master.開始時間 && master.終了時間 && (
                             <Badge variant="secondary" className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
@@ -719,6 +744,16 @@ export default function MasterDataManagement() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mr-2">
+                            <Label htmlFor={`active-${master.業務id}`} className="text-sm">
+                              {master.is_active !== false ? '有効' : '無効'}
+                            </Label>
+                            <Switch
+                              id={`active-${master.業務id}`}
+                              checked={master.is_active !== false}
+                              onCheckedChange={(checked) => handleBusinessMasterToggleActive(master.業務id || '', checked)}
+                            />
+                          </div>
                           <Button
                             size="sm"
                             variant="outline"
