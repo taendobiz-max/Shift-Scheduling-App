@@ -32,7 +32,7 @@ interface AllowanceData {
 
 export default function MobileShiftView() {
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedOffice, setSelectedOffice] = useState<string>('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [offices, setOffices] = useState<any[]>([]);
@@ -43,6 +43,7 @@ export default function MobileShiftView() {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // ログインユーザー情報を取得
   useEffect(() => {
@@ -97,7 +98,12 @@ export default function MobileShiftView() {
       
       if (!error && data) {
         setEmployees(data);
-    setSelectedEmployee(""); // 営業所変更時に従業員選択をリセット
+        // 初回ロード時以外のみ従業員選択をリセット
+        if (!isInitialLoad) {
+          setSelectedEmployee("");
+        } else {
+          setIsInitialLoad(false);
+        }
       }
     };
     fetchEmployees();
@@ -105,7 +111,10 @@ export default function MobileShiftView() {
 
   // 実行ボタンがクリックされたときにシフトデータを取得
   const handleExecute = async () => {
+    console.log('🔍 [DEBUG] handleExecute called with:', { selectedEmployee, selectedDate, selectedOffice });
+    
     if (!selectedEmployee || !selectedDate) {
+      console.log('⚠️ [DEBUG] Missing required fields');
       return;
     }
 
