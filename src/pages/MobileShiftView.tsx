@@ -141,8 +141,10 @@ export default function MobileShiftView() {
         
         const formattedShifts = shiftData.map(shift => {
           const business = businessMap.get(shift.business_master_id);
+          console.log('🔍 [DEBUG] Shift business mapping:', { shift_id: shift.id, business_master_id: shift.business_master_id, business: business });
           return {
             ...shift,
+            business_name: business?.['業務名'] || '業務名不明',
             start_time: business?.['開始時間'] || '',
             end_time: business?.['終了時間'] || '',
           };
