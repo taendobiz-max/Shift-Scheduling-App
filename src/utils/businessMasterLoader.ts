@@ -10,6 +10,7 @@ export interface BusinessMaster {
   深夜手当?: string;
   スキルマップ項目名?: string;
   ペア業務id?: string;
+  is_active?: boolean;
 }
 
 // For backward compatibility
@@ -23,6 +24,7 @@ export const loadBusinessMasterFromSupabase = async (): Promise<BusinessMaster[]
     const { data, error } = await supabase
       .from('business_master')
       .select('*')
+      .eq('is_active', true)
       .order('業務id');
 
     if (error) {

@@ -55,6 +55,8 @@ interface BusinessMaster {
   終了時間?: string;
   業務グループ?: string;
   業務タイプ?: string;
+  is_active?: boolean;
+  営業所?: string;
 }
 
 interface TimeSlot {
@@ -765,7 +767,8 @@ export default function ShiftSchedule() {
       // Load business masters
       const { data: businessData, error: businessError } = await supabase
         .from('business_master')
-        .select('*');
+        .select('*')
+        .eq('is_active', true);
       
       if (businessError) {
         console.error('❌ Error loading business masters:', businessError);

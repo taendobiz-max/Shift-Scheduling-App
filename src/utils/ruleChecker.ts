@@ -405,7 +405,8 @@ async function checkRollCallAssignment(shifts: any[]): Promise<RuleViolation[]> 
   // business_masterテーブルから点呼業務を取得
   const { data: businessMasters, error: businessError } = await supabase
     .from('business_master')
-    .select('業務id, 業務名');
+    .select('業務id, 業務名')
+    .eq('is_active', true);
   
   if (businessError) {
     console.error('❌ [ROLL_CALL_CHECK] Failed to fetch business_master:', businessError);
