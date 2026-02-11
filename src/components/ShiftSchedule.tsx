@@ -51,6 +51,7 @@ interface EmployeeData {
 interface BusinessMaster {
   業務id?: string;
   業務名?: string;
+  営業所?: string;
   開始時間?: string;
   終了時間?: string;
   業務グループ?: string;
@@ -431,6 +432,7 @@ export default function ShiftSchedule() {
   
   // 期間勤務割確認のBusiness ViewデータをuseMemoでキャッシュ
   const periodBusinessViewData = React.useMemo(() => {
+    console.error("[DEBUG] periodBusinessViewData useMemo CALLED", { periodViewMode, businessMastersLength: businessMasters.length, selectedLocation });
     if (periodViewMode !== 'business') return null;
     
     try {
@@ -440,6 +442,13 @@ export default function ShiftSchedule() {
         .sort();
       
       // business_masterから業務リストを取得（シフトの有無に関わらず全業務を表示）
+      console.log('🔍 [DEBUG] periodBusinessViewData - businessMasters:', {
+        total: businessMasters.length,
+        selectedLocation,
+        sample: businessMasters[0],
+        rollCallBusinesses: businessMasters.filter(b => b.業務名?.includes('点呼')).map(b => ({ 業務名: b.業務名, 営業所: b.営業所 }))
+      });
+      
       const businesses = businessMasters
         .filter(b => b.営業所 === selectedLocation)
         .map(b => b.業務名)
@@ -451,6 +460,12 @@ export default function ShiftSchedule() {
           if (!aIsRollCall && bIsRollCall) return 1;
           return a.localeCompare(b);
         });
+      
+      console.log('🔍 [DEBUG] periodBusinessViewData - filtered businesses:', {
+        count: businesses.length,
+        businesses: businesses.slice(0, 10),
+        rollCallBusinesses: businesses.filter(b => b?.includes('点呼'))
+      });
       
       const shiftMap = new Map();
       periodShifts.forEach(shift => {

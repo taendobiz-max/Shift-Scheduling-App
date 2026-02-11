@@ -438,7 +438,10 @@ export default function ShiftSchedule() {
       const dates = [...new Set(periodShifts.map(s => s.date))]
         .filter(date => date >= periodStartDate && date <= periodEndDate)
         .sort();
-      const businesses = [...new Set(periodShifts.map(s => s.business_name))]
+      // business_masterから業務リストを取得（シフトの有無に関わらず全業務を表示）
+      const businesses = businessMasters
+        .filter(b => b.営業所 === selectedLocation)
+        .map(b => b.業務名)
         .sort((a, b) => {
           // 点呼業務を一番上に表示
           const aIsRollCall = a.includes('点呼');
@@ -469,7 +472,7 @@ export default function ShiftSchedule() {
       console.error('❌ [ERROR] Failed to compute period business view data:', error);
       return null;
     }
-  }, [periodShifts, periodViewMode]);
+  }, [periodShifts, periodViewMode, businessMasters, selectedLocation, periodStartDate, periodEndDate]);
   
   // Monitor periodShifts changes
   useEffect(() => {
