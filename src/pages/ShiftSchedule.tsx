@@ -439,6 +439,7 @@ export default function ShiftSchedule() {
         .filter(b => b.営業所 === selectedLocation)
         .filter(b => b.is_active || periodShifts.some(s => s.業務名 === b.業務名)) // アクティブな業務 + シフトがある非アクティブ業務
         .map(b => b.業務名)
+        .filter(name => name !== '無し') // 「無し」を除外
         .sort((a, b) => {
           // 点呼業務を一番上に表示
           const aIsRollCall = a.includes('点呼');
