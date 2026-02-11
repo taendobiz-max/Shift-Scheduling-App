@@ -17,6 +17,7 @@ import BusinessRuleManagement from './pages/BusinessRuleManagement';
 import UnifiedRuleManagement from './pages/UnifiedRuleManagement';
 
 import UserManagement from './pages/UserManagement';
+import UserRegistration from './pages/UserRegistration';
 import MobileShiftView from './pages/MobileShiftView';
 import OvertimeRegistration from './pages/OvertimeRegistration';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -50,6 +51,7 @@ const App = () => {
             <Route path="/master-data" element={<ProtectedRoute requiredRole={2}><MasterDataManagement /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute requiredRole={2}><Reports /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute requiredRole={2}><UserManagement /></ProtectedRoute>} />
+            <Route path="/user-registration" element={<ProtectedRoute requiredRole={3}><UserRegistration /></ProtectedRoute>} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

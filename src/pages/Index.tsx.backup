@@ -37,10 +37,6 @@ export default function Index() {
 
         {/* メイン機能カード */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {/* 権限レベル2以上のみ表示 */}
-
-          {getCurrentUser()?.role >= 2 && (
-
           <Link to="/shift-generator">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-blue-200 hover:border-blue-400">
               <CardHeader>
@@ -59,9 +55,6 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
-
-          )}
-
 
           <Link to="/shift-schedule">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -82,12 +75,6 @@ export default function Index() {
             </Card>
           </Link>
 
-          {/* 権限レベル2以上のみ表示 */}
-
-
-          {getCurrentUser()?.role >= 2 && (
-
-
           <Link to="/vacation-management">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-red-200 hover:border-red-400">
               <CardHeader>
@@ -107,18 +94,6 @@ export default function Index() {
             </Card>
           </Link>
 
-
-          )}
-
-
-          {/* 権限レベル2以上のみ表示 */}
-
-
-
-          {getCurrentUser()?.role >= 2 && (
-
-
-
           <Link to="/employees">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
@@ -137,19 +112,6 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
-
-
-
-          )}
-
-
-          {/* 権限レベル2以上のみ表示 */}
-
-
-
-          {getCurrentUser()?.role >= 2 && (
-
-
 
           <Link to="/master-data">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -171,21 +133,6 @@ export default function Index() {
           </Link>
 
 
-
-          )}
-
-
-
-          {/* 権限レベル2以上のみ表示 */}
-
-
-
-
-          {getCurrentUser()?.role >= 2 && (
-
-
-
-
           <Link to="/reports">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
@@ -204,20 +151,6 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
-
-
-
-
-          )}
-
-
-          {/* 権限レベル2以上のみ表示 */}
-
-
-
-          {getCurrentUser()?.role >= 2 && (
-
-
 
           <Link to="/unified-rules">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-green-200 hover:border-green-400">
@@ -239,21 +172,6 @@ export default function Index() {
           </Link>
 
 
-
-          )}
-
-
-
-          {/* 権限レベル2以上のみ表示 */}
-
-
-
-
-          {getCurrentUser()?.role >= 2 && (
-
-
-
-
           <Link to="/overtime-registration">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-purple-200 hover:border-purple-400">
               <CardHeader>
@@ -272,12 +190,6 @@ export default function Index() {
               </CardContent>
             </Card>
           </Link>
-
-
-
-
-          )}
-
           <Link to="/mobile-shift-view">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-blue-200 hover:border-blue-400">
               <CardHeader>
