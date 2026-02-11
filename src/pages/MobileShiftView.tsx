@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +43,7 @@ export default function MobileShiftView() {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const isInitialLoadRef = useRef(true);
 
   // ログインユーザー情報を取得
   useEffect(() => {
@@ -99,10 +99,10 @@ export default function MobileShiftView() {
       if (!error && data) {
         setEmployees(data);
         // 初回ロード時以外のみ従業員選択をリセット
-        if (!isInitialLoad) {
+        if (!isInitialLoadRef.current) {
           setSelectedEmployee("");
         } else {
-          setIsInitialLoad(false);
+          isInitialLoadRef.current = false;
         }
       }
     };
