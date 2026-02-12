@@ -39,6 +39,7 @@ export default function MobileShiftView() {
   const [offices, setOffices] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [shifts, setShifts] = useState<ShiftData[]>([]);
+  const [nextDayShifts, setNextDayShifts] = useState<ShiftData[]>([]);
   const [overtime, setOvertime] = useState<number>(0);
   const [allowances, setAllowances] = useState<AllowanceData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -165,6 +166,42 @@ export default function MobileShiftView() {
         setShifts([]);
       }
 
+      // 翌日のシフトデータを取得
+      const nextDate = format(new Date(parse(dateStr, 'yyyy-MM-dd', new Date()).getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+      const { data: nextDayShiftData, error: nextDayShiftError } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', employeeNumber)
+        .eq('date', nextDate);
+      
+      if (!nextDayShiftError && nextDayShiftData && nextDayShiftData.length > 0) {
+        const nextBusinessIds = nextDayShiftData.map(s => s.business_master_id).filter(Boolean);
+        const { data: nextBusinessData } = await supabase
+          .from('business_master')
+          .select('*')
+          .in('業務id', nextBusinessIds);
+        
+        const nextBusinessMap = new Map();
+        if (nextBusinessData) {
+          nextBusinessData.forEach(b => {
+            nextBusinessMap.set(b['業務id'], b);
+          });
+        }
+        
+        const formattedNextDayShifts = nextDayShiftData.map(shift => {
+          const business = nextBusinessMap.get(shift.business_master_id);
+          return {
+            ...shift,
+            business_name: business?.['業務名'] || '業務名不明',
+            start_time: business?.['開始時間'] || '',
+            end_time: business?.['終了時間'] || '',
+          };
+        });
+        setNextDayShifts(formattedNextDayShifts);
+      } else {
+        setNextDayShifts([]);
+      }
+
       // 残業時間を取得
       const date = parse(selectedDate, 'yyyy-MM-dd', new Date());
       const monthStart = format(new Date(date.getFullYear(), date.getMonth(), 1), 'yyyy-MM-dd');
@@ -185,43 +222,6 @@ export default function MobileShiftView() {
       } else {
         setOvertime(0);
       }
-
-      // 手当回数を計算
-      const { data: businessMasters } = await supabase
-        .from('business_master')
-        .select('業務id, 業務名, 早朝手当, 深夜手当');
-      
-      const businessMap = new Map((businessMasters || []).map(b => [b.業務id, b]));
-      
-      const { data: monthShifts } = await supabase
-        .from('shifts')
-        .select('business_master_id')
-        .eq('employee_id', selectedEmployee)
-        .gte('date', monthStart)
-        .lte('date', monthEnd);
-      
-      const allowanceTypes: {[key: string]: number} = {};
-      
-      if (monthShifts) {
-        monthShifts.forEach(shift => {
-          const business = businessMap.get(shift.business_master_id);
-          if (business) {
-            if (business.早朝手当) {
-              allowanceTypes['早朝手当'] = (allowanceTypes['早朝手当'] || 0) + 1;
-            }
-            if (business.深夜手当) {
-              allowanceTypes['深夜手当'] = (allowanceTypes['深夜手当'] || 0) + 1;
-            }
-          }
-        });
-      }
-      
-      const allowanceList = Object.entries(allowanceTypes).map(([type, count]) => ({
-        allowance_type: type,
-        count: count
-      }));
-      
-      setAllowances(allowanceList);
     } catch (error) {
       console.error('Error fetching shift data:', error);
     } finally {
@@ -364,46 +364,54 @@ export default function MobileShiftView() {
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <TrendingUp className="h-5 w-5 mr-2" />
-                    今月の残業時間
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">
-                    {overtime.toFixed(1)}時間
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <Award className="h-5 w-5 mr-2" />
-                    今月の手当回数
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {allowances.length > 0 ? (
-                    <div className="space-y-2">
-                      {allowances.map((allowance, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span className="text-gray-700">{allowance.allowance_type}</span>
-                          <span className="text-xl font-bold text-blue-600">
-                            {allowance.count}回
-                          </span>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="h-5 w-5 mr-2" />
+                  翌日の勤務予定
+                </CardTitle>
+                <CardDescription>
+                  {format(new Date(parse(selectedDate, 'yyyy-MM-dd', new Date()).getTime() + 24 * 60 * 60 * 1000), 'yyyy年MM月dd日', { locale: ja })}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {nextDayShifts.length > 0 ? (
+                  <div className="space-y-3">
+                    {nextDayShifts.map((shift) => (
+                      <div
+                        key={shift.id}
+                        className="p-4 bg-green-50 rounded-lg border border-green-200"
+                      >
+                        <div className="font-semibold text-lg text-green-900 mb-2">
+                          {shift.business_name}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-gray-500">手当なし</div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        <div className="text-sm text-green-700">
+                          {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    この日のシフトはありません
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <TrendingUp className="h-5 w-5 mr-2" />
+                  今月の残業時間
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600">
+                  {overtime.toFixed(1)}時間
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
