@@ -135,7 +135,16 @@ export default function MobileShiftView() {
       console.log('🔍 [DEBUG] Sample shifts for date:', { date: dateStr, count: sampleData?.length, sample: sampleData });
       if (sampleData && sampleData.length > 0) {
         console.log('📝 [DEBUG] Shift table columns:', Object.keys(sampleData[0]));
+        console.log('👥 [DEBUG] Sample employee_ids:', sampleData.map(s => ({ id: s.id, employee_id: s.employee_id, business_name: s.business_name })));
       }
+      
+      // 角田さんの全シフトを確認（日付フィルターなし）
+      const { data: tsunodaAllShifts } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', selectedEmployee)
+        .limit(5);
+      console.log('👤 [DEBUG] 角田さんの全シフト（最大5件）:', tsunodaAllShifts);
       
       // シフトデータを取得
       const { data: shiftData, error: shiftError } = await supabase
