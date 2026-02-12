@@ -113,10 +113,7 @@ export default function MobileShiftView() {
 
   // 実行ボタンがクリックされたときにシフトデータを取得
   const handleExecute = async () => {
-    console.log('🔍 [DEBUG] handleExecute called with:', { selectedEmployee, selectedDate, selectedOffice });
-    
     if (!selectedEmployee || !selectedDate) {
-      console.log('⚠️ [DEBUG] Missing required fields');
       return;
     }
 
