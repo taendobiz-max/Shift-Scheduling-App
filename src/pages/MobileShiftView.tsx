@@ -34,7 +34,8 @@ export default function MobileShiftView() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedOffice, setSelectedOffice] = useState<string>('');
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [selectedEmployee, setSelectedEmployee] = useState<string>(''); // UUID (id)
+  const [selectedEmployeeNumber, setSelectedEmployeeNumber] = useState<string>(''); // employee_id
   const [offices, setOffices] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [shifts, setShifts] = useState<ShiftData[]>([]);
@@ -62,12 +63,13 @@ export default function MobileShiftView() {
           
           const { data: employeeData } = await supabase
             .from('employees')
-            .select('office')
+            .select('office, employee_id')
             .eq('id', userData.employee_id)
             .single();
           
           if (employeeData) {
             setSelectedOffice(employeeData.office);
+            setSelectedEmployeeNumber(employeeData.employee_id);
           }
         }
       }
@@ -149,10 +151,20 @@ export default function MobileShiftView() {
       console.log('👤 [DEBUG] 角田さんの全シフト（最大5件）:', tsunodaAllShifts);
       
       // シフトデータを取得
+      // 従業員番号を取得
+      const { data: employeeData } = await supabase
+        .from('employees')
+        .select('employee_id')
+        .eq('id', selectedEmployee)
+        .single();
+      
+      const employeeNumber = employeeData?.employee_id || selectedEmployeeNumber;
+      console.log('🔢 [DEBUG] Using employee_number:', employeeNumber);
+      
       const { data: shiftData, error: shiftError } = await supabase
         .from('shifts')
         .select('*')
-        .eq('employee_id', selectedEmployee)
+        .eq('employee_id', employeeNumber)
         .eq('date', dateStr);
       
       console.log('📊 [DEBUG] Shift query result:', { data: shiftData, error: shiftError });
