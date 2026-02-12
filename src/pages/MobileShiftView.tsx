@@ -125,6 +125,18 @@ export default function MobileShiftView() {
       const dateStr = selectedDate;
       console.log('📅 [DEBUG] Fetching shift data:', { employee_id: selectedEmployee, date: dateStr });
       
+      // デバッグ: 2026-02-01の全シフトデータを取得してテーブル構造を確認
+      const { data: sampleData, error: sampleError } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('date', dateStr)
+        .limit(3);
+      
+      console.log('🔍 [DEBUG] Sample shifts for date:', { date: dateStr, count: sampleData?.length, sample: sampleData });
+      if (sampleData && sampleData.length > 0) {
+        console.log('📝 [DEBUG] Shift table columns:', Object.keys(sampleData[0]));
+      }
+      
       // シフトデータを取得
       const { data: shiftData, error: shiftError } = await supabase
         .from('shifts')
