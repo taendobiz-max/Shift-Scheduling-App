@@ -125,32 +125,6 @@ export default function MobileShiftView() {
     
     try {
       const dateStr = selectedDate;
-      console.log('📅 [DEBUG] Fetching shift data:', { employee_id: selectedEmployee, date: dateStr });
-      
-      // デバッグ: 2026-02-01の全シフトデータを取得してテーブル構造を確認
-      const { data: sampleData, error: sampleError } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('date', dateStr)
-        .limit(3);
-      
-      console.log('🔍 [DEBUG] Sample shifts for date:', { date: dateStr, count: sampleData?.length, sample: sampleData });
-      if (sampleData && sampleData.length > 0) {
-        console.log('📝 [DEBUG] Shift table columns:', Object.keys(sampleData[0]));
-        sampleData.forEach((s, index) => {
-          console.log(`👥 [DEBUG] Sample ${index + 1}: employee_id="${s.employee_id}", business_name="${s.business_name}"`);
-        });
-      }
-      
-      // 角田さんの全シフトを確認（日付フィルターなし）
-      const { data: tsunodaAllShifts } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('employee_id', selectedEmployee)
-        .limit(5);
-      console.log('👤 [DEBUG] 角田さんの全シフト（最大5件）:', tsunodaAllShifts);
-      
-      // シフトデータを取得
       // 従業員番号を取得
       const { data: employeeData } = await supabase
         .from('employees')
@@ -159,15 +133,12 @@ export default function MobileShiftView() {
         .single();
       
       const employeeNumber = employeeData?.employee_id || selectedEmployeeNumber;
-      console.log('🔢 [DEBUG] Using employee_number:', employeeNumber);
       
       const { data: shiftData, error: shiftError } = await supabase
         .from('shifts')
         .select('*')
         .eq('employee_id', employeeNumber)
         .eq('date', dateStr);
-      
-      console.log('📊 [DEBUG] Shift query result:', { data: shiftData, error: shiftError });
       
       if (!shiftError && shiftData && shiftData.length > 0) {
         const businessIds = shiftData.map(s => s.business_master_id).filter(Boolean);
@@ -185,7 +156,6 @@ export default function MobileShiftView() {
         
         const formattedShifts = shiftData.map(shift => {
           const business = businessMap.get(shift.business_master_id);
-          console.log('🔍 [DEBUG] Shift business mapping:', { shift_id: shift.id, business_master_id: shift.business_master_id, business: business });
           return {
             ...shift,
             business_name: business?.['業務名'] || '業務名不明',
