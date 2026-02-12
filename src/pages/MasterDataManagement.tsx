@@ -598,20 +598,6 @@ export default function MasterDataManagement() {
       {/* Tabs for Business Groups, Business Masters and Spot Business */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center gap-4 mb-6">
-          <TabsList className="grid grid-cols-3 flex-1 max-w-5xl">
-          <TabsTrigger value="business-groups" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            業務グループ
-          </TabsTrigger>
-          <TabsTrigger value="business-masters" className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
-            業務マスタ
-          </TabsTrigger>
-          <TabsTrigger value="spot-business" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            スポット業務
-          </TabsTrigger>
-        </TabsList>
         <div className="w-48">
           <Select value={officeFilter} onValueChange={setOfficeFilter}>
             <SelectTrigger>
@@ -625,6 +611,20 @@ export default function MasterDataManagement() {
             </SelectContent>
           </Select>
         </div>
+        <TabsList className="grid grid-cols-3 flex-1 max-w-5xl">
+          <TabsTrigger value="business-groups" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            業務グループ
+          </TabsTrigger>
+          <TabsTrigger value="business-masters" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            業務マスタ
+          </TabsTrigger>
+          <TabsTrigger value="spot-business" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            スポット業務
+          </TabsTrigger>
+        </TabsList>
       </div>
 
         {/* Business Groups Tab */}
