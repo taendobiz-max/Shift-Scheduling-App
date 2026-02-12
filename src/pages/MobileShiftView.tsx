@@ -135,7 +135,9 @@ export default function MobileShiftView() {
       console.log('🔍 [DEBUG] Sample shifts for date:', { date: dateStr, count: sampleData?.length, sample: sampleData });
       if (sampleData && sampleData.length > 0) {
         console.log('📝 [DEBUG] Shift table columns:', Object.keys(sampleData[0]));
-        console.log('👥 [DEBUG] Sample employee_ids:', sampleData.map(s => ({ id: s.id, employee_id: s.employee_id, business_name: s.business_name })));
+        sampleData.forEach((s, index) => {
+          console.log(`👥 [DEBUG] Sample ${index + 1}: employee_id="${s.employee_id}", business_name="${s.business_name}"`);
+        });
       }
       
       // 角田さんの全シフトを確認（日付フィルターなし）
