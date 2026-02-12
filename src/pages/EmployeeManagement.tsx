@@ -217,14 +217,13 @@ export default function EmployeeManagement() {
       console.log('💾 Saving employee data for ID:', employeeId);
       console.log('💾 Edit form data:', JSON.stringify(editFormData, null, 2));
       
-      // Ensure roll_call_capable and roll_call_duty are properly set
+      // Ensure roll_call_capable is properly set
       const updateData: EmployeeMaster = {
         name: editFormData.name,
         office: editFormData.office,
         班: editFormData.班,
         display_order: editFormData.display_order,
-        roll_call_capable: editFormData.roll_call_capable || false,
-        roll_call_duty: editFormData.roll_call_duty || '0'
+        roll_call_capable: editFormData.roll_call_capable || false
       };
       
       console.log('💾 Update data to send:', JSON.stringify(updateData, null, 2));
@@ -250,14 +249,13 @@ export default function EmployeeManagement() {
   const handleQuickToggleRollCall = async (employee: EmployeeMaster) => {
     if (!employee.employee_id) return;
 
-    const currentCapable = employee.roll_call_capable || employee.roll_call_duty === '1';
+    const currentCapable = employee.roll_call_capable || false;
     const newCapable = !currentCapable;
 
     try {
       const updateData: EmployeeMaster = {
         ...employee,
-        roll_call_capable: newCapable,
-        roll_call_duty: newCapable ? '1' : '0'
+        roll_call_capable: newCapable
       };
 
       const success = await updateEmployeeInSupabase(employee.employee_id, updateData);
@@ -552,10 +550,9 @@ export default function EmployeeManagement() {
                             <label className="text-sm font-medium">点呼対応</label>
                             <div className="flex items-center space-x-2 mt-3">
                               <Checkbox
-                                checked={editFormData.roll_call_capable || editFormData.roll_call_duty === '1'}
+                                checked={editFormData.roll_call_capable || false}
                                 onCheckedChange={(checked) => {
                                   handleEditFormChange('roll_call_capable', checked);
-                                  handleEditFormChange('roll_call_duty', checked ? '1' : '0');
                                 }}
                               />
                               <span className="text-sm">対応可能</span>

@@ -6,8 +6,7 @@ export interface EmployeeMaster {
   name?: string;
   office?: string;
   班?: string; // 東京営業所のみ：Galaxy、Aube、無し
-  roll_call_duty?: string;
-  roll_call_capable?: boolean; // New field for roll call capability
+  roll_call_capable?: boolean; // Roll call capability
   [key: string]: unknown;
 }
 
@@ -25,11 +24,10 @@ export const loadEmployeesFromExcel = async (): Promise<EmployeeMaster[]> => {
     if (!fetchError && existingData && existingData.length > 0) {
       console.log(`✅ Loaded ${existingData.length} employees from Supabase`);
       
-      // Normalize roll_call_duty values
+      // Normalize roll_call_capable values
       const normalizedData = existingData.map(emp => ({
         ...emp,
-        roll_call_duty: emp.roll_call_duty === 'true' || emp.roll_call_duty === '1' ? '1' : '0',
-        roll_call_capable: emp.roll_call_capable || emp.roll_call_duty === '1' || emp.roll_call_duty === 'true'
+        roll_call_capable: emp.roll_call_capable || false
       }));
       
       return normalizedData;
@@ -77,7 +75,6 @@ export const loadEmployeesFromExcel = async (): Promise<EmployeeMaster[]> => {
               employee['office'] = value;
               break;
             case '点呼業務':
-              employee['roll_call_duty'] = value;
               // Convert to boolean for roll_call_capable
               employee['roll_call_capable'] = value === '1' || value === 'true' || value === '可';
               break;
@@ -187,11 +184,10 @@ export const reloadEmployeesFromExcel = async (): Promise<EmployeeMaster[]> => {
     
     console.log(`✅ Loaded ${existingData.length} employees from Supabase`);
     
-    // Normalize roll_call_duty values
+    // Normalize roll_call_capable values
     const normalizedData = existingData.map(emp => ({
       ...emp,
-      roll_call_duty: emp.roll_call_duty === 'true' || emp.roll_call_duty === '1' ? '1' : '0',
-      roll_call_capable: emp.roll_call_capable || emp.roll_call_duty === '1' || emp.roll_call_duty === 'true'
+      roll_call_capable: emp.roll_call_capable || false
     }));
     
     return normalizedData;

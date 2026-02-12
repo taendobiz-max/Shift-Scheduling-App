@@ -39,8 +39,7 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onEmployeeUpdated
   const handleRollCallCapableChange = (checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      roll_call_capable: checked,
-      roll_call_duty: checked ? '1' : '0' // Sync with legacy field
+      roll_call_capable: checked
     }));
   };
 
@@ -146,30 +145,7 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onEmployeeUpdated
             </p>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="roll_call_duty">点呼業務（レガシー）</Label>
-            <Select
-              value={formData.roll_call_duty || ''}
-              onValueChange={(value) => {
-                handleInputChange('roll_call_duty', value);
-                // Sync with new checkbox field
-                setFormData(prev => ({
-                  ...prev,
-                  roll_call_duty: value,
-                  roll_call_capable: value === '1'
-                }));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="点呼業務を選択" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">対応可能</SelectItem>
-                <SelectItem value="0">対応不可</SelectItem>
-                <SelectItem value="">未設定</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
         </div>
         
         <DialogFooter>

@@ -19,7 +19,6 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
     name: '',
     office: '',
     班: '',
-    roll_call_duty: '',
     display_order: 9999
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +64,6 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
       name: '',
       office: '',
       班: '',
-      roll_call_duty: '',
       display_order: 9999
     });
     onClose();
@@ -150,32 +148,15 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="display_order">表示順</Label>
-              <Input
-                id="display_order"
-                type="number"
-                value={formData.display_order}
-                onChange={(e) => handleInputChange('display_order', parseInt(e.target.value) || 9999)}
-                placeholder="9999"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roll_call_duty">点呼業務</Label>
-              <Select
-                value={formData.roll_call_duty}
-                onValueChange={(value) => handleInputChange('roll_call_duty', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="点呼業務を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">対応可能</SelectItem>
-                  <SelectItem value="0">対応不可</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="display_order">表示順</Label>
+            <Input
+              id="display_order"
+              type="number"
+              value={formData.display_order}
+              onChange={(e) => handleInputChange('display_order', parseInt(e.target.value) || 9999)}
+              placeholder="9999"
+            />
           </div>
         </div>
         
