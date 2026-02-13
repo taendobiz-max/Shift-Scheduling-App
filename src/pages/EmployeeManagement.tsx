@@ -664,12 +664,12 @@ export default function EmployeeManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[600px] border">
                 <table className="w-full border-collapse">
-                  <thead>
+                  <thead className="sticky top-0 z-20">
                     <tr className="bg-muted">
-                      <th className="border p-2 text-left font-medium sticky left-0 bg-muted z-10">従業員名</th>
-                      <th className="border p-2 text-left font-medium">営業所</th>
+                      <th className="border p-2 text-left font-medium sticky left-0 bg-muted z-30 whitespace-nowrap">従業員名</th>
+                      <th className="border p-2 text-left font-medium sticky left-[120px] bg-muted z-30 whitespace-nowrap">営業所</th>
                       {filteredBusinessGroups.map(group => (
                         <th key={group} className="border p-2 text-center font-medium text-sm whitespace-nowrap">
                           {group}
@@ -680,8 +680,8 @@ export default function EmployeeManagement() {
                   <tbody>
                     {filteredEmployees.map((emp, index) => (
                       <tr key={emp.employee_id || index} className="hover:bg-muted/50">
-                        <td className="border p-2 font-medium sticky left-0 bg-background">{emp.name}</td>
-                        <td className="border p-2">{emp.office || '-'}</td>
+                        <td className="border p-2 font-medium sticky left-0 bg-background z-10 whitespace-nowrap">{emp.name}</td>
+                        <td className="border p-2 sticky left-[120px] bg-background z-10 whitespace-nowrap">{emp.office || '-'}</td>
                         {filteredBusinessGroups.map(group => {
                           const empSkills = employeeSkills[emp.employee_id || ''] || new Set();
                           const hasSkill = empSkills.has(group);
