@@ -668,8 +668,8 @@ export default function EmployeeManagement() {
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 z-20">
                     <tr className="bg-muted">
-                      <th className="border p-2 text-left font-medium sticky left-0 bg-muted z-30 whitespace-nowrap min-w-[150px]">従業員名</th>
-                      <th className="border p-2 text-left font-medium sticky left-[150px] bg-muted z-30 whitespace-nowrap min-w-[100px]">営業所</th>
+                      <th className="border p-2 text-left font-medium sticky left-0 bg-muted z-30 whitespace-nowrap w-[150px]">従業員名</th>
+                      <th className="border p-2 text-left font-medium sticky left-[150px] bg-muted z-30 whitespace-nowrap w-[100px]">営業所</th>
                       {filteredBusinessGroups.map(group => (
                         <th key={group} className="border p-2 text-center font-medium text-sm whitespace-nowrap">
                           {group}
@@ -680,13 +680,13 @@ export default function EmployeeManagement() {
                   <tbody>
                     {filteredEmployees.map((emp, index) => (
                       <tr key={emp.employee_id || index} className="hover:bg-muted/50">
-                        <td className="border p-2 font-medium sticky left-0 bg-background z-20 whitespace-nowrap min-w-[150px]">{emp.name}</td>
-                        <td className="border p-2 sticky left-[150px] bg-background z-20 whitespace-nowrap min-w-[100px]">{emp.office || '-'}</td>
+                        <td className="border p-2 font-medium sticky left-0 bg-background z-20 whitespace-nowrap w-[150px]">{emp.name}</td>
+                        <td className="border p-2 sticky left-[150px] bg-background z-20 whitespace-nowrap w-[100px]">{emp.office || '-'}</td>
                         {filteredBusinessGroups.map(group => {
                           const empSkills = employeeSkills[emp.employee_id || ''] || new Set();
                           const hasSkill = empSkills.has(group);
                           return (
-                            <td key={group} className="border p-2 text-center">
+                            <td key={group} className="border p-2 text-center relative z-0">
                               <Checkbox
                                 checked={hasSkill}
                                 onCheckedChange={async () => {
