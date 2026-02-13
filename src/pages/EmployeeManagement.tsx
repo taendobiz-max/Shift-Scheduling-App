@@ -687,11 +687,21 @@ export default function EmployeeManagement() {
                           const hasSkill = empSkills.has(group);
                           return (
                             <td key={group} className="border p-2 text-center">
-                              {hasSkill ? (
-                                <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-gray-300 mx-auto" />
-                              )}
+                              <Checkbox
+                                checked={hasSkill}
+                                onCheckedChange={async () => {
+                                  try {
+                                    const { toggleEmployeeSkill } = await import('@/utils/skillMatrixLoader');
+                                    await toggleEmployeeSkill(emp.employee_id || '', group);
+                                    await loadData();
+                                    toast.success(`✅ ${emp.name}の${group}スキルを${hasSkill ? '削除' : '追加'}しました`);
+                                  } catch (error) {
+                                    console.error('Skill toggle error:', error);
+                                    toast.error('❌ スキルの更新に失敗しました');
+                                  }
+                                }}
+                                className="mx-auto cursor-pointer"
+                              />
                             </td>
                           );
                         })}
