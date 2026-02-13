@@ -665,7 +665,7 @@ export default function EmployeeManagement() {
             </CardHeader>
             <CardContent>
               <div className="overflow-auto max-h-[600px] border">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse table-fixed">
                   <thead className="sticky top-0 z-20">
                     <tr className="bg-muted">
                       <th className="border p-2 text-left font-medium sticky left-0 bg-muted z-30 whitespace-nowrap w-[150px]">従業員名</th>
