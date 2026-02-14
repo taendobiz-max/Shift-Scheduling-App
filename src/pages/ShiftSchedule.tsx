@@ -2052,6 +2052,8 @@ export default function ShiftSchedule() {
                     
                     return a.name.localeCompare(b.name);
                   });
+                  
+                  console.log('ソート後の業務グループ一覧:', JSON.stringify(businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })), null, 2));
 
                   return businessGroups.map((businessGroup) => {
                     const businessShifts = businessGroup.shifts;
