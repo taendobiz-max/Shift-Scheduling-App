@@ -797,7 +797,8 @@ export default function ShiftSchedule() {
       const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
         .select('*')
-        .in('date', [selectedDate, previousDateStr]);
+        .in('date', [selectedDate, previousDateStr])
+        .eq('location', selectedLocation);
 
       if (shiftsError) {
         console.error('❌ Error loading shifts:', shiftsError);
