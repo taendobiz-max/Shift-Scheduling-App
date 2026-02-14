@@ -2002,58 +2002,29 @@ export default function ShiftSchedule() {
                   // 業務マスタから全業務を取得
                   locationBusinessMasters.forEach(businessMaster => {
                     const businessName = businessMaster.業務名 || '';
-                    const isOvernightBus = businessName.includes('夜行バス') || businessName.includes('往路') || businessName.includes('復路');
                     
-                    // 夜行バスの場合、班ごとに分けて表示
-                    if (isOvernightBus) {
-                      // Aube班とGalaxy班の両方を作成
-                      ['Aube', 'Galaxy'].forEach(group => {
-                        const groupKey = `${businessName}_${group}`;
-                        if (!processedBusinesses.has(groupKey)) {
-                          processedBusinesses.add(groupKey);
-                          const groupShifts = allShifts.filter(s => 
-                            s.business_name === businessName && s.employee_group === group
-                          );
-                          businessGroups.push({
-                            key: groupKey,
-                            name: `${businessName} (${group}班)`,
-                            shifts: groupShifts
-                          });
-                        }
+                    // 全ての業務を班分けせずに表示
+                    if (!processedBusinesses.has(businessName)) {
+                      processedBusinesses.add(businessName);
+                      const businessShifts = allShifts.filter(s => s.business_name === businessName);
+                      
+                      businessGroups.push({
+                        key: businessName,
+                        name: businessName,
+                        shifts: businessShifts
                       });
-                    } else {
-                      // 通常の業務
-                      if (!processedBusinesses.has(businessName)) {
-                        processedBusinesses.add(businessName);
-                        const businessShifts = allShifts.filter(s => s.business_name === businessName);
-                        
-                        businessGroups.push({
-                          key: businessName,
-                          name: businessName,
-                          shifts: businessShifts
-                        });
-                      }
                     }
                   });
                   
                   console.log('業務グループ一覧:', JSON.stringify(businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })), null, 2));
                   console.log('選択された拠点の業務マスタ数:', locationBusinessMasters.length);
                   
-                  // ソート：点呼業務を一番上に、次にAube班、その次にGalaxy班
+                  // ソート:点呼業務を一番上に、その他は業務名順
                   businessGroups.sort((a, b) => {
                     const aIsRollCall = a.name.includes('点呼');
                     const bIsRollCall = b.name.includes('点呼');
                     if (aIsRollCall && !bIsRollCall) return -1;
                     if (!aIsRollCall && bIsRollCall) return 1;
-                    
-                    // Aube班をGalaxy班より先に
-                    const aIsAube = a.name.includes('Aube班');
-                    const bIsAube = b.name.includes('Aube班');
-                    const aIsGalaxy = a.name.includes('Galaxy班');
-                    const bIsGalaxy = b.name.includes('Galaxy班');
-                    
-                    if (aIsAube && bIsGalaxy) return -1;
-                    if (aIsGalaxy && bIsAube) return 1;
                     
                     return a.name.localeCompare(b.name);
                   });
