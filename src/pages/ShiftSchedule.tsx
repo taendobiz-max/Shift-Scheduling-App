@@ -1235,7 +1235,7 @@ export default function ShiftSchedule() {
     }
   };
 
-  const getTimeBarStyle = (startTime: string, endTime: string) => {
+  const getTimeBarStyle = (startTime: string, endTime: string): { left: string; width: string; }[] => {
     const timeToHour = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number);
       let adjustedHours = hours - 4;
@@ -1246,10 +1246,31 @@ export default function ShiftSchedule() {
     const startHour = timeToHour(startTime);
     const endHour = timeToHour(endTime);
     
+    // 日またぎの判定: endHour < startHour の場合
+    const isOvernight = endHour < startHour;
+    
+    if (isOvernight) {
+      // 日またぎの場合、2つのバーを返す
+      // 1つ目: 当日のバー（startTime から 02:59 まで）
+      const todayEndHour = 23; // 02:59 = 調整後23時間
+      const todayLeft = (startHour / 24) * 100;
+      const todayWidth = ((todayEndHour - startHour) / 24) * 100;
+      
+      // 2つ目: 翌日のバー（04:00 から endTime まで）
+      const tomorrowLeft = 0; // 04:00 = 調整後0時間
+      const tomorrowWidth = (endHour / 24) * 100;
+      
+      return [
+        { left: `${todayLeft}%`, width: `${todayWidth}%` },
+        { left: `${tomorrowLeft}%`, width: `${tomorrowWidth}%` }
+      ];
+    }
+    
+    // 通常の場合、1つのバーを配列で返す
     const left = (startHour / 24) * 100;
     const width = ((endHour - startHour) / 24) * 100;
 
-    return { left: `${left}%`, width: `${width}%` };
+    return [{ left: `${left}%`, width: `${width}%` }];
   };
   
   // Calculate empty time slots for an employee
@@ -1813,14 +1834,14 @@ export default function ShiftSchedule() {
                           
                           {/* Shift Bars */}
                           {employeeShifts.map((shift) => {
-                            const barStyle = getTimeBarStyle(
+                            const barStyles = getTimeBarStyle(
                               shift.start_time || '09:00:00',
                               shift.end_time || '17:00:00'
                             );
                             
-                            return (
+                            return barStyles.map((barStyle, index) => (
                               <ShiftBar
-                                key={shift.id}
+                                key={`${shift.id}-${index}`}
                                 employeeId={shift.employee_id}
                                 employeeName={shift.employee_name || employee.name}
                                 shiftId={shift.id}
@@ -1848,8 +1869,8 @@ export default function ShiftSchedule() {
                                 isSpotBusiness={shift.is_spot_business || false}
                                 viewMode={dailyViewMode}
                               />
-                            );
-                          })}
+                            ));
+                          })
                         </div>
                       </div>
                     );
