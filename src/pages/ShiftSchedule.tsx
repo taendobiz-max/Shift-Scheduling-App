@@ -2032,7 +2032,7 @@ export default function ShiftSchedule() {
                     }
                   });
                   
-                  console.log('業務グループ一覧:', businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })));
+                  console.log('業務グループ一覧:', JSON.stringify(businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })), null, 2));
                   
                   // ソート：点呼業務を一番上に、次にAube班、その次にGalaxy班
                   businessGroups.sort((a, b) => {
