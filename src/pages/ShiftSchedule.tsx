@@ -797,8 +797,7 @@ export default function ShiftSchedule() {
       const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
         .select('*')
-        .in('date', [selectedDate, previousDateStr])
-        .eq('location', selectedLocation);
+        .in('date', [selectedDate, previousDateStr]);
 
       if (shiftsError) {
         console.error('❌ Error loading shifts:', shiftsError);
@@ -1985,44 +1984,42 @@ export default function ShiftSchedule() {
                     return false;
                   });
                   
-                  // 東京の夜行バスの場合、班ごとに分けて表示
+                  // 選択された拠点の業務マスタを取得
+                  const locationBusinessMasters = businessMasters.filter(bm => bm.営業所 === selectedLocation);
+                  
+                  // 業務グループを作成（アサインされていない業務も含む）
                   const businessGroups: Array<{key: string; name: string; shifts: ShiftData[]}> = [];
                   const processedBusinesses = new Set<string>();
                   
                   console.log('allShifts for business view:', allShifts.map(s => ({ date: s.date, business_name: s.business_name, employee_group: s.employee_group, employee_name: s.employee_name })));
                   
-                  allShifts.forEach(shift => {
-                    const businessName = shift.business_name || '';
-                    const isTokyoOvernightBus = shift.location === '東京' && 
-                      (businessName.includes('夜行バス') || businessName.includes('往路') || businessName.includes('復路'));
+                  // 業務マスタから全業務を取得
+                  locationBusinessMasters.forEach(businessMaster => {
+                    const businessName = businessMaster.業務名 || '';
+                    const isOvernightBus = businessName.includes('夜行バス') || businessName.includes('往路') || businessName.includes('復路');
                     
-                    if (businessName.includes('奈良便')) {
-                      console.log('奈良便シフト:', { date: shift.date, business_name: businessName, employee_group: shift.employee_group, employee_name: shift.employee_name, isTokyoOvernightBus });
-                    }
-                    
-                    if (isTokyoOvernightBus && shift.employee_group) {
-                      // 東京の夜行バスで班情報がある場合
-                      const groupKey = `${businessName}_${shift.employee_group}`;
-                      if (!processedBusinesses.has(groupKey)) {
-                        processedBusinesses.add(groupKey);
-                        const groupShifts = allShifts.filter(s => 
-                          s.business_name === businessName && s.employee_group === shift.employee_group
-                        );
-                        businessGroups.push({
-                          key: groupKey,
-                          name: `${businessName} (${shift.employee_group}班)`,
-                          shifts: groupShifts
-                        });
-                      }
+                    // 夜行バスの場合、班ごとに分けて表示
+                    if (isOvernightBus) {
+                      // Aube班とGalaxy班の両方を作成
+                      ['Aube', 'Galaxy'].forEach(group => {
+                        const groupKey = `${businessName}_${group}`;
+                        if (!processedBusinesses.has(groupKey)) {
+                          processedBusinesses.add(groupKey);
+                          const groupShifts = allShifts.filter(s => 
+                            s.business_name === businessName && s.employee_group === group
+                          );
+                          businessGroups.push({
+                            key: groupKey,
+                            name: `${businessName} (${group}班)`,
+                            shifts: groupShifts
+                          });
+                        }
+                      });
                     } else {
                       // 通常の業務
                       if (!processedBusinesses.has(businessName)) {
                         processedBusinesses.add(businessName);
                         const businessShifts = allShifts.filter(s => s.business_name === businessName);
-                        
-                        if (businessName.includes('奈良便')) {
-                          console.log('奈良便の業務グループを作成:', { businessName, shiftsCount: businessShifts.length });
-                        }
                         
                         businessGroups.push({
                           key: businessName,
@@ -2034,6 +2031,7 @@ export default function ShiftSchedule() {
                   });
                   
                   console.log('業務グループ一覧:', JSON.stringify(businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })), null, 2));
+                  console.log('選択された拠点の業務マスタ数:', locationBusinessMasters.length);
                   
                   // ソート：点呼業務を一番上に、次にAube班、その次にGalaxy班
                   businessGroups.sort((a, b) => {
