@@ -1988,10 +1988,16 @@ export default function ShiftSchedule() {
                   const businessGroups: Array<{key: string; name: string; shifts: ShiftData[]}> = [];
                   const processedBusinesses = new Set<string>();
                   
+                  console.log('allShifts for business view:', allShifts.map(s => ({ date: s.date, business_name: s.business_name, employee_group: s.employee_group, employee_name: s.employee_name })));
+                  
                   allShifts.forEach(shift => {
                     const businessName = shift.business_name || '';
                     const isTokyoOvernightBus = shift.location === '東京' && 
                       (businessName.includes('夜行バス') || businessName.includes('往路') || businessName.includes('復路'));
+                    
+                    if (businessName.includes('奈良便')) {
+                      console.log('奈良便シフト:', { date: shift.date, business_name: businessName, employee_group: shift.employee_group, employee_name: shift.employee_name, isTokyoOvernightBus });
+                    }
                     
                     if (isTokyoOvernightBus && shift.employee_group) {
                       // 東京の夜行バスで班情報がある場合
