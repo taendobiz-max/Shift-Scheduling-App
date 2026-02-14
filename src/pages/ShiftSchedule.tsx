@@ -2018,6 +2018,11 @@ export default function ShiftSchedule() {
                       if (!processedBusinesses.has(businessName)) {
                         processedBusinesses.add(businessName);
                         const businessShifts = allShifts.filter(s => s.business_name === businessName);
+                        
+                        if (businessName.includes('奈良便')) {
+                          console.log('奈良便の業務グループを作成:', { businessName, shiftsCount: businessShifts.length });
+                        }
+                        
                         businessGroups.push({
                           key: businessName,
                           name: businessName,
@@ -2026,6 +2031,8 @@ export default function ShiftSchedule() {
                       }
                     }
                   });
+                  
+                  console.log('業務グループ一覧:', businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })));
                   
                   // ソート：点呼業務を一番上に、次にAube班、その次にGalaxy班
                   businessGroups.sort((a, b) => {
