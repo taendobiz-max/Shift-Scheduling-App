@@ -788,11 +788,16 @@ export default function ShiftSchedule() {
         console.log('🔍 [DEBUG] Business master field names:', businessData[0] ? Object.keys(businessData[0]) : 'No data');
       }
       
-      // Load shifts for selected date
+      // Load shifts for selected date and previous day (for overnight shifts)
+      const selectedDateObj = new Date(selectedDate);
+      const previousDate = new Date(selectedDateObj);
+      previousDate.setDate(previousDate.getDate() - 1);
+      const previousDateStr = previousDate.toISOString().split('T')[0];
+      
       const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
         .select('*')
-        .eq('date', selectedDate);
+        .in('date', [selectedDate, previousDateStr]);
 
       if (shiftsError) {
         console.error('❌ Error loading shifts:', shiftsError);
