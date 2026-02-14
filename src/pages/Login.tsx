@@ -74,9 +74,7 @@ export default function Login() {
                 required
                 autoFocus
               />
-              <p className="text-xs text-gray-500">
-                ※ メールアドレス全体（例: t-endo@fkk-g.co.jp）でも入力可能です
-              </p>
+
             </div>
             
             <div className="space-y-2">
@@ -98,6 +96,10 @@ export default function Login() {
             >
               {isLoading ? 'ログイン中...' : 'ログイン'}
             </Button>
+            
+            <p className="text-xs text-center text-gray-500 mt-4">
+              ユーザIDやパスワードが分からない方は<a href="mailto:t-endo@fkk-g.co.jp" className="text-blue-600 hover:underline">t-endo@fkk-g.co.jp</a>へご連絡ください
+            </p>
           </form>
         </CardContent>
       </Card>
