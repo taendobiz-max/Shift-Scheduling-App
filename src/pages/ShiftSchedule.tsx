@@ -2057,6 +2057,10 @@ export default function ShiftSchedule() {
                     const businessShifts = businessGroup.shifts;
                     const business = businessGroup.name;
                     
+                    if (business.includes('奈良便')) {
+                      console.log('奈良便の業務グループをレンダリング:', { business, shiftsCount: businessShifts.length });
+                    }
+                    
                     return (
                       <div key={businessGroup.key} className="flex border-b border-gray-200 hover:bg-gray-50">
                         {/* Business Name Column */}
