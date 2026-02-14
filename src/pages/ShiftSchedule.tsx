@@ -1998,7 +1998,7 @@ export default function ShiftSchedule() {
                       const groupKey = `${businessName}_${shift.employee_group}`;
                       if (!processedBusinesses.has(groupKey)) {
                         processedBusinesses.add(groupKey);
-                        const groupShifts = shifts.filter(s => 
+                        const groupShifts = allShifts.filter(s => 
                           s.business_name === businessName && s.employee_group === shift.employee_group
                         );
                         businessGroups.push({
@@ -2011,7 +2011,7 @@ export default function ShiftSchedule() {
                       // 通常の業務
                       if (!processedBusinesses.has(businessName)) {
                         processedBusinesses.add(businessName);
-                        const businessShifts = shifts.filter(s => s.business_name === businessName);
+                        const businessShifts = allShifts.filter(s => s.business_name === businessName);
                         businessGroups.push({
                           key: businessName,
                           name: businessName,
