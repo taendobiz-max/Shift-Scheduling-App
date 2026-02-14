@@ -1961,8 +1961,9 @@ export default function ShiftSchedule() {
                 {(() => {
                   // 前日の日またぎシフトを含むシフトデータを取得（選択された拠点のみ）
                   const allShifts = shifts.filter(s => {
-                    // 拠点のフィルタリング
-                    if (s.location !== selectedLocation) {
+                    // 業務マスタの営業所で拠点をフィルタリング
+                    const businessMaster = businessMasters.find(bm => bm.業務id === s.business_id);
+                    if (!businessMaster || businessMaster.営業所 !== selectedLocation) {
                       return false;
                     }
                     
