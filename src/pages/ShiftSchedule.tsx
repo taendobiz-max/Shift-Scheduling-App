@@ -1959,11 +1959,36 @@ export default function ShiftSchedule() {
 
                 {/* Business Rows */}
                 {(() => {
+                  // 前日の日またぎシフトを含むシフトデータを取得
+                  const allShifts = shifts.filter(s => {
+                    // 当日のシフト
+                    if (s.date === selectedDate) {
+                      return true;
+                    }
+                    
+                    // 前日の日またぎシフト
+                    const shiftDate = new Date(s.date);
+                    const selected = new Date(selectedDate);
+                    const dayDiff = (selected.getTime() - shiftDate.getTime()) / (1000 * 60 * 60 * 24);
+                    
+                    if (dayDiff === 1) {
+                      // 前日のシフトで、終了時刻が開始時刻より小さい場合（日またぎ）
+                      const startHour = parseInt((s.start_time || "00:00:00").split(":")[0]);
+                      const endHour = parseInt((s.end_time || "00:00:00").split(":")[0]);
+                      
+                      if (endHour < startHour) {
+                        return true; // 前日の日またぎシフトを含める
+                      }
+                    }
+                    
+                    return false;
+                  });
+                  
                   // 東京の夜行バスの場合、班ごとに分けて表示
                   const businessGroups: Array<{key: string; name: string; shifts: ShiftData[]}> = [];
                   const processedBusinesses = new Set<string>();
                   
-                  shifts.forEach(shift => {
+                  allShifts.forEach(shift => {
                     const businessName = shift.business_name || '';
                     const isTokyoOvernightBus = shift.location === '東京' && 
                       (businessName.includes('夜行バス') || businessName.includes('往路') || businessName.includes('復路'));
@@ -2048,14 +2073,18 @@ export default function ShiftSchedule() {
                           
                           {/* Shift Bars */}
                           {businessShifts.map((shift) => {
-                            const barStyle = getTimeBarStyle(
+                            // 前日の日またぎシフトかどうかを判定
+                            const isNextDay = shift.date !== selectedDate;
+                            
+                            const barStyles = getTimeBarStyle(
                               shift.start_time || '09:00:00',
-                              shift.end_time || '17:00:00'
+                              shift.end_time || '17:00:00',
+                              isNextDay
                             );
                             
-                            return (
+                            return barStyles.map((barStyle, index) => (
                               <ShiftBar
-                                key={shift.id}
+                                key={`${shift.id}-${index}`}
                                 employeeId={shift.employee_id}
                                 employeeName={shift.employee_name}
                                 shiftId={shift.id}
@@ -2083,7 +2112,7 @@ export default function ShiftSchedule() {
                                 isSpotBusiness={shift.is_spot_business || false}
                                 viewMode={dailyViewMode}
                               />
-                            );
+                            ));
                           })}
                         </div>
                       </div>
