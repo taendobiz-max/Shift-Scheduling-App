@@ -648,9 +648,23 @@ export default function ShiftSchedule() {
   };
 
   useEffect(() => {
-    // Set default date to today
-    const today = new Date();
-    setSelectedDate(today.toISOString().split('T')[0]);
+    // Read URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const dateParam = urlParams.get('date');
+    const locationParam = urlParams.get('location');
+    
+    // Set date from URL parameter or default to today
+    if (dateParam) {
+      setSelectedDate(dateParam);
+    } else {
+      const today = new Date();
+      setSelectedDate(today.toISOString().split('T')[0]);
+    }
+    
+    // Set location from URL parameter if provided
+    if (locationParam) {
+      setSelectedLocation(locationParam);
+    }
   }, []);
 
   useEffect(() => {
