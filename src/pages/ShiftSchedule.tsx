@@ -1278,8 +1278,8 @@ export default function ShiftSchedule() {
           { left: `${tomorrowLeft}%`, width: `${tomorrowWidth}%` }
         ];
       } else {
-        // 当日の画面では、当日分のバー（startTime から 02:59 まで）のみを返す
-        const todayEndHour = 23; // 02:59 = 調整後23時間
+        // 当日の画面では、当日分のバー（startTime から 03:59 まで）のみを返す
+        const todayEndHour = 24; // 03:59 = 調整後24時間
         const todayLeft = (startHour / 24) * 100;
         const todayWidth = ((todayEndHour - startHour) / 24) * 100;
         
