@@ -1739,7 +1739,7 @@ export default function ShiftSchedule() {
               <div className="min-w-[1200px]">
                 {/* Time Header */}
                 <div className="flex border-b-2 border-gray-300 bg-gray-100 sticky top-0 z-10">
-                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center whitespace-nowrap">
+                  <div className="w-24 p-2 border-r-2 border-gray-300 font-semibold flex items-center whitespace-nowrap">
                     従業員名
                   </div>
                   <div className="flex-1 relative">
@@ -1782,7 +1782,7 @@ export default function ShiftSchedule() {
                     return (
                       <div key={employee.employee_id} className="flex border-b border-gray-200 hover:bg-gray-50">
                         {/* Employee Name Column */}
-                        <div className="w-40 p-2 border-r-2 border-gray-300 font-medium flex items-center">
+                         <div className="w-24 p-2 border-r-2 border-gray-300 font-medium flex items-center">
                           {employee.name}
                         </div>
                         
@@ -1868,7 +1868,7 @@ export default function ShiftSchedule() {
               <div className="min-w-[1200px]">
                 {/* Time Header */}
                 <div className="flex border-b-2 border-gray-300 bg-gray-100 sticky top-0 z-10">
-                  <div className="w-40 p-2 border-r-2 border-gray-300 font-semibold flex items-center whitespace-nowrap">
+                  <div className="w-24 p-2 border-r-2 border-gray-300 font-semibold flex items-center whitespace-nowrap">
                     業務名
                   </div>
                   <div className="flex-1 relative">
@@ -1950,7 +1950,7 @@ export default function ShiftSchedule() {
                     return (
                       <div key={businessGroup.key} className="flex border-b border-gray-200 hover:bg-gray-50">
                         {/* Business Name Column */}
-                        <div className="w-40 p-2 border-r-2 border-gray-300 font-medium flex items-center">
+                        <div className="w-24 p-2 border-r-2 border-gray-300 font-medium flex items-center">
                           {business}
                         </div>
                         
