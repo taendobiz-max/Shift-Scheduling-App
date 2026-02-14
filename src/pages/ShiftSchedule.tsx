@@ -1235,7 +1235,7 @@ export default function ShiftSchedule() {
     }
   };
 
-  const getTimeBarStyle = (startTime: string, endTime: string): { left: string; width: string; }[] => {
+  const getTimeBarStyle = (startTime: string, endTime: string, isNextDay: boolean = false): { left: string; width: string; }[] => {
     const timeToHour = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number);
       let adjustedHours = hours - 4;
@@ -1250,20 +1250,24 @@ export default function ShiftSchedule() {
     const isOvernight = endHour < startHour;
     
     if (isOvernight) {
-      // 日またぎの場合、2つのバーを返す
-      // 1つ目: 当日のバー（startTime から 02:59 まで）
-      const todayEndHour = 23; // 02:59 = 調整後23時間
-      const todayLeft = (startHour / 24) * 100;
-      const todayWidth = ((todayEndHour - startHour) / 24) * 100;
-      
-      // 2つ目: 翌日のバー（04:00 から endTime まで）
-      const tomorrowLeft = 0; // 04:00 = 調整後0時間
-      const tomorrowWidth = (endHour / 24) * 100;
-      
-      return [
-        { left: `${todayLeft}%`, width: `${todayWidth}%` },
-        { left: `${tomorrowLeft}%`, width: `${tomorrowWidth}%` }
-      ];
+      if (isNextDay) {
+        // 翌日の画面では、翌日分のバー（04:00 から endTime まで）のみを返す
+        const tomorrowLeft = 0; // 04:00 = 調整後0時間
+        const tomorrowWidth = (endHour / 24) * 100;
+        
+        return [
+          { left: `${tomorrowLeft}%`, width: `${tomorrowWidth}%` }
+        ];
+      } else {
+        // 当日の画面では、当日分のバー（startTime から 02:59 まで）のみを返す
+        const todayEndHour = 23; // 02:59 = 調整後23時間
+        const todayLeft = (startHour / 24) * 100;
+        const todayWidth = ((todayEndHour - startHour) / 24) * 100;
+        
+        return [
+          { left: `${todayLeft}%`, width: `${todayWidth}%` }
+        ];
+      }
     }
     
     // 通常の場合、1つのバーを配列で返す
@@ -1798,7 +1802,31 @@ export default function ShiftSchedule() {
                     return (a.name || '').localeCompare(b.name || '');
                   })
                   .map((employee) => {
-                    const employeeShifts = shifts.filter(s => s.employee_id === employee.employee_id);
+                    const employeeShifts = shifts.filter(s => {
+                      // 当日のシフト
+                      if (s.employee_id === employee.employee_id && s.date === selectedDate) {
+                        return true;
+                      }
+                      
+                      // 前日の日またぎシフト
+                      if (s.employee_id === employee.employee_id) {
+                        const shiftDate = new Date(s.date);
+                        const selected = new Date(selectedDate);
+                        const dayDiff = (selected.getTime() - shiftDate.getTime()) / (1000 * 60 * 60 * 24);
+                        
+                        if (dayDiff === 1) {
+                          // 前日のシフトで、終了時刻が開始時刻より小さい場合（日またぎ）
+                          const startHour = parseInt((s.start_time || "00:00:00").split(":")[0]);
+                          const endHour = parseInt((s.end_time || "00:00:00").split(":")[0]);
+                          
+                          if (endHour < startHour) {
+                            return true; // 前日の日またぎシフトを含める
+                          }
+                        }
+                      }
+                      
+                      return false;
+                    });
                     
                     return (
                       <div key={employee.employee_id} className="flex border-b border-gray-200 hover:bg-gray-50">
@@ -1834,9 +1862,13 @@ export default function ShiftSchedule() {
                           
                           {/* Shift Bars */}
                           {employeeShifts.map((shift) => {
+                            // 前日の日またぎシフトかどうかを判定
+                            const isNextDay = shift.date !== selectedDate;
+                            
                             const barStyles = getTimeBarStyle(
                               shift.start_time || '09:00:00',
-                              shift.end_time || '17:00:00'
+                              shift.end_time || '17:00:00',
+                              isNextDay
                             );
                             
                             return barStyles.map((barStyle, index) => (
