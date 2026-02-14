@@ -1959,8 +1959,13 @@ export default function ShiftSchedule() {
 
                 {/* Business Rows */}
                 {(() => {
-                  // 前日の日またぎシフトを含むシフトデータを取得
+                  // 前日の日またぎシフトを含むシフトデータを取得（選択された拠点のみ）
                   const allShifts = shifts.filter(s => {
+                    // 拠点のフィルタリング
+                    if (s.location !== selectedLocation) {
+                      return false;
+                    }
+                    
                     // 当日のシフト
                     if (s.date === selectedDate) {
                       return true;
