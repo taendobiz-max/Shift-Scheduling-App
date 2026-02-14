@@ -1870,7 +1870,7 @@ export default function ShiftSchedule() {
                                 viewMode={dailyViewMode}
                               />
                             ));
-                          })
+                          })}
                         </div>
                       </div>
                     );
