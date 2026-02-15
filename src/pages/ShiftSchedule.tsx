@@ -1508,10 +1508,11 @@ export default function ShiftSchedule() {
                                       multiDayBusiness ? 'bg-purple-100' : ''
                                     }`}
                                     onClick={() => {
-                                      const employeeShift = periodShifts.find(s => s.employee_name === employee);
-                                      if (employeeShift) {
+                                      // allEmployeesから直接employee_idを取得（シフトがない従業員にも対応）
+                                      const employeeData = allEmployees.find(e => e.name === employee && e.office === selectedLocation);
+                                      if (employeeData) {
                                         // ポップアップアサイン機能を開く
-                                        handleAssignPopupOpen(date, employeeShift.employee_id, employee);
+                                        handleAssignPopupOpen(date, employeeData.employee_id, employee);
                                       }
                                     }}
                                   >
