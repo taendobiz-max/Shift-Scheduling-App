@@ -1178,11 +1178,10 @@ export default function ShiftSchedule() {
       let shiftsToCheck: any[] = [];
       
       if (activeTab === 'daily') {
-        // 日付勤務割確認: 選択されている日付と営業所でフィルタリング
+        // 日付勤務割確認: shifts配列は既に選択されている日付と前日のシフトを含むため、営業所のみでフィルタリング
         shiftsToCheck = shifts.filter(s => {
-          const dateMatch = s.date === selectedDate;
           const locationMatch = selectedLocation === 'all' || s.location === selectedLocation;
-          return dateMatch && locationMatch;
+          return locationMatch;
         });
         console.log('🔍 [RULE_CHECK] Daily view - Date:', selectedDate, 'Location:', selectedLocation, 'Shifts:', shiftsToCheck.length);
       } else {
