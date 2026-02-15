@@ -9,6 +9,7 @@ import { supabase } from '@/utils/supabaseClient';
 import { Link } from 'react-router-dom';
 
 interface Employee {
+  id: string;
   employee_id: string;
   name: string;
   office: string;
@@ -82,7 +83,7 @@ const Reports: React.FC = () => {
       // Fetch all employees
       let employeeQuery = supabase
         .from('employees')
-        .select('employee_id, name, office');
+        .select('id, employee_id, name, office');
       
       // Filter by office if not "u3059u3079u3066"
       if (selectedOffice !== 'u3059u3079u3066') {
