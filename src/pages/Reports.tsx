@@ -162,7 +162,7 @@ const Reports: React.FC = () => {
         const leaveDays = empLeaves.length;
 
         // Calculate overtime hours from manual_overtime table only
-        const empOvertimes = (overtimeData || []).filter((o: any) => o.employee_id === emp.employee_id);
+        const empOvertimes = (overtimeData || []).filter((o: any) => o.employee_id === emp.id);
         const overtimeHours = empOvertimes.reduce((sum: number, o: any) => {
           return sum + (parseFloat(o.overtime_hours) || 0);
         }, 0);
