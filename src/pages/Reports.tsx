@@ -85,8 +85,8 @@ const Reports: React.FC = () => {
         .from('employees')
         .select('id, employee_id, name, office');
       
-      // Filter by office if not "u3059u3079u3066"
-      if (selectedOffice !== 'u3059u3079u3066') {
+      // Filter by office if not "すべて"
+      if (selectedOffice !== 'すべて') {
         employeeQuery = employeeQuery.eq('office', selectedOffice);
       }
       
