@@ -157,6 +157,7 @@ const ShiftBar = ({
     return (
       <div
         onClick={onClick}
+        onContextMenu={onContextMenu}
         className={`inline-block px-2 py-1 rounded text-white text-xs font-medium cursor-pointer ${
           isSelected 
             ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300' 
