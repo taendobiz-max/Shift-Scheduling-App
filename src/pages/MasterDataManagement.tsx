@@ -778,14 +778,12 @@ export default function MasterDataManagement() {
                         {master.開始時間 && master.終了時間 && (
                           <p><strong>拘束時間:</strong> {calculateWorkDuration(master.開始時間, master.終了時間)}</p>
                         )}
-                        {master.スキルマップ項目名 && (
-                          <p><strong>スキル:</strong> {master.スキルマップ項目名}</p>
+
+                        {master.早朝手当 === 'true' && (
+                          <p><strong>早朝手当:</strong> あり</p>
                         )}
-                        {master.早朝手当 && (
-                          <p><strong>早朝手当:</strong> {master.早朝手当}</p>
-                        )}
-                        {master.深夜手当 && (
-                          <p><strong>深夜手当:</strong> {master.深夜手当}</p>
+                        {master.深夜手当 === 'true' && (
+                          <p><strong>深夜手当:</strong> あり</p>
                         )}
                         {master.ペア業務id && (
                           <p><strong>ペア業務:</strong> {master.ペア業務id}</p>
@@ -966,44 +964,35 @@ export default function MasterDataManagement() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="早朝手当">早朝手当</Label>
-                <Input
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
                   id="早朝手当"
-                  value={businessMasterForm.早朝手当}
-                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 早朝手当: e.target.value })}
-                  placeholder="例: 500円"
+                  checked={businessMasterForm.早朝手当 === 'true'}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 早朝手当: e.target.checked ? 'true' : '' })}
+                  className="h-4 w-4"
                 />
+                <Label htmlFor="早朝手当" className="cursor-pointer">早朝手当</Label>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="深夜手当">深夜手当</Label>
-                <Input
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
                   id="深夜手当"
-                  value={businessMasterForm.深夜手当}
-                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 深夜手当: e.target.value })}
-                  placeholder="例: 1000円"
+                  checked={businessMasterForm.深夜手当 === 'true'}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 深夜手当: e.target.checked ? 'true' : '' })}
+                  className="h-4 w-4"
                 />
+                <Label htmlFor="深夜手当" className="cursor-pointer">深夜手当</Label>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="スキルマップ項目名">スキルマップ項目名</Label>
-                <Input
-                  id="スキルマップ項目名"
-                  value={businessMasterForm.スキルマップ項目名}
-                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, スキルマップ項目名: e.target.value })}
-                  placeholder="例: 運転技能"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ペア業務id">ペア業務ID</Label>
-                <Input
-                  id="ペア業務id"
-                  value={businessMasterForm.ペア業務id}
-                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
-                  placeholder="例: TKS_PAIR"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="ペア業務id">ペア業務ID</Label>
+              <Input
+                id="ペア業務id"
+                value={businessMasterForm.ペア業務id}
+                onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
+                placeholder="例: TKS_PAIR"
+              />
             </div>
             
             {/* 夜行バス関連フィールド */}
