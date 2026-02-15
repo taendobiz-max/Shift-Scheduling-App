@@ -1585,7 +1585,10 @@ export default function ShiftSchedule() {
                                                 }
                                               }}
                                             >
-                                              {business.name}
+                                              {shift?.multi_day_info?.direction 
+                                                ? `${business.name}（${shift.multi_day_info.direction === 'outbound' ? '往路' : '復路'}）`
+                                                : business.name
+                                              }
                                             </div>
                                           );
                                         })}  
