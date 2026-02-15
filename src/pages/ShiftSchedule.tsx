@@ -403,7 +403,8 @@ export default function ShiftSchedule() {
               name: baseName,
               isMultiDay: true,
               colspan: actualColspan,
-              setId: shift.multi_day_set_id
+              setId: shift.multi_day_set_id,
+              shiftId: shift.id  // 個別のシフトIDも追加
             });
           }
         } else {
