@@ -410,7 +410,8 @@ export default function ShiftSchedule() {
           employeeShifts.get(shift.date).push({
             name: shift.business_name,
             isMultiDay: false,
-            colspan: 1
+            colspan: 1,
+            shiftId: shift.id
           });
         }
       });    
@@ -1537,11 +1538,14 @@ export default function ShiftSchedule() {
                                     {businesses.length > 0 ? (
                                       <div className="space-y-1">
                                         {businesses.map((business: any, idx: number) => {
-                                          const shift = periodShifts.find(s => 
-                                            s.employee_name === employee && 
-                                            s.date === date && 
-                                            s.business_name === business.name
-                                          );
+                                          // shiftMapにshiftIdが含まれている場合はそれを使用
+                                          const shift = business.shiftId 
+                                            ? periodShifts.find(s => s.id === business.shiftId)
+                                            : periodShifts.find(s => 
+                                                s.employee_name === employee && 
+                                                s.date === date && 
+                                                s.business_name === business.name
+                                              );
                           // 夜行バス業務かどうかを判定（業務マスタの業務タイプで判定）
                           const businessMaster = businessMasters.find(bm => bm.業務名 === business.name);
                           const isOvernightBus = businessMaster?.業務タイプ === '夜行バス（往路）' || businessMaster?.業務タイプ === '夜行バス（復路）';
