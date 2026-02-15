@@ -524,7 +524,7 @@ export default function MasterDataManagement() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">マスタデータ管理</h1>
+          <h1 className="text-3xl font-bold">業務管理</h1>
           <p className="text-muted-foreground mt-2">業務グループ・業務マスタの管理</p>
         </div>
         <div className="flex gap-2">

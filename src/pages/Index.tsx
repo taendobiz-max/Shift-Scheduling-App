@@ -158,15 +158,15 @@ export default function Index() {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Settings className="h-6 w-6 mr-2" />
-                  マスタデータ管理
+                  業務管理
                 </CardTitle>
                 <CardDescription>
-                  基本設定とマスタデータ
+                  業務内容の詳細を管理
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600">
-                  路線、車両、勤務パターンなどの基本データを管理。システム全体の設定を一元化できます。
+                  業務グループや業務マスタなど、業務内容の詳細を管理します。
                 </p>
               </CardContent>
             </Card>
