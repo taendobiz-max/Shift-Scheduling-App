@@ -1174,8 +1174,26 @@ export default function ShiftSchedule() {
     try {
       console.log('🔍 [RULE_CHECK] Starting rule check...');
       
-      // 現在表示されているシフトをチェック
-      const shiftsToCheck = activeTab === 'daily' ? shifts : periodShifts;
+      // 画面に表示されている日付/期間と営業所を参照してシフトをフィルタリング
+      let shiftsToCheck: any[] = [];
+      
+      if (activeTab === 'daily') {
+        // 日付勤務割確認: 選択されている日付と営業所でフィルタリング
+        shiftsToCheck = shifts.filter(s => {
+          const dateMatch = s.date === selectedDate;
+          const locationMatch = selectedLocation === 'all' || s.location === selectedLocation;
+          return dateMatch && locationMatch;
+        });
+        console.log('🔍 [RULE_CHECK] Daily view - Date:', selectedDate, 'Location:', selectedLocation, 'Shifts:', shiftsToCheck.length);
+      } else {
+        // 期間勤務割確認: 選択されている期間と営業所でフィルタリング
+        shiftsToCheck = periodShifts.filter(s => {
+          const dateMatch = s.date >= periodStartDate && s.date <= periodEndDate;
+          const locationMatch = selectedLocation === 'all' || s.location === selectedLocation;
+          return dateMatch && locationMatch;
+        });
+        console.log('🔍 [RULE_CHECK] Period view - Start:', periodStartDate, 'End:', periodEndDate, 'Location:', selectedLocation, 'Shifts:', shiftsToCheck.length);
+      }
       
       if (shiftsToCheck.length === 0) {
         toast.info('チェックするシフトがありません');
