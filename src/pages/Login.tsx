@@ -68,7 +68,7 @@ export default function Login() {
               <Input
                 id="userIdOrEmail"
                 type="text"
-                placeholder="ユーザーIDを入力（例: t-endo）"
+                placeholder="ユーザーIDを入力"
                 value={userIdOrEmail}
                 onChange={(e) => setUserIdOrEmail(e.target.value)}
                 required
