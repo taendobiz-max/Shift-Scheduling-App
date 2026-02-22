@@ -18,7 +18,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
     employee_id: '',
     name: '',
     office: '',
-    班: '',
+    team: '',
     display_order: 9999
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -63,7 +63,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
       employee_id: '',
       name: '',
       office: '',
-      班: '',
+      team: '',
       display_order: 9999
     });
     onClose();
@@ -110,7 +110,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
                   handleInputChange('office', value);
                   // 営業所が東京以外の場合は班をクリア
                   if (value !== '東京') {
-                    handleInputChange('班', '');
+                    handleInputChange('team', '');
                   }
                 }}
               >
@@ -126,10 +126,10 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="班">班（東京のみ）</Label>
+              <Label htmlFor="team">班（東京のみ）</Label>
               <Select
-                value={formData.班}
-                onValueChange={(value) => handleInputChange('班', value)}
+                value={formData.team}
+                onValueChange={(value) => handleInputChange('team', value)}
                 disabled={formData.office !== '東京'}
               >
                 <SelectTrigger>

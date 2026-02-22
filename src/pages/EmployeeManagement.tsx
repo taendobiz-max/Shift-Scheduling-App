@@ -221,7 +221,7 @@ export default function EmployeeManagement() {
       const updateData: EmployeeMaster = {
         name: editFormData.name,
         office: editFormData.office,
-        班: editFormData.班,
+        team: editFormData.team,
         display_order: editFormData.display_order,
         roll_call_capable: editFormData.roll_call_capable || false
       };
@@ -508,9 +508,9 @@ export default function EmployeeManagement() {
                               value={editFormData.office || ''}
                               onValueChange={(value) => {
                                 handleEditFormChange('office', value);
-                                // 営業所が東京以外の場合は班をクリア
-                                if (value !== '東京') {
-                                  handleEditFormChange('班', '');
+                              // 営業所が東京以外の場合は班をクリア
+                              if (value !== '東京') {
+                                handleEditFormChange('team', '');
                                 }
                               }}
                             >
@@ -528,8 +528,8 @@ export default function EmployeeManagement() {
                           <div>
                             <label className="text-sm font-medium">班（東京のみ）</label>
                             <Select
-                              value={editFormData.班 || ''}
-                              onValueChange={(value) => handleEditFormChange('班', value)}
+                              value={editFormData.team || ''}
+                              onValueChange={(value) => handleEditFormChange('team', value)}
                               disabled={editFormData.office !== '東京'}
                             >
                               <SelectTrigger className="mt-1">
