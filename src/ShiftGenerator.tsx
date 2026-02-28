@@ -5,7 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home } from 'lucide-react';
+import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home, Trash2 } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { supabase } from '@/lib/supabase';
 // 本社を拠点選択から除外（2026-01-29）
 // import { generateShifts } from '@/utils/shiftGenerator'; // Not used - using API server instead
@@ -62,11 +68,12 @@ interface GenerationSummary {
 }
 
 // Draggable Employee Component
-const DraggableEmployee = ({ shift, children, hasChanges, isPair }: { 
+const DraggableEmployee = ({ shift, children, hasChanges, isPair, onDelete }: { 
   shift: ShiftResult | NonWorkingMember, 
   children: React.ReactNode, 
   hasChanges: boolean,
-  isPair: boolean 
+  isPair: boolean,
+  onDelete?: (shiftId: string) => void
 }) => {
   const {
     attributes,
@@ -82,7 +89,7 @@ const DraggableEmployee = ({ shift, children, hasChanges, isPair }: {
     transform: CSS.Translate.toString(transform),
   };
 
-  return (
+  const draggableDiv = (
     <div
       ref={setNodeRef}
       style={style}
@@ -98,6 +105,27 @@ const DraggableEmployee = ({ shift, children, hasChanges, isPair }: {
       {children}
     </div>
   );
+
+  if (onDelete) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          {draggableDiv}
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+            onClick={() => onDelete(shift.id!)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            削除
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  }
+
+  return draggableDiv;
 };
 
 // Draggable Non-Working Member Component
@@ -997,6 +1025,11 @@ export default function ShiftGenerator() {
     return business && (business.ペア業務ID || business.pair_business_id);
   };
 
+  const handleDeleteShift = (shiftId: string) => {
+    setShiftResults(prev => prev.filter(shift => shift.id !== shiftId));
+    setHasChanges(true);
+  };
+
   const renderDraggableCell = (businessMaster: string, date: string, employeeName: string, shift?: ShiftResult) => {
     const cellKey = `${businessMaster}-${date}`;
     const isEmpty = employeeName === '-';
@@ -1017,6 +1050,7 @@ export default function ShiftGenerator() {
           shift={shift!} 
           hasChanges={hasChanges} 
           isPair={isPairBusiness(businessMaster)}
+          onDelete={handleDeleteShift}
         >
           <div className="flex items-center justify-center space-x-1">
             <Move className="w-3 h-3 opacity-50" />
@@ -1233,6 +1267,8 @@ export default function ShiftGenerator() {
             <Move className="h-4 w-4" />
             <AlertDescription>
               <strong>ドラッグ&ドロップ操作:</strong> 従業員名をドラッグして他の日付や業務に移動できます。各日付の最下段の非出勤者欄にドロップすると希望休に設定されます。
+              <br />
+              <strong>右クリック削除:</strong> 従業員名を右クリックすると「削除」メニューが表示されます。削除するとセルが空きになります。
               <br />
               <strong>ペア業務:</strong> 紫色の左線があるセルはペア業務です。同じ従業員にアサインされます。
               <br />

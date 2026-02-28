@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home } from 'lucide-react';
+import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home, Trash2 } from 'lucide-react';
+// ContextMenu replaced with custom implementation
 import { supabase } from '@/lib/supabase';
+// 本社を拠点選択から除外（2026-01-29）
 // import { generateShifts } from '@/utils/shiftGenerator'; // Not used - using API server instead
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 import { loadBusinessMasterFromSupabase, BusinessMaster } from '@/utils/businessMasterLoader';
@@ -60,12 +62,42 @@ interface GenerationSummary {
   total_employees: number;
 }
 
+// Custom Context Menu Component
+const CustomContextMenu = ({ x, y, onDelete, onClose }: { x: number, y: number, onDelete: () => void, onClose: () => void }) => {
+  useEffect(() => {
+    const handleClick = () => onClose();
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+  return (
+    <div
+      style={{ position: 'fixed', top: y, left: x, zIndex: 9999 }}
+      className="bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[120px]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+        onClick={() => { onDelete(); onClose(); }}
+      >
+        <Trash2 className="w-4 h-4" />
+        削除
+      </button>
+    </div>
+  );
+};
+
 // Draggable Employee Component
-const DraggableEmployee = ({ shift, children, hasChanges, isPair }: { 
+const DraggableEmployee = ({ shift, children, hasChanges, isPair, onDelete }: { 
   shift: ShiftResult | NonWorkingMember, 
   children: React.ReactNode, 
   hasChanges: boolean,
-  isPair: boolean 
+  isPair: boolean,
+  onDelete?: (shiftId: string) => void
 }) => {
   const {
     attributes,
@@ -81,21 +113,42 @@ const DraggableEmployee = ({ shift, children, hasChanges, isPair }: {
     transform: CSS.Translate.toString(transform),
   };
 
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (onDelete) {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    }
+  }, [onDelete]);
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={`
-        ${isDragging ? 'opacity-50' : ''}
-        ${hasChanges ? 'ring-2 ring-orange-300' : ''}
-        ${isPair ? 'border-l-4 border-purple-400' : ''}
-        bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm cursor-move hover:bg-blue-200 transition-colors
-      `}
-    >
-      {children}
-    </div>
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        onContextMenu={handleContextMenu}
+        className={`
+          ${isDragging ? 'opacity-50' : ''}
+          ${hasChanges ? 'ring-2 ring-orange-300' : ''}
+          ${isPair ? 'border-l-4 border-purple-400' : ''}
+          bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm cursor-move hover:bg-blue-200 transition-colors
+        `}
+      >
+        {children}
+      </div>
+      {contextMenu && onDelete && (
+        <CustomContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onDelete={() => onDelete(shift.id!)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </>
   );
 };
 
@@ -189,6 +242,9 @@ export default function ShiftGenerator() {
   const [generationSummary, setGenerationSummary] = useState<GenerationSummary | null>(null);
   const [activeShift, setActiveShift] = useState<ShiftResult | NonWorkingMember | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [panelSearch, setPanelSearch] = useState('');
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -287,7 +343,6 @@ export default function ShiftGenerator() {
         convertedEmployees
           .map(emp => emp.location)
           .filter(location => location && location.trim() !== '')
-          .filter(location => location !== '本社')
       )];
       
       console.log('📍 Extracted locations:', uniqueLocations);
@@ -421,10 +476,10 @@ export default function ShiftGenerator() {
 
       console.log(`👥 Filtered employees for location ${selectedLocation} (before exclusion):`, filteredEmployees);
 
-      // 除外従業員をフィルタリング（点呼対応可能な従業員は除外しない）
+      // 除外従業員をフィルタリング
       try {
-        const excludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIdsForRegularShifts(selectedLocation);
-        console.log(`🚫 Excluded employee IDs for ${selectedLocation} (excluding roll call capable):`, excludedIds);
+        const excludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIds(selectedLocation);
+        console.log(`🚫 Excluded employee IDs for ${selectedLocation}:`, excludedIds);
         
         const beforeCount = filteredEmployees.length;
         filteredEmployees = filteredEmployees.filter(emp => {
@@ -435,8 +490,8 @@ export default function ShiftGenerator() {
         const excludedCount = beforeCount - afterCount;
         
         if (excludedCount > 0) {
-          console.log(`✅ Excluded ${excludedCount} employees from shift generation (excluding roll call capable)`);
-          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名（点呼対応可能な従業員を除く）`);
+          console.log(`✅ Excluded ${excludedCount} employees from shift generation`);
+          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名`);
         }
       } catch (error) {
         console.warn('⚠️ Could not load excluded employees:', error);
@@ -997,6 +1052,19 @@ export default function ShiftGenerator() {
     return business && (business.ペア業務ID || business.pair_business_id);
   };
 
+  const handleDeleteShift = (shiftId: string) => {
+    setShiftResults(prev => prev.filter(shift => shift.id !== shiftId));
+    setHasChanges(true);
+  };
+
+  const toggleDateCollapse = (date: string) => {
+    setCollapsedDates(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date); else next.add(date);
+      return next;
+    });
+  };
+
   const renderDraggableCell = (businessMaster: string, date: string, employeeName: string, shift?: ShiftResult) => {
     const cellKey = `${businessMaster}-${date}`;
     const isEmpty = employeeName === '-';
@@ -1017,6 +1085,7 @@ export default function ShiftGenerator() {
           shift={shift!} 
           hasChanges={hasChanges} 
           isPair={isPairBusiness(businessMaster)}
+          onDelete={handleDeleteShift}
         >
           <div className="flex items-center justify-center space-x-1">
             <Move className="w-3 h-3 opacity-50" />
@@ -1209,7 +1278,7 @@ export default function ShiftGenerator() {
                   リセット
                 </Button>
               )}
-              <Button onClick={saveShifts} disabled={isGenerating} variant={hasChanges ? "default" : "secondary"}>
+              <Button onClick={saveShifts} disabled={isGenerating} className={hasChanges ? "bg-cyan-600 hover:bg-cyan-700 text-white" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"}>
                 {isGenerating ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
@@ -1233,6 +1302,8 @@ export default function ShiftGenerator() {
             <Move className="h-4 w-4" />
             <AlertDescription>
               <strong>ドラッグ&ドロップ操作:</strong> 従業員名をドラッグして他の日付や業務に移動できます。各日付の最下段の非出勤者欄にドロップすると希望休に設定されます。
+              <br />
+              <strong>右クリック削除:</strong> 従業員名を右クリックすると「削除」メニューが表示されます。削除するとセルが空きになります。
               <br />
               <strong>ペア業務:</strong> 紫色の左線があるセルはペア業務です。同じ従業員にアサインされます。
               <br />
@@ -1302,8 +1373,10 @@ export default function ShiftGenerator() {
             </Alert>
           )}
 
+          {/* Main content: matrix + floating panel */}
+          <div className="flex gap-4 items-start">
           {/* Scrollable table container */}
-          <div className="border border-gray-300 rounded-lg overflow-hidden">
+          <div className="flex-1 min-w-0 border border-gray-300 rounded-lg overflow-hidden">
             <div className="max-h-[600px] overflow-y-auto">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
@@ -1355,25 +1428,164 @@ export default function ShiftGenerator() {
                       ))}
                     </tr>
                   ))}
+                  {/* 休暇登録済み従業員行 */}
+                  {nonWorkingMembers.some(nw => nw.source === 'vacation_master') && (
+                    <tr className="bg-orange-50">
+                      <td className="border-t-2 border-r border-orange-300 px-4 py-2 bg-orange-100">
+                        <div className="flex items-center space-x-2">
+                          <UserX className="w-4 h-4 text-orange-600" />
+                          <div>
+                            <div className="font-medium text-sm text-orange-800">📅 休暇登録済み</div>
+                            <div className="text-xs text-orange-600">移動不可</div>
+                          </div>
+                        </div>
+                      </td>
+                      {dates.map(date => {
+                        const vacationMembers = nonWorkingMembers.filter(
+                          nw => nw.date === date && nw.source === 'vacation_master'
+                        );
+                        return (
+                          <td key={`vacation-${date}`} className="border-t-2 border-r border-orange-300 px-2 py-2">
+                            {vacationMembers.length === 0 ? (
+                              <div className="text-center text-orange-300 text-xs py-1">-</div>
+                            ) : (
+                              <div className="space-y-1">
+                                {vacationMembers.map(nw => (
+                                  <div
+                                    key={nw.id}
+                                    className="bg-orange-100 text-orange-800 border border-orange-300 px-2 py-1 rounded text-xs text-center"
+                                    title={nw.reason || '休暇'}
+                                  >
+                                    {nw.employeeName}
+                                    {nw.reason && (
+                                      <span className="ml-1 text-orange-500">({nw.reason})</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Non-working and Unassigned employees tables */}
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Non-working members table */}
-            <div className="border border-red-300 rounded-lg overflow-hidden">
+          {/* Floating panel: Unassigned employees */}
+          <div className={`flex-shrink-0 border border-gray-300 rounded-lg overflow-hidden transition-all duration-200 ${isPanelOpen ? 'w-64' : 'w-10'}`} style={{ position: 'sticky', top: '1rem', maxHeight: '600px' }}>
+            {isPanelOpen ? (
+              <>
+                <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-gray-600" />
+                    <div>
+                      <div className="font-semibold text-gray-800 text-sm">未アサイン</div>
+                      <div className="text-xs text-gray-500">ドラッグでアサイン</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsPanelOpen(false)}
+                    className="text-gray-500 hover:text-gray-700 text-xs px-1"
+                    title="閉じる"
+                  >
+                    ►
+                  </button>
+                </div>
+                <div className="px-2 py-2 border-b border-gray-200">
+                  <input
+                    type="text"
+                    placeholder="名前で検索..."
+                    value={panelSearch}
+                    onChange={(e) => setPanelSearch(e.target.value)}
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                  />
+                </div>
+                <div className="overflow-y-auto" style={{ maxHeight: '500px' }}>
+                  {dates.map(date => {
+                    const unassignedEmps = getUnassignedEmployees(date).filter(emp => {
+                      const name = emp.氏名 || emp.name || '';
+                      return panelSearch === '' || name.includes(panelSearch);
+                    });
+                    const isCollapsed = collapsedDates.has(date);
+                    const dateLabel = new Date(date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' });
+                    return (
+                      <div key={`panel-${date}`} className="border-b border-gray-200 last:border-b-0">
+                        <button
+                          className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 text-xs font-medium text-gray-700"
+                          onClick={() => toggleDateCollapse(date)}
+                        >
+                          <span>{dateLabel}</span>
+                          <span className="flex items-center gap-1">
+                            <span className="bg-blue-100 text-blue-700 rounded-full px-1.5 py-0.5 text-xs">{unassignedEmps.length}</span>
+                            <span>{isCollapsed ? '▼' : '▲'}</span>
+                          </span>
+                        </button>
+                        {!isCollapsed && (
+                          <div className="px-2 py-1 space-y-1">
+                            {unassignedEmps.length === 0 ? (
+                              <div className="text-xs text-gray-400 text-center py-1">全員アサイン済</div>
+                            ) : (
+                              unassignedEmps.map((emp, idx) => {
+                                const tempShift: ShiftResult = {
+                                  id: `unassigned-${emp.id}-${date}-${idx}`,
+                                  date: date,
+                                  businessMaster: '',
+                                  employeeName: emp.氏名 || emp.name,
+                                  employeeId: emp.従業員ID || emp.id
+                                };
+                                return (
+                                  <DraggableEmployee
+                                    key={tempShift.id}
+                                    shift={tempShift}
+                                    hasChanges={false}
+                                    isPair={false}
+                                  >
+                                    <div className="flex items-center space-x-1">
+                                      <Move className="w-3 h-3 opacity-50" />
+                                      <span className="text-xs" title={`従業員ID: ${emp.従業員ID || emp.id}`}>
+                                        {emp.氏名 || emp.name}
+                                      </span>
+                                    </div>
+                                  </DraggableEmployee>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsPanelOpen(true)}
+                className="w-full h-full flex flex-col items-center justify-center py-4 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                title="未アサイン従業員パネルを開く"
+              >
+                <Users className="w-4 h-4 mb-1" />
+                <span className="text-xs writing-mode-vertical">◄</span>
+              </button>
+            )}
+          </div>
+          </div>{/* end flex */}
+
+          {/* Non-working members table (manual only - vacation_master shown in matrix) */}
+          {nonWorkingMembers.some(nw => nw.source !== 'vacation_master') && (
+            <div className="mt-6 border border-red-300 rounded-lg overflow-hidden">
               <div className="bg-red-50 px-4 py-3 border-b border-red-300">
                 <div className="flex items-center space-x-2">
                   <UserX className="w-5 h-5 text-red-600" />
                   <div>
-                    <div className="font-semibold text-red-800">非出勤者</div>
-                    <div className="text-xs text-red-600">希望休・休暇（ドラッグで業務にアサイン可能）</div>
+                    <div className="font-semibold text-red-800">非出勤者（希望休）</div>
+                    <div className="text-xs text-red-600">ドラッグで業務にアサイン可能</div>
                   </div>
                 </div>
               </div>
-              <div className="max-h-[300px] overflow-y-auto">
+              <div className="max-h-[200px] overflow-y-auto">
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 bg-red-50">
                     <tr>
@@ -1383,7 +1595,7 @@ export default function ShiftGenerator() {
                   </thead>
                   <tbody>
                     {dates.map(date => {
-                      const dateNonWorking = nonWorkingMembers.filter(nw => nw.date === date);
+                      const dateNonWorking = nonWorkingMembers.filter(nw => nw.date === date && nw.source !== 'vacation_master');
                       if (dateNonWorking.length === 0) return null;
                       return (
                         <tr key={`nw-table-${date}`} className="hover:bg-red-25">
@@ -1400,12 +1612,7 @@ export default function ShiftGenerator() {
                                 <DraggableNonWorking key={nw.id} member={nw}>
                                   <div className="flex items-center space-x-1">
                                     <Move className="w-3 h-3 opacity-50" />
-                                    <span title={`${nw.reason}${nw.source === 'vacation_master' ? ' (休暇登録)' : ''}`}>
-                                      {nw.employeeName}
-                                      {nw.source === 'vacation_master' && (
-                                        <span className="ml-1 text-xs">📅</span>
-                                      )}
-                                    </span>
+                                    <span>{nw.employeeName}</span>
                                   </div>
                                 </DraggableNonWorking>
                               ))}
@@ -1418,76 +1625,7 @@ export default function ShiftGenerator() {
                 </table>
               </div>
             </div>
-
-            {/* Unassigned employees table */}
-            <div className="border border-gray-300 rounded-lg overflow-hidden">
-              <div className="bg-gray-100 px-4 py-3 border-b border-gray-300">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-gray-600" />
-                  <div>
-                    <div className="font-semibold text-gray-800">未割り当て従業員</div>
-                    <div className="text-xs text-gray-600">シフト未アサイン（ドラッグで業務にアサイン可能）</div>
-                  </div>
-                </div>
-              </div>
-              <div className="max-h-[300px] overflow-y-auto">
-                <table className="w-full border-collapse">
-                  <thead className="sticky top-0 bg-gray-100">
-                    <tr>
-                      <th className="border-b border-r border-gray-300 px-3 py-2 text-left text-sm font-medium">日付</th>
-                      <th className="border-b border-gray-300 px-3 py-2 text-left text-sm font-medium">従業員</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dates.map(date => {
-                      const unassignedEmps = getUnassignedEmployees(date);
-                      if (unassignedEmps.length === 0) return null;
-                      return (
-                        <tr key={`ua-table-${date}`} className="hover:bg-gray-50">
-                          <td className="border-b border-r border-gray-300 px-3 py-2 text-sm align-top">
-                            {new Date(date).toLocaleDateString('ja-JP', { 
-                              month: 'short', 
-                              day: 'numeric',
-                              weekday: 'short'
-                            })}
-                          </td>
-                          <td className="border-b border-gray-300 px-3 py-2">
-                            <div className="space-y-1">
-                              {unassignedEmps.map((emp, idx) => {
-                                // Create a temporary shift object for dragging
-                                const tempShift: ShiftResult = {
-                                  id: `unassigned-${emp.id}-${date}-${idx}`,
-                                  date: date,
-                                  businessMaster: '',
-                                  employeeName: emp.氏名 || emp.name,
-                                  employeeId: emp.従業員ID || emp.id
-                                };
-                                return (
-                                  <DraggableEmployee 
-                                    key={tempShift.id}
-                                    shift={tempShift} 
-                                    hasChanges={false}
-                                    isPair={false}
-                                  >
-                                    <div className="flex items-center space-x-1">
-                                      <Move className="w-3 h-3 opacity-50" />
-                                      <span title={`従業員ID: ${emp.従業員ID || emp.id}`}>
-                                        {emp.氏名 || emp.name}
-                                      </span>
-                                    </div>
-                                  </DraggableEmployee>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          )}
 
           <div className="mt-4 text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1615,7 +1753,7 @@ export default function ShiftGenerator() {
                 <SelectValue placeholder="拠点を選択してください" />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((location) => (
+                {locations.filter(location => location !== '本社').map((location) => (
                   <SelectItem key={location} value={location}>
                     {location}
                   </SelectItem>
