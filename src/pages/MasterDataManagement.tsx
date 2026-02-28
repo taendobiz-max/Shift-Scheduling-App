@@ -40,6 +40,7 @@ import { supabase } from '@/utils/supabaseClient';
 import { loadEmployeesFromExcel } from '@/utils/employeeExcelLoader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SpotBusinessMasterManagement } from '@/components/SpotBusinessMasterManagement';
+import { OFFICES } from '@/constants';
 
 // Business Group interfaces
 interface BusinessGroup {
@@ -187,7 +188,7 @@ export default function MasterDataManagement() {
     } catch (error) {
       console.error('Error loading locations:', error);
       // Fallback locations
-      setAvailableLocations(['全拠点', '川越', '東京', '川口']);
+      setAvailableLocations(['全拠点', ...OFFICES]);
     }
   };
 
@@ -605,9 +606,9 @@ export default function MasterDataManagement() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="すべて">すべて</SelectItem>
-              <SelectItem value="川越">川越</SelectItem>
-              <SelectItem value="東京">東京</SelectItem>
-              <SelectItem value="川口">川口</SelectItem>
+              {OFFICES.map((office) => (
+                <SelectItem key={office} value={office}>{office}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

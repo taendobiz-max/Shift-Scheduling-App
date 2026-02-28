@@ -25,6 +25,7 @@ import { Link } from 'react-router-dom';
 import { VacationMaster, VacationType } from '@/types/vacation';
 import { loadEmployeesFromExcel, EmployeeMaster } from '@/utils/employeeExcelLoader';
 import { getCurrentUser } from '@/utils/auth';
+import { VACATION_TYPES } from '@/constants';
 
 interface Employee {
   id: string;
@@ -62,7 +63,7 @@ export default function VacationManagement() {
   };
 
   // 休暇種別の選択肢
-  const vacationTypes: VacationType[] = ['公休', '私用', '病欠', '忌引', 'その他'];
+  const vacationTypes: VacationType[] = [...VACATION_TYPES];
 
   // フォームデータ
   const [formData, setFormData] = useState<VacationFormData>({

@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { UnifiedRule, RuleType } from '../types/unifiedRule';
+import { OFFICES } from '@/constants';
 
 interface EditRuleModalProps {
   rule: UnifiedRule;
@@ -139,7 +140,7 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               適用営業所 <span className="text-red-500">*</span>
             </label>
             <div className="space-y-2">
-              {['東京', '川越', '川口'].map((location) => (
+              {OFFICES.map((location) => (
                 <label key={location} className="flex items-center space-x-2">
                   <input
                     type="checkbox"

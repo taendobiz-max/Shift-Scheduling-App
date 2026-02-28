@@ -30,6 +30,7 @@ import EditRuleModal from '../components/EditRuleModal';
 import { ExcludedEmployeesManagement } from '../components/ExcludedEmployeesManagement';
 import { IncompatiblePairsManagement } from '../components/IncompatiblePairsManagement';
 import type { UnifiedRule, RuleType } from '../types/unifiedRule';
+import { OFFICES } from '@/constants';
 
 const UnifiedRuleManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('rules');
@@ -319,7 +320,7 @@ const UnifiedRuleManagement: React.FC = () => {
 
             {/* 拠点フィルター */}
             <div className="mt-4 flex flex-wrap gap-2">
-              {['川越', '東京', '川口'].map((location) => (
+              {OFFICES.map((location) => (
                 <label key={location} className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"

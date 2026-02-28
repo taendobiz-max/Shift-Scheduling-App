@@ -36,6 +36,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IncompatiblePairsManager, IncompatiblePair } from '@/utils/incompatiblePairsManager';
 import { supabase } from '@/lib/supabase';
+import { OFFICES } from '@/constants';
 
 interface Employee {
   employee_id: string;
@@ -61,7 +62,7 @@ export function IncompatiblePairsManagement() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [availableEmployees, setAvailableEmployees] = useState<Employee[]>([]);
 
-  const locations = ['東京', '川越', '川口'];
+  const locations = OFFICES;
   const severityLabels = {
     high: '高',
     medium: '中',

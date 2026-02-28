@@ -28,6 +28,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { VACATION_REASON_REQUESTED } from '@/constants';
 
 interface ShiftResult {
   date: string;
@@ -742,7 +743,7 @@ export default function ShiftGenerator() {
           date: targetDate,
           employeeName: activeShift.employeeName,
           employeeId: activeShift.employeeId,
-          reason: '希望休',
+          reason: VACATION_REASON_REQUESTED,
           source: 'manual'
         };
         
@@ -791,7 +792,7 @@ export default function ShiftGenerator() {
             date: targetDate,
             employeeName: targetShift.employeeName,
             employeeId: targetShift.employeeId,
-            reason: '希望休',
+            reason: VACATION_REASON_REQUESTED,
             source: 'manual'
           };
           
@@ -838,7 +839,7 @@ export default function ShiftGenerator() {
           date: targetDate,
           employeeName: employee.氏名 || employee.name,
           employeeId: employee.従業員ID || employee.id,
-          reason: '希望休',
+          reason: VACATION_REASON_REQUESTED,
           source: 'manual'
         };
         

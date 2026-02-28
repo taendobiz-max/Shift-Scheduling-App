@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { EmployeeMaster, updateEmployeeInSupabase } from '@/utils/employeeExcelLoader';
+import { OFFICES } from '@/constants';
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
@@ -119,9 +120,9 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onEmployeeUpdated
                 <SelectValue placeholder="営業所を選択" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="川越">川越</SelectItem>
-                <SelectItem value="東京">東京</SelectItem>
-                <SelectItem value="川口">川口</SelectItem>
+                {OFFICES.map((office) => (
+                  <SelectItem key={office} value={office}>{office}</SelectItem>
+                ))}
                 <SelectItem value="その他">その他</SelectItem>
               </SelectContent>
             </Select>

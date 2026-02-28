@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Clock, Save, AlertCircle, Home } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useNavigate } from 'react-router-dom';
+import { OFFICES } from '@/constants';
 
 export default function OvertimeRegistration() {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function OvertimeRegistration() {
 
   // 営業所リストを設定（固定値）
   useEffect(() => {
-    const officeList = ['川越', '東京', '川口'];
+    const officeList = [...OFFICES];
     setOffices(officeList);
   }, []);
 

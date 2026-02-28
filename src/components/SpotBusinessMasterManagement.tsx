@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Plus, Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { OFFICES } from '@/constants';
 
 interface SpotBusinessMaster {
   id: string;
@@ -30,7 +31,7 @@ interface SpotBusinessMasterForm {
   memo: string;
 }
 
-const OFFICES = ['川越', '東京', '川口'];
+// OFFICES は @/constants からインポート
 
 export function SpotBusinessMasterManagement() {
   const [spotMasters, setSpotMasters] = useState<SpotBusinessMaster[]>([]);

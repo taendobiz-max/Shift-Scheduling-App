@@ -21,6 +21,7 @@ import { checkShiftRules, RuleViolation } from '@/utils/ruleChecker';
 import { AddSpotBusinessDialog } from '@/components/AddSpotBusinessDialog';
 import DeleteShiftsModal from '@/components/DeleteShiftsModal';
 import { AssignEmployeeDialog } from '@/components/AssignEmployeeDialog';
+import { OFFICES } from '@/constants';
 
 interface ShiftData {
   id: string;
@@ -1396,8 +1397,9 @@ export default function ShiftSchedule() {
               <SelectValue placeholder="拠点を選択" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="川越">川越</SelectItem>
-              <SelectItem value="東京">東京</SelectItem>
+              {['川越', '東京'].map((office) => (
+                <SelectItem key={office} value={office}>{office}</SelectItem>
+              ))}
               <SelectItem value="川口">川口</SelectItem>
             </SelectContent>
           </Select>

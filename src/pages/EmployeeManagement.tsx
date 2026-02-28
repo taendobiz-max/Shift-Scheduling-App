@@ -14,6 +14,7 @@ import { AddEmployeeModal } from '@/components/AddEmployeeModal';
 import { EmployeeSkillModal } from '@/components/EmployeeSkillModal';
 import { getAllBusinessGroups } from '@/utils/businessGroupManager';
 import { supabase } from '@/utils/supabaseClient';
+import { OFFICES, TOKYO_TEAMS } from '@/constants';
 
 
 export default function EmployeeManagement() {
@@ -540,8 +541,9 @@ export default function EmployeeManagement() {
                                 } />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Galaxy">Galaxy</SelectItem>
-                                <SelectItem value="Aube">Aube</SelectItem>
+                                {TOKYO_TEAMS.map((team) => (
+                                  <SelectItem key={team} value={team}>{team}</SelectItem>
+                                ))}
                                 <SelectItem value="無し">無し</SelectItem>
                               </SelectContent>
                             </Select>

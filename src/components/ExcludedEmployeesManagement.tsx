@@ -39,6 +39,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ExcludedEmployeesManager, ExcludedEmployee } from '@/utils/excludedEmployeesManager';
 import { supabase } from '@/lib/supabase';
+import { OFFICES } from '@/constants';
 
 interface EmployeeOption {
   id: string;
@@ -64,7 +65,7 @@ export const ExcludedEmployeesManagement: React.FC = () => {
     can_handle_roll_call: false
   });
 
-  const locations = ['東京', '川越', '川口'];
+  const locations = OFFICES;
 
   useEffect(() => {
     loadExcludedEmployees();

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabaseClient';
+import { OFFICES, TOKYO_TEAMS, SHIFT_DEFAULTS } from '@/constants';
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
     name: '',
     office: '',
     team: '',
-    display_order: 9999
+    display_order: SHIFT_DEFAULTS.DISPLAY_ORDER_MAX
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -64,7 +65,7 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
       name: '',
       office: '',
       team: '',
-      display_order: 9999
+      display_order: SHIFT_DEFAULTS.DISPLAY_ORDER_MAX
     });
     onClose();
   };
@@ -118,10 +119,9 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
                   <SelectValue placeholder="営業所を選択" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="川越">川越</SelectItem>
-                  <SelectItem value="東京">東京</SelectItem>
-                  <SelectItem value="川口">川口</SelectItem>
-                  <SelectItem value="その他">その他</SelectItem>
+                  {[...OFFICES, 'その他'].map((office) => (
+                    <SelectItem key={office} value={office}>{office}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -140,9 +140,9 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
                   } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Galaxy">Galaxy</SelectItem>
-                  <SelectItem value="Aube">Aube</SelectItem>
-                  <SelectItem value="無し">無し</SelectItem>
+                  {TOKYO_TEAMS.map((team) => (
+                    <SelectItem key={team} value={team}>{team}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
