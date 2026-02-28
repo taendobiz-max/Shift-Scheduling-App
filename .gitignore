@@ -49,3 +49,21 @@ test-results/
 pnpm-lock.yaml
 *.pyc
 __pycache__
+
+# Archived files
+.archived/
+.checkpoints/
+dist_backup_*/
+_archived_*/
+src/_archive/
+*.tar.gz
+
+# API server build artifacts and logs
+api-server/dist/
+api-server/*.log
+api-server/*.js
+!api-server/ecosystem.config.js
+api-server/.checkpoints/
+
+# API (legacy, replaced by api-server)
+api/
