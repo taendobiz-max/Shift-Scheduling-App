@@ -442,16 +442,14 @@ export default function ShiftSchedule() {
       const businesses = businessMasters
         .filter(b => b.営業所 === selectedLocation)
         .filter(b => b.is_active || periodShifts.some(s => s.業務名 === b.業務名)) // アクティブな業務 + シフトがある非アクティブ業務
-        .map(b => b.業務名)
-        .filter(name => name !== '無し') // 「無し」を除外
+        .filter(b => b.業務名 !== '無し') // 「無し」を除外
         .sort((a, b) => {
-          // 点呼業務を一番上に表示
-          const aIsRollCall = a.includes('点呼');
-          const bIsRollCall = b.includes('点呼');
-          if (aIsRollCall && !bIsRollCall) return -1;
-          if (!aIsRollCall && bIsRollCall) return 1;
-          return a.localeCompare(b);
-        });
+          // display_order順
+          const aOrder = a.display_order ?? 9999;
+          const bOrder = b.display_order ?? 9999;
+          return aOrder - bOrder;
+        })
+        .map(b => b.業務名);
       
       const shiftMap = new Map();
       periodShifts.forEach(shift => {
@@ -781,7 +779,9 @@ export default function ShiftSchedule() {
       // Load business masters (including inactive ones)
       const { data: businessData, error: businessError } = await supabase
         .from('business_master')
-        .select('*');
+        .select('*')
+        .order('display_order', { ascending: true })
+        .order('業務id', { ascending: true });
       
       if (businessError) {
         console.error('❌ Error loading business masters:', businessError);
@@ -2048,14 +2048,11 @@ export default function ShiftSchedule() {
                   console.log('業務グループ一覧:', JSON.stringify(businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })), null, 2));
                   console.log('選択された拠点の業務マスタ数:', locationBusinessMasters.length);
                   
-                  // ソート:点呼業務を一番上に、その他は業務名順
+                  // ソート: display_order順
                   businessGroups.sort((a, b) => {
-                    const aIsRollCall = a.name.includes('点呼');
-                    const bIsRollCall = b.name.includes('点呼');
-                    if (aIsRollCall && !bIsRollCall) return -1;
-                    if (!aIsRollCall && bIsRollCall) return 1;
-                    
-                    return a.name.localeCompare(b.name);
+                    const aOrder = locationBusinessMasters.find(bm => bm.業務名 === a.name)?.display_order ?? 9999;
+                    const bOrder = locationBusinessMasters.find(bm => bm.業務名 === b.name)?.display_order ?? 9999;
+                    return aOrder - bOrder;
                   });
                   
                   console.log('ソート後の業務グループ一覧:', JSON.stringify(businessGroups.map(g => ({ name: g.name, shiftsCount: g.shifts.length })), null, 2));

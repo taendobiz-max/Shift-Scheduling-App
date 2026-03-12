@@ -49,12 +49,14 @@ interface BusinessGroup {
   description: string;
   created_at: string;
   営業所?: string;
+  display_order?: number;
 }
 
 interface BusinessGroupForm {
   name: string;
   description: string;
   営業所: string;
+  display_order: number;
 }
 
 // Business Master interfaces (using Japanese column names from actual data)
@@ -71,6 +73,7 @@ interface BusinessMaster {
   ペア業務id?: string;
   created_at?: string;
   is_active?: boolean;       // 業務の有効/無効
+  display_order?: number;    // 表示順
   [key: string]: unknown;        // その他の日本語カラム
 }
 
@@ -90,6 +93,7 @@ interface BusinessMasterForm {
   班ローテーション: boolean;
   班指定: string;
   方向: string;
+  display_order: number;
 }
 
 
@@ -104,6 +108,7 @@ export default function MasterDataManagement() {
     name: "",
     description: "",
     営業所: "川越",
+    display_order: 9999,
   });
 
   // Business Master state (using Japanese data structure)
@@ -128,6 +133,7 @@ export default function MasterDataManagement() {
     班ローテーション: false,
     班指定: 'none',
     方向: 'none',
+    display_order: 9999,
   });
 
   // Available locations from employee data
@@ -199,7 +205,8 @@ export default function MasterDataManagement() {
       const { data, error } = await supabase
         .from('business_groups')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true });
 
       if (error) {
         throw error;
@@ -257,6 +264,7 @@ export default function MasterDataManagement() {
       name: group.name,
       description: group.description,
       営業所: group.営業所 || '川越',
+      display_order: group.display_order ?? 9999,
     });
     setEditingBusinessGroupId(group.id);
     setIsBusinessGroupEditing(true);
@@ -268,6 +276,7 @@ export default function MasterDataManagement() {
       name: '',
       description: '',
       営業所: '川越',
+      display_order: 9999,
     });
     setEditingBusinessGroupId(null);
     setIsBusinessGroupEditing(false);
@@ -299,8 +308,9 @@ export default function MasterDataManagement() {
     setBusinessGroupForm({
       name: '',
       description: '',
-    });
       営業所: '川越',
+      display_order: 9999,
+    });
     setEditingBusinessGroupId(null);
     setIsBusinessGroupEditing(false);
   };
@@ -314,6 +324,7 @@ export default function MasterDataManagement() {
       const { data, error } = await supabase
         .from('business_master')
         .select('*')  // 全ての日本語カラムを取得（有効/無効を問わず）
+        .order('display_order', { ascending: true })
         .order('業務id', { ascending: true });
 
       if (error) {
@@ -403,6 +414,7 @@ export default function MasterDataManagement() {
       班ローテーション: (master as any).班ローテーション || false,
       班指定: (master as any).班指定 || 'none',
       方向: (master as any).方向 || 'none',
+      display_order: master.display_order ?? 9999,
     });
     setEditingBusinessMasterId(master.業務id || null);
     setIsBusinessMasterEditing(true);
@@ -426,6 +438,7 @@ export default function MasterDataManagement() {
       班ローテーション: false,
       班指定: '',
       方向: '',
+      display_order: 9999,
     });
     setEditingBusinessMasterId(null);
     setIsBusinessMasterEditing(false);
@@ -472,6 +485,7 @@ export default function MasterDataManagement() {
 
   const resetBusinessMasterForm = () => {
     setBusinessMasterForm({
+      業務id: '',
       業務名: '',
       営業所: '',
       業務グループ: '',
@@ -481,6 +495,12 @@ export default function MasterDataManagement() {
       深夜手当: '',
       スキルマップ項目名: '',
       ペア業務id: '',
+      業務タイプ: 'normal',
+      運行日数: 1,
+      班ローテーション: false,
+      班指定: 'none',
+      方向: 'none',
+      display_order: 9999,
     });
     setEditingBusinessMasterId(null);
     setIsBusinessMasterEditing(false);
@@ -658,6 +678,7 @@ export default function MasterDataManagement() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-20">表示順</TableHead>
                         <TableHead>業務グループ名</TableHead>
                         <TableHead>営業所</TableHead>
                         <TableHead>説明</TableHead>
@@ -669,6 +690,7 @@ export default function MasterDataManagement() {
                         .filter(group => officeFilter === 'すべて' || group.営業所 === officeFilter)
                         .map((group) => (
                         <TableRow key={group.id}>
+                          <TableCell className="text-center text-muted-foreground">{group.display_order ?? 9999}</TableCell>
                           <TableCell className="font-medium">{group.name}</TableCell>
                           <TableCell>{group.営業所 || '−'}</TableCell>
                           <TableCell>{group.description || '−'}</TableCell>
@@ -723,11 +745,12 @@ export default function MasterDataManagement() {
               ) : (
                 <div className="space-y-4">
                   {businessMasters.filter(master => officeFilter === "すべて" || master.営業所 === officeFilter).map((master) => (
-                    <div key={master.業務id} className={`border rounded-lg p-4 ${
+                      <div key={master.業務id} className={`border rounded-lg p-4 ${
                       master.is_active === false ? 'bg-gray-50 opacity-60' : ''
                     }`}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground bg-gray-100 rounded px-2 py-0.5 font-mono">{master.display_order ?? 9999}</span>
                           <h4 className={`font-medium ${
                             master.is_active === false ? 'text-gray-400' : ''
                           }`}>{master.業務名}</h4>
@@ -855,6 +878,17 @@ export default function MasterDataManagement() {
                 onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, description: e.target.value })}
                 placeholder="業務グループの説明（任意）"
                 rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="groupDisplayOrder">表示順 <span className="text-xs text-muted-foreground">(小さい値ほど上に表示、未設定は9999)</span></Label>
+              <Input
+                id="groupDisplayOrder"
+                type="number"
+                min="1"
+                value={businessGroupForm.display_order}
+                onChange={(e) => setBusinessGroupForm({ ...businessGroupForm, display_order: parseInt(e.target.value) || 9999 })}
+                placeholder="例: 10"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -993,6 +1027,17 @@ export default function MasterDataManagement() {
                 value={businessMasterForm.ペア業務id}
                 onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
                 placeholder="例: TKS_PAIR"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="displayOrder">表示順 <span className="text-xs text-muted-foreground">(小さい値ほど上に表示、未設定は9999)</span></Label>
+              <Input
+                id="displayOrder"
+                type="number"
+                min="1"
+                value={businessMasterForm.display_order}
+                onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, display_order: parseInt(e.target.value) || 9999 })}
+                placeholder="例: 10"
               />
             </div>
             
