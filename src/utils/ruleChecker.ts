@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { validateSplitRest, checkMonthlySplitRestLimit } from './splitRestValidator';
 
 export interface RuleViolation {
-  type: 'time_conflict' | 'rest_time' | 'consecutive_days' | 'split_rest' | 'constraint' | 'roll_call_missing';
+  type: 'time_conflict' | 'rest_time' | 'consecutive_days' | 'split_rest' | 'constraint' | 'roll_call_missing' | 'roll_call_skill_missing' | 'skill_mismatch';
   severity: 'error' | 'warning';
   date: string;
   employeeName: string;
@@ -49,7 +49,11 @@ export async function checkShiftRules(
   const rollCallViolations = await checkRollCallAssignment(shifts);
   violations.push(...rollCallViolations);
   
-  // 6. 制約エンジンによるチェック (統合シフトルール管理に移行済み)
+  // 6. スキルチェック（業務に必要なスキルを持たない従業員のアサインをエラー表示）
+  const skillViolations = await checkSkillMismatch(shifts);
+  violations.push(...skillViolations);
+  
+  // 7. 制約エンジンによるチェック (統合シフトルール管理に移行済み)
   // const constraintViolations = await checkConstraints(shifts, location);
   // violations.push(...constraintViolations);
   
@@ -392,6 +396,110 @@ async function checkSplitRest(shifts: any[]): Promise<RuleViolation[]> {
 //   const violations: RuleViolation[] = [];
 //   return violations;
 // }
+
+/**
+ * スキルチェック
+ * 業務マスタの「スキルマップ項目名」が設定されている業務に対して、
+ * アサインされた従業員がそのスキル（skill_matrixに登録）を持っているかを確認
+ */
+async function checkSkillMismatch(shifts: any[]): Promise<RuleViolation[]> {
+  const violations: RuleViolation[] = [];
+  
+  console.log('🎯 [SKILL_CHECK] Starting skill mismatch check');
+  
+  // スキルマップ項目名が設定されている業務マスタを取得
+  const { data: businessMasters, error: businessError } = await supabase
+    .from('business_master')
+    .select('業務id, 業務名, スキルマップ項目名')
+    .eq('is_active', true)
+    .not('スキルマップ項目名', 'is', null)
+    .neq('スキルマップ項目名', '');
+  
+  if (businessError) {
+    console.error('❌ [SKILL_CHECK] Failed to fetch business_master:', businessError);
+    return violations;
+  }
+  
+  if (!businessMasters || businessMasters.length === 0) {
+    console.log('ℹ️ [SKILL_CHECK] No businesses with skill requirements found');
+    return violations;
+  }
+  
+  // 業務id → スキルマップ項目名 のマップを作成
+  const businessSkillMap = new Map<string, { 業務名: string; スキルマップ項目名: string }>(
+    businessMasters.map(b => [b.業務id, { 業務名: b.業務名, スキルマップ項目名: b.スキルマップ項目名 }])
+  );
+  
+  // スキルチェックが必要なシフトを抽出
+  const shiftsRequiringSkill = shifts.filter(shift => {
+    const businessId = shift.business_id || shift.business_master_id || shift.業務id;
+    return businessSkillMap.has(businessId);
+  });
+  
+  if (shiftsRequiringSkill.length === 0) {
+    console.log('ℹ️ [SKILL_CHECK] No shifts require skill check');
+    return violations;
+  }
+  
+  // チェック対象の従業員IDを収集
+  const employeeIds = [...new Set(shiftsRequiringSkill.map(s => s.employee_id).filter(Boolean))];
+  
+  if (employeeIds.length === 0) {
+    return violations;
+  }
+  
+  // skill_matrixから対象従業員のスキルを一括取得
+  const { data: skillMatrix, error: skillError } = await supabase
+    .from('skill_matrix')
+    .select('employee_id, business_group')
+    .in('employee_id', employeeIds);
+  
+  if (skillError) {
+    console.error('❌ [SKILL_CHECK] Failed to fetch skill_matrix:', skillError);
+    return violations;
+  }
+  
+  // 従業員ID → 保有スキルセット のマップを作成
+  const employeeSkillMap = new Map<string, Set<string>>();
+  for (const skill of skillMatrix || []) {
+    if (!employeeSkillMap.has(skill.employee_id)) {
+      employeeSkillMap.set(skill.employee_id, new Set());
+    }
+    employeeSkillMap.get(skill.employee_id)!.add(skill.business_group);
+  }
+  
+  // 各シフトのスキルチェック
+  for (const shift of shiftsRequiringSkill) {
+    const businessId = shift.business_id || shift.business_master_id || shift.業務id;
+    const businessInfo = businessSkillMap.get(businessId);
+    if (!businessInfo) continue;
+    
+    const employeeId = shift.employee_id;
+    const employeeName = shift.employee_name || shift.従業員名 || employeeId;
+    const date = shift.shift_date || shift.date || shift.日付;
+    const requiredSkill = businessInfo.スキルマップ項目名;
+    
+    const employeeSkills = employeeSkillMap.get(employeeId) || new Set();
+    
+    if (!employeeSkills.has(requiredSkill)) {
+      violations.push({
+        type: 'skill_mismatch',
+        severity: 'error',
+        date: date,
+        employeeName: employeeName,
+        employeeId: employeeId,
+        description: 'スキル不足',
+        details: `${employeeName}さんは「${businessInfo.業務名}」にアサインされていますが、必要なスキル「${requiredSkill}」を持っていません。`
+      });
+      
+      console.log(`❌ [SKILL_CHECK] ${employeeName} lacks skill "${requiredSkill}" for business "${businessInfo.業務名}" on ${date}`);
+    }
+  }
+  
+  console.log(`🎯 [SKILL_CHECK] Check completed: ${violations.length} violations found`);
+  
+  return violations;
+}
 
 /**
  * 点呼対応者チェック
