@@ -2,7 +2,7 @@
  * ルール編集モーダル
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import type { UnifiedRule, RuleType } from '../types/unifiedRule';
 import { OFFICES } from '@/constants';
@@ -14,18 +14,7 @@ interface EditRuleModalProps {
 }
 
 const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) => {
-  const [formData, setFormData] = useState<UnifiedRule>(rule.id ? rule : {
-    ...rule,
-    rule_name: '',
-    rule_type: 'constraint',
-    rule_category: '',
-    description: '',
-    applicable_locations: ['東京'],
-    priority_level: 5,
-    enforcement_level: 'recommended',
-    rule_config: {},
-    is_active: true
-  });
+  const [formData, setFormData] = useState<UnifiedRule>(rule);
   const [saving, setSaving] = useState(false);
 
   // ルールタイプのラベル

@@ -189,7 +189,8 @@ const UnifiedRuleManagement: React.FC = () => {
         });
       } else {
         // 新規ルールの作成
-        await UnifiedRuleManager.createRule(updatedRule);
+        const { id: _id, created_at: _ca, updated_at: _ua, ...ruleData } = updatedRule;
+        await UnifiedRuleManager.createRule(ruleData);
         toast({
           title: '成功',
           description: 'ルールを作成しました'
@@ -310,7 +311,7 @@ const UnifiedRuleManagement: React.FC = () => {
 
               {/* 新規作成ボタン */}
               <button
-                onClick={() => setEditingRule({} as UnifiedRule)}
+                onClick={() => setEditingRule({ id: '', rule_name: '', rule_type: 'constraint', rule_category: '', description: '', applicable_locations: ['東京'], priority_level: 5, enforcement_level: 'recommended', rule_config: {}, is_active: true } as UnifiedRule)}
                 className="flex items-center justify-center space-x-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
