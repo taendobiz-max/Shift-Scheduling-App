@@ -1,7 +1,7 @@
 /**
  * BusinessRuleAdapter
  * 
- * unified_shift_rulesテーブルからビジネスルール（rule_type='business_logic'）を取得し、
+ * unified_shift_rulesテーブルからビジネスルール（rule_type='filter'）を取得し、
  * BusinessRule形式に変換するアダプター。
  * フォールバック機能付き: unified_shift_rulesが存在しない場合はbusiness_rulesから取得。
  */
@@ -58,7 +58,7 @@ export class BusinessRuleAdapter {
       let query = this.supabase
         .from('unified_shift_rules')
         .select('*')
-        .eq('rule_type', 'business_logic')
+        .eq('rule_type', 'filter')
         .eq('is_active', true)
         .order('priority', { ascending: false });
 

@@ -11,11 +11,11 @@
  * ルールタイプ
  */
 export type RuleType = 
-  | 'business_assignment'  // 業務割り当て時のルール
-  | 'employee_filter'      // 従業員フィルタリングルール
-  | 'constraint_check'     // 制約チェックルール
-  | 'pair_business'        // ペア業務ルール
-  | 'custom';              // カスタムルール
+  | 'constraint'    // 制約条件（ルールチェックで使用）
+  | 'filter'        // フィルター（シフト自動生成の従業員絞り込みで使用）
+  | 'assignment'    // 割り当てロジック
+  | 'validation'    // 検証
+  | 'optimization'; // 最適化
 
 /**
  * ルールハンドラー名

@@ -250,7 +250,7 @@ export class BusinessRuleEngine implements IBusinessRuleEngine {
   async checkConstraints(context: RuleContext): Promise<ConstraintResult[]> {
     const results: ConstraintResult[] = [];
     const applicableRules = this.getApplicableRules(context).filter(
-      rule => rule.rule_type === 'constraint_check'
+      rule => rule.rule_type === 'constraint'
     );
 
     for (const rule of applicableRules) {
