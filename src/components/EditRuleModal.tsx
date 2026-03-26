@@ -1,17 +1,37 @@
 /**
  * ルール編集モーダル
  */
-
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import type { UnifiedRule, RuleType } from '../types/unifiedRule';
+import type { UnifiedRule, RuleType, RuleConfig } from '../types/unifiedRule';
 import { OFFICES } from '@/constants';
+import RuleConfigForm from './RuleConfigForm';
 
 interface EditRuleModalProps {
   rule: UnifiedRule;
   onClose: () => void;
   onSave: (updatedRule: UnifiedRule) => Promise<void>;
 }
+
+/**
+ * rule_type が変更された際のデフォルト rule_config を返す
+ */
+const getDefaultConfigForType = (ruleType: RuleType): RuleConfig => {
+  switch (ruleType) {
+    case 'constraint':
+      return { constraint_type: '', value: 0 };
+    case 'filter':
+      return { actions: { filter_employees: { handler: '', params: {} } } };
+    case 'assignment':
+      return { assignment_type: '' };
+    case 'validation':
+      return { validation_type: '' };
+    case 'optimization':
+      return { optimization_type: '', weight: 1.0 };
+    default:
+      return {};
+  }
+};
 
 const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) => {
   const [formData, setFormData] = useState<UnifiedRule>(rule);
@@ -49,6 +69,17 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
     setFormData({ ...formData, applicable_locations: newLocations });
   };
 
+  /**
+   * rule_type 変更時: rule_config をデフォルト値にリセット
+   */
+  const handleRuleTypeChange = (newType: RuleType) => {
+    setFormData({
+      ...formData,
+      rule_type: newType,
+      rule_config: getDefaultConfigForType(newType),
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -62,7 +93,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
             <X className="w-6 h-6" />
           </button>
         </div>
-
         {/* フォーム */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* ルール名 */}
@@ -78,7 +108,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               required
             />
           </div>
-
           {/* ルールタイプ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -86,7 +115,7 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
             </label>
             <select
               value={formData.rule_type}
-              onChange={(e) => setFormData({ ...formData, rule_type: e.target.value as RuleType })}
+              onChange={(e) => handleRuleTypeChange(e.target.value as RuleType)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
@@ -95,7 +124,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               ))}
             </select>
           </div>
-
           {/* カテゴリ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -109,7 +137,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               required
             />
           </div>
-
           {/* 説明 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -122,7 +149,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
           {/* 適用営業所 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -142,7 +168,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               ))}
             </div>
           </div>
-
           {/* 優先度 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -165,7 +190,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               0: 最高優先度、10: 最低優先度
             </p>
           </div>
-
           {/* 強制レベル */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -183,27 +207,16 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
             </select>
           </div>
 
-          {/* ルール設定（JSON） */}
+          {/* ルール設定（rule_typeに応じたフォーム） */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              ルール設定（JSON）
+              ルール設定 <span className="text-red-500">*</span>
             </label>
-            <textarea
-              value={JSON.stringify(formData.rule_config, null, 2)}
-              onChange={(e) => {
-                try {
-                  const config = JSON.parse(e.target.value);
-                  setFormData({ ...formData, rule_config: config });
-                } catch (error) {
-                  // JSON パースエラーは無視（入力中）
-                }
-              }}
-              rows={8}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+            <RuleConfigForm
+              ruleType={formData.rule_type}
+              config={formData.rule_config}
+              onChange={(newConfig) => setFormData({ ...formData, rule_config: newConfig })}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              JSON形式で入力してください
-            </p>
           </div>
 
           {/* 有効/無効 */}
@@ -218,7 +231,6 @@ const EditRuleModal: React.FC<EditRuleModalProps> = ({ rule, onClose, onSave }) 
               <span className="text-sm font-medium text-gray-700">このルールを有効にする</span>
             </label>
           </div>
-
           {/* ボタン */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
