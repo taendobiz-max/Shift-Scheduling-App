@@ -97,22 +97,33 @@ export default function EmployeeManagement() {
 
   const loadEmployeeSkills = async (employeeData: EmployeeMaster[]) => {
     try {
-      const { data: skillsData, error } = await supabase
-        .from('skill_matrix')
-        .select('employee_id, business_group');
-
-      if (error) {
-        console.error('❌ Error loading employee skills:', error);
-        return;
-      }
-
+      // Supabaseのデフォルトでは1000件までしか取得できないため、全件取得する
       const skillsMap: Record<string, Set<string>> = {};
-      skillsData?.forEach(skill => {
-        if (!skillsMap[skill.employee_id]) {
-          skillsMap[skill.employee_id] = new Set();
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: skillsData, error } = await supabase
+          .from('skill_matrix')
+          .select('employee_id, business_group')
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error('❌ Error loading employee skills:', error);
+          break;
         }
-        skillsMap[skill.employee_id].add(skill.business_group);
-      });
+
+        if (!skillsData || skillsData.length === 0) break;
+
+        skillsData.forEach(skill => {
+          if (!skillsMap[skill.employee_id]) {
+            skillsMap[skill.employee_id] = new Set();
+          }
+          skillsMap[skill.employee_id].add(skill.business_group);
+        });
+
+        if (skillsData.length < pageSize) break; // 最後のページ
+        from += pageSize;
+      }
 
       setEmployeeSkills(skillsMap);
       console.log('✅ Loaded employee skills:', skillsMap);
