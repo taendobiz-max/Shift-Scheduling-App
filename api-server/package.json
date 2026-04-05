@@ -2,10 +2,13 @@
   "name": "shift-api-server",
   "version": "1.0.0",
   "description": "API server for shift scheduling",
-  "main": "server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "ts-node server.ts",
-    "dev": "nodemon --exec ts-node server.ts"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "start:dev": "ts-node server.ts",
+    "dev": "nodemon --exec ts-node server.ts",
+    "build:start": "tsc && node dist/server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

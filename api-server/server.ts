@@ -33,7 +33,7 @@ app.get('/api/health', (req, res) => {
 // Generate shifts endpoint
 app.post('/api/generate-shifts', async (req, res) => {
   try {
-    console.log('🟢🟢🟢 NEW SERVER.JS - Received shift generation request 🟢🟢🟢');
+    console.log('🟢🟢🟢 SERVER.TS - Received shift generation request 🟢🟢🟢');
     const { employees, businessMasters, dateRange, pairGroups, location } = req.body;
     
     if (!employees || !businessMasters || !dateRange) {
@@ -47,9 +47,8 @@ app.post('/api/generate-shifts', async (req, res) => {
       });
     }
     
-    console.log(`📊 NEW SERVER.JS - Processing ${dateRange.length} days for ${employees.length} employees`);
+    console.log(`📊 SERVER.TS - Processing ${dateRange.length} days for ${employees.length} employees`);
     
-    // Call generateShifts once with the entire date range
     const result = await generateShifts(
       employees,
       businessMasters,
@@ -61,7 +60,6 @@ app.post('/api/generate-shifts', async (req, res) => {
     console.log('✅ Shift generation completed');
     console.log(`📦 Result summary: ${result.shifts?.length || 0} shifts generated`);
     
-    // Log first shift to check multi_day_set_id
     if (result.shifts && result.shifts.length > 0) {
       console.log('🔍 First shift sample:', JSON.stringify(result.shifts[0], null, 2));
     }
@@ -75,6 +73,46 @@ app.post('/api/generate-shifts', async (req, res) => {
       success: false,
       error: 'Internal server error',
       message: error.message
+    });
+  }
+});
+
+// Manual shift assignment endpoint
+app.post('/api/shifts', async (req, res) => {
+  try {
+    const { employee_id, business_id, date, location } = req.body;
+    
+    console.log('📝 Manual shift assignment request:', { employee_id, business_id, date, location });
+    
+    if (!employee_id || !business_id || !date) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameters: employee_id, business_id, date'
+      });
+    }
+    
+    const { data, error } = await supabase
+      .from('shifts')
+      .insert([{
+        employee_id,
+        business_master_id: business_id,
+        date,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    
+    if (error) {
+      console.error('❌ Error inserting shift:', error);
+      throw error;
+    }
+    
+    console.log('✅ Shift assigned successfully:', (data as any[])[0]);
+    res.json({ success: true, shift: (data as any[])[0] });
+  } catch (error: any) {
+    console.error('Error assigning shift:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
     });
   }
 });
@@ -119,7 +157,7 @@ app.post('/api/business-rules', async (req, res) => {
       .select();
     
     if (error) throw error;
-    res.json(data[0]);
+    res.json((data as any[])[0]);
   } catch (error: any) {
     console.error('Error creating business rule:', error);
     res.status(500).json({ error: error.message });
@@ -135,7 +173,7 @@ app.put('/api/business-rules/:id', async (req, res) => {
       .select();
     
     if (error) throw error;
-    res.json(data[0]);
+    res.json((data as any[])[0]);
   } catch (error: any) {
     console.error('Error updating business rule:', error);
     res.status(500).json({ error: error.message });
@@ -153,6 +191,125 @@ app.delete('/api/business-rules/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Error deleting business rule:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete employee endpoint
+app.delete('/api/employees/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    console.log('🗑️ Deleting employee via API:', employeeId);
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('employee_id', employeeId);
+    
+    if (error) {
+      console.error('❌ Error deleting employee:', error);
+      throw error;
+    }
+    
+    console.log('✅ Employee deleted successfully via API');
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting employee:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== User Management API =====
+
+// Create user
+app.post('/api/users', async (req, res) => {
+  try {
+    const { email, name, password, role, office } = req.body;
+    console.log('👤 Creating user:', email);
+    
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name, role }
+    });
+    
+    if (authError) {
+      console.error('❌ Error creating auth user:', authError);
+      throw authError;
+    }
+    
+    // Wait for trigger to create public.users record
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (office) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ office, role, name })
+        .eq('id', authData.user.id);
+      
+      if (updateError) {
+        console.error('⚠️ Error updating office:', updateError);
+      }
+    }
+    
+    console.log('✅ User created successfully');
+    res.json({ success: true, user: authData.user });
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user
+app.put('/api/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, role, office, password } = req.body;
+    console.log('👤 Updating user:', userId);
+    
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ name, role, office })
+      .eq('id', userId);
+    
+    if (updateError) {
+      console.error('❌ Error updating user:', updateError);
+      throw updateError;
+    }
+    
+    if (password) {
+      const { error: pwError } = await supabase.auth.admin.updateUserById(userId, { password });
+      if (pwError) {
+        console.error('❌ Error updating password:', pwError);
+        throw pwError;
+      }
+    }
+    
+    console.log('✅ User updated successfully');
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user
+app.delete('/api/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('🗑️ Deleting user:', userId);
+    
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    
+    if (error) {
+      console.error('❌ Error deleting user:', error);
+      throw error;
+    }
+    
+    console.log('✅ User deleted successfully');
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
     res.status(500).json({ error: error.message });
   }
 });

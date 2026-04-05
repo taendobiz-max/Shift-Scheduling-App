@@ -29,6 +29,7 @@ export interface Shift {
   employee_name?: string;
   business_group: string;
   business_name?: string;
+  business_master_id?: string;
   start_time: string;
   end_time: string;
   shift_date: string;
