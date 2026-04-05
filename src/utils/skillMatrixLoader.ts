@@ -261,18 +261,21 @@ export const getEmployeeSkills = async (employeeName: string): Promise<SkillMatr
 export const addEmployeeSkill = async (
   employeeName: string, 
   businessGroup: string, 
-  skillLevel: string = '対応可能'
+  skillLevel: string = '○'
 ): Promise<boolean> => {
   try {
     console.log(`💾 Adding skill for ${employeeName}: ${businessGroup}`);
     
+    // upsertを使用して重複エラーを回避（ユニーク制約: employee_id, skill_name）
     const { error } = await supabase
       .from('skill_matrix')
-      .insert({
+      .upsert({
         employee_id: employeeName,
         skill_name: businessGroup,
         business_group: businessGroup,
         skill_level: skillLevel
+      }, {
+        onConflict: 'employee_id,skill_name'
       });
 
     if (error) {
