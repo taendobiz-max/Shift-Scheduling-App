@@ -34,6 +34,10 @@ export default function EmployeeManagement() {
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [selectedEmployeeForSkill, setSelectedEmployeeForSkill] = useState<{ id: string; name: string; office?: string } | null>(null);
   const [activeTab, setActiveTab] = useState('employees');
+  // スキルマトリクス一括保存用：未保存の変更を管理
+  // key: "employeeId::businessGroup", value: true(追加) / false(削除)
+  const [pendingSkillChanges, setPendingSkillChanges] = useState<Record<string, boolean>>({});
+  const [isSavingSkills, setIsSavingSkills] = useState(false);
 
   // Load data on component mount
   useEffect(() => {
@@ -660,10 +664,72 @@ export default function EmployeeManagement() {
         <TabsContent value="matrix" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>スキルマトリクス</CardTitle>
-              <CardDescription>
-                従業員のスキル保有状況をマトリクス形式で表示します
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>スキルマトリクス</CardTitle>
+                  <CardDescription>
+                    従業員のスキル保有状況をマトリクス形式で表示します
+                    {Object.keys(pendingSkillChanges).length > 0 && (
+                      <span className="ml-2 text-amber-600 font-medium">
+                        （{Object.keys(pendingSkillChanges).length}件の未保存の変更があります）
+                      </span>
+                    )}
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  {Object.keys(pendingSkillChanges).length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPendingSkillChanges({});
+                        toast.info('変更をリセットしました');
+                      }}
+                      disabled={isSavingSkills}
+                    >
+                      <XIcon className="h-4 w-4 mr-1" />
+                      リセット
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (Object.keys(pendingSkillChanges).length === 0) return;
+                      setIsSavingSkills(true);
+                      try {
+                        const { addEmployeeSkill, removeEmployeeSkill } = await import('@/utils/skillMatrixLoader');
+                        const entries = Object.entries(pendingSkillChanges);
+                        let successCount = 0;
+                        let failCount = 0;
+                        for (const [key, shouldAdd] of entries) {
+                          const [empId, group] = key.split('::');
+                          const ok = shouldAdd
+                            ? await addEmployeeSkill(empId, group)
+                            : await removeEmployeeSkill(empId, group);
+                          if (ok) successCount++; else failCount++;
+                        }
+                        setPendingSkillChanges({});
+                        await loadEmployeeSkills(employees);
+                        if (failCount === 0) {
+                          toast.success(`✅ ${successCount}件のスキルを更新しました`);
+                        } else {
+                          toast.warning(`⚠️ ${successCount}件成功、${failCount}件失敗しました`);
+                        }
+                      } catch (error) {
+                        console.error('Skill save error:', error);
+                        toast.error('❌ スキルの保存に失敗しました');
+                      } finally {
+                        setIsSavingSkills(false);
+                      }
+                    }}
+                    disabled={isSavingSkills || Object.keys(pendingSkillChanges).length === 0}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    {isSavingSkills ? '保存中...' : '更新'}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-auto max-h-[600px] border">
@@ -685,22 +751,29 @@ export default function EmployeeManagement() {
                         <td className="border p-2 font-medium sticky left-0 bg-background z-20 whitespace-nowrap min-w-[150px] w-[150px]">{emp.name}</td>
                         <td className="border p-2 sticky left-[150px] bg-background z-10 whitespace-nowrap min-w-[100px] w-[100px]">{emp.office || '-'}</td>
                         {filteredBusinessGroups.map(group => {
-                          const empSkills = employeeSkills[emp.employee_id || ''] || new Set();
-                          const hasSkill = empSkills.has(group);
+                          const empId = emp.employee_id || '';
+                          const key = `${empId}::${group}`;
+                          const empSkills = employeeSkills[empId] || new Set();
+                          const savedState = empSkills.has(group);
+                          // pendingに変更があればそちらを優先
+                          const currentState = key in pendingSkillChanges ? pendingSkillChanges[key] : savedState;
+                          const isDirty = key in pendingSkillChanges;
                           return (
-                            <td key={group} className="border p-2 text-center relative z-0">
+                            <td key={group} className={`border p-2 text-center relative z-0${isDirty ? ' bg-amber-50' : ''}`}>
                               <Checkbox
-                                checked={hasSkill}
-                                onCheckedChange={async () => {
-                                  try {
-                                    const { toggleEmployeeSkill } = await import('@/utils/skillMatrixLoader');
-                                    await toggleEmployeeSkill(emp.employee_id || '', group);
-                                    await loadData();
-                                    toast.success(`✅ ${emp.name}の${group}スキルを${hasSkill ? '削除' : '追加'}しました`);
-                                  } catch (error) {
-                                    console.error('Skill toggle error:', error);
-                                    toast.error('❌ スキルの更新に失敗しました');
-                                  }
+                                checked={currentState}
+                                onCheckedChange={() => {
+                                  const newState = !currentState;
+                                  setPendingSkillChanges(prev => {
+                                    const next = { ...prev };
+                                    // 変更後の状態がDB保存済みの状態と同じなら、pendingから削除（変更なし扱い）
+                                    if (newState === savedState) {
+                                      delete next[key];
+                                    } else {
+                                      next[key] = newState;
+                                    }
+                                    return next;
+                                  });
                                 }}
                                 className="mx-auto cursor-pointer"
                               />
