@@ -9,12 +9,25 @@
 import { createClient } from '@supabase/supabase-js';
 import type { BusinessRule } from './rule-engine-types';
 
+// Import shared supabase client if available
+let sharedSupabase: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { supabase } = require('./supabaseClient');
+  sharedSupabase = supabase;
+} catch (e) {
+  // supabaseClient not available in this context
+}
+
 export class BusinessRuleAdapter {
   private supabase: any;
 
   constructor(supabaseUrl?: string, supabaseKey?: string) {
     if (supabaseUrl && supabaseKey) {
       this.supabase = createClient(supabaseUrl, supabaseKey);
+    } else if (sharedSupabase) {
+      // Use shared supabase client from supabaseClient.ts
+      this.supabase = sharedSupabase;
     }
   }
 

@@ -3,6 +3,8 @@ import { supabase } from './supabaseClient';
 import { ConstraintEngine } from './constraintEngine';
 import { ConstraintManager } from './constraintManager';
 import { RuleEngine } from './RuleEngine';
+import { BusinessRuleEngine } from './BusinessRuleEngine';
+import type { RuleContext, EmployeeInfo as BREEmployeeInfo, BusinessInfo } from './rule-engine-types';
 
 // Load skill matrix from database
 // Load skill matrix from database
@@ -449,6 +451,78 @@ async function generateShiftsForSingleDate(
     console.log(`📋 [RULE_ENGINE] Max daily shifts: ${ruleEngine.getMaxDailyShifts()}`);
     console.log(`📋 [RULE_ENGINE] Exclusive groups: ${JSON.stringify(ruleEngine.getExclusiveGroups())}`);
     
+    // Initialize BusinessRuleEngine for filter rules (team_filter, team_rotation_filter)
+    console.log(`🔧 [DEBUG] Initializing BusinessRuleEngine...`);
+    const businessRuleEngine = new BusinessRuleEngine();
+    console.log(`🔧 [DEBUG] BusinessRuleEngine instance created, calling loadRules...`);
+    try {
+      await businessRuleEngine.loadRules(location);
+      console.log(`📋 [BUSINESS_RULE_ENGINE] Loaded rules for location: ${location}`);
+    } catch (breError) {
+      console.warn(`⚠️ [BUSINESS_RULE_ENGINE] Failed to load rules, continuing without filter rules:`, breError);
+    }
+    console.log(`🔧 [DEBUG] BusinessRuleEngine initialization complete`);
+    
+    // Helper: convert shiftGenerator employee to BREEmployeeInfo for BusinessRuleEngine
+    function toBREEmployee(emp: any): BREEmployeeInfo {
+      const empId = emp.id || emp.従業員ID || emp.employee_id;
+      return {
+        employee_id: empId,
+        name: emp.name || emp.氏名 || emp.名前 || '名前不明',
+        班: emp.班 || emp.team || undefined,
+        営業所: emp.location || emp.拠点 || emp.営業所 || location || '',
+        roll_call_capable: emp.roll_call_capable,
+        roll_call_duty: emp.roll_call_duty,
+        skills: emp.skills || undefined,
+        ...emp
+      };
+    }
+    
+    // Helper: apply BusinessRuleEngine filter for a specific business
+    // Returns filtered employee list (falls back to original list if filter returns empty)
+    async function applyBusinessRuleFilter(business: any, employeeList: any[]): Promise<any[]> {
+      try {
+        const businessInfo: BusinessInfo = {
+          業務名: business.業務名 || business.name || '',
+          業務グループ: business.業務グループ || business.business_group || '',
+          業務タイプ: business.業務タイプ || business.business_type || '',
+          班指定: business.班指定 || business.team_assignment || undefined,
+          ペア業務ID: business.ペア業務id || business.pair_business_id || undefined,
+          運行日数: business.運行日数 || business.operation_days || undefined,
+          方向: business.方向 || business.direction || undefined,
+          ...business
+        };
+        const context: RuleContext = {
+          business: businessInfo,
+          date: normalizedTargetDate,
+          location: location || '',
+          availableEmployees: employeeList.map(toBREEmployee),
+          existingShifts: shifts
+        };
+        const filtered = await businessRuleEngine.filterEmployees(context);
+        if (filtered.length === 0) {
+          // フィルタ結果が空の場合はフォールバック（全員を対象とする）
+          console.log(`⚠️ [BUSINESS_RULE_ENGINE] Filter returned 0 employees for ${business.業務名 || business.name}, falling back to all employees`);
+          return employeeList;
+        }
+        // BREEmployeeInfoのemployee_idを使って元のemployeeオブジェクトに戻す
+        const filteredIds = new Set(filtered.map(e => e.employee_id));
+        const result = employeeList.filter(emp => {
+          const empId = emp.id || emp.従業員ID || emp.employee_id;
+          return filteredIds.has(empId);
+        });
+        if (result.length === 0) {
+          console.log(`⚠️ [BUSINESS_RULE_ENGINE] No matching employees after ID mapping for ${business.業務名 || business.name}, falling back to all employees`);
+          return employeeList;
+        }
+        console.log(`✅ [BUSINESS_RULE_ENGINE] Filtered ${employeeList.length} → ${result.length} employees for ${business.業務名 || business.name}`);
+        return result;
+      } catch (err) {
+        console.warn(`⚠️ [BUSINESS_RULE_ENGINE] Filter error for ${business.業務名 || business.name}:`, err);
+        return employeeList;
+      }
+    }
+    
     // Load business history from DB if not provided
     console.log('🔍 [DEBUG] existingBusinessHistory:', existingBusinessHistory);
     let employeeBusinessHistory: Map<string, Set<string>>;
@@ -769,7 +843,9 @@ async function generateShiftsForSingleDate(
         continue;
       }
       
-      const candidateEmployees = rollCallCapableEmployees;
+      // Also apply BusinessRuleEngine filter (team_filter etc.) on top of roll call filter
+      const breFilteredRollCall = await applyBusinessRuleFilter(business, rollCallCapableEmployees);
+      const candidateEmployees = breFilteredRollCall;
       
       // Sort by diversity score (prioritize employees who haven't done this business)
       const sortedEmployees = candidateEmployees.sort((a, b) => {
@@ -876,9 +952,14 @@ async function generateShiftsForSingleDate(
       let selectedEmployee = null;
       let minViolations = Infinity;
       
+      // Apply BusinessRuleEngine filter for the first business in the pair group
+      // (team_filter / team_rotation_filter are applied per business group)
+      const primaryBusiness = businessGroup[0];
+      const breFilteredEmployees = await applyBusinessRuleFilter(primaryBusiness, availableEmployees);
+      
       // Find employee with best diversity score who can handle this pair
       const businessIds = businessGroup.map(b => b.業務id || b.id || 'unknown');
-      const sortedEmployees = availableEmployees.sort((a, b) => {
+      const sortedEmployees = breFilteredEmployees.sort((a, b) => {
         const aScore = calculatePairDiversityScore(a, businessIds, employeeBusinessHistory, employeeAssignmentCounts);
         const bScore = calculatePairDiversityScore(b, businessIds, employeeBusinessHistory, employeeAssignmentCounts);
         return bScore - aScore; // Higher score first
@@ -1110,12 +1191,15 @@ async function generateShiftsForSingleDate(
       
       console.log(`🔄 Processing single business: ${businessName}`);
       
+      // Apply BusinessRuleEngine filter (team_filter / team_rotation_filter)
+      const breFilteredForSingle = await applyBusinessRuleFilter(business, availableEmployees);
+      
       let selectedEmployee = null;
       let minViolations = Infinity;
       
       // Find employee with least assignments who can handle this business
       // Prioritize employees who haven't done this business before (diversity)
-      const sortedEmployees = availableEmployees.sort((a, b) => {
+      const sortedEmployees = breFilteredForSingle.sort((a, b) => {
         const aId = a.id || a.従業員ID || a.employee_id;
         const bId = b.id || b.従業員ID || b.employee_id;
         
