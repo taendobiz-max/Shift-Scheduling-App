@@ -305,9 +305,15 @@ export class RuleEngine {
     const businessName = business.業務名 || business.name || '';
     const businessType = business.業務タイプ || business.business_type || '';
     
-    // 業務タイプベースの判定
+    // 業務タイプベースの判定（設定値との完全一致）
     if (businessTypes.includes(businessType)) {
       console.log(`🌙 [OVERNIGHT] Detected overnight business by type: ${businessName} (${businessType})`);
+      return true;
+    }
+    
+    // フォールバック：overnight_outbound/overnight_returnは常に夜行バスとして扱う
+    if (businessType === 'overnight_outbound' || businessType === 'overnight_return') {
+      console.log(`🌙 [OVERNIGHT] Detected overnight business by fallback type: ${businessName} (${businessType})`);
       return true;
     }
     
