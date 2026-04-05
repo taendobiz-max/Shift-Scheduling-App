@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Users, RefreshCw, AlertTriangle, Home, Save, CheckCircle2, Plus, Trash2, ChevronDown, ChevronRight, XCircle, AlertCircle, Info } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -2187,88 +2188,155 @@ export default function ShiftSchedule() {
   
   {/* Rule Check Dialog */}
   <Dialog open={showRuleCheckDialog} onOpenChange={setShowRuleCheckDialog}>
-    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
+    <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+      <DialogHeader className="flex-shrink-0">
+        <DialogTitle className="flex items-center gap-2 text-lg">
           <CheckCircle2 className="h-5 w-5" />
           ルールチェック結果
         </DialogTitle>
-        <DialogDescription>
-          {ruleViolations.length === 0 ? (
-            'すべてのシフトが制約条件を満たしています。'
-          ) : (
-            `${ruleViolations.filter(v => v.severity === 'error').length}件のエラー、${ruleViolations.filter(v => v.severity === 'warning').length}件の警告が見つかりました。`
-          )}
-        </DialogDescription>
       </DialogHeader>
-      
-      {ruleViolations.length > 0 && (
-        <div className="space-y-4 mt-4">
-          {/* エラー一覧 */}
-          {ruleViolations.filter(v => v.severity === 'error').length > 0 && (
-            <div>
-              <h3 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                エラー ({ruleViolations.filter(v => v.severity === 'error').length}件)
-              </h3>
-              <div className="space-y-2">
-                {ruleViolations.filter(v => v.severity === 'error').map((violation, index) => (
-                  <Alert key={index} variant="destructive">
-                    <AlertDescription>
-                      <div className="font-medium">
-                        {violation.date} - {violation.employeeName}
-                      </div>
-                      <div className="text-sm mt-1">
-                        <span className="font-semibold">{violation.description}</span>
-                        {violation.details && (
-                          <div className="mt-1 text-xs">{violation.details}</div>
-                        )}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* 警告一覧 */}
-          {ruleViolations.filter(v => v.severity === 'warning').length > 0 && (
-            <div>
-              <h3 className="font-semibold text-yellow-600 mb-2 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                警告 ({ruleViolations.filter(v => v.severity === 'warning').length}件)
-              </h3>
-              <div className="space-y-2">
-                {ruleViolations.filter(v => v.severity === 'warning').map((violation, index) => (
-                  <Alert key={index}>
-                    <AlertDescription>
-                      <div className="font-medium">
-                        {violation.date} - {violation.employeeName}
-                      </div>
-                      <div className="text-sm mt-1">
-                        <span className="font-semibold">{violation.description}</span>
-                        {violation.details && (
-                          <div className="mt-1 text-xs">{violation.details}</div>
-                        )}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-      
-      {ruleViolations.length === 0 && (
-        <div className="text-center py-8">
+
+      {/* サマリーカード */}
+      {ruleViolations.length === 0 ? (
+        <div className="text-center py-10">
           <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
           <p className="text-lg font-medium text-green-600">制約違反はありません</p>
           <p className="text-sm text-gray-500 mt-2">すべてのシフトがルールに準拠しています。</p>
         </div>
-      )}
-      
-      <DialogFooter>
+      ) : (() => {
+        const errors = ruleViolations.filter(v => v.severity === 'error');
+        const warnings = ruleViolations.filter(v => v.severity === 'warning');
+
+        // カテゴリ定義
+        const categoryDefs: { type: RuleViolation['type']; label: string; severity: 'error' | 'warning' }[] = [
+          { type: 'time_conflict',          label: '時間重複',       severity: 'error' },
+          { type: 'rest_time',              label: '休息時間不足',   severity: 'error' },
+          { type: 'split_rest',             label: '分割休息違反',   severity: 'error' },
+          { type: 'skill_mismatch',         label: 'スキル不足',     severity: 'error' },
+          { type: 'roll_call_missing',      label: '点呼未対応',     severity: 'error' },
+          { type: 'roll_call_skill_missing',label: '点呼スキル不足', severity: 'error' },
+          { type: 'constraint',             label: 'その他制約',     severity: 'error' },
+          { type: 'consecutive_days',       label: '連続勤務日数',   severity: 'warning' },
+        ];
+
+        const categorized = categoryDefs
+          .map(def => ({
+            ...def,
+            items: ruleViolations.filter(v => v.type === def.type),
+          }))
+          .filter(c => c.items.length > 0);
+
+        // デフォルトで開くアコーディオン（エラーカテゴリのみ）
+        const defaultOpen = categorized
+          .filter(c => c.severity === 'error')
+          .map(c => c.type);
+
+        return (
+          <div className="flex flex-col gap-4 overflow-hidden">
+            {/* サマリーカード行 */}
+            <div className="flex gap-3 flex-shrink-0">
+              <div className={`flex-1 rounded-lg border-2 p-3 flex items-center gap-3 ${
+                errors.length > 0 ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <XCircle className={`h-8 w-8 flex-shrink-0 ${errors.length > 0 ? 'text-red-500' : 'text-gray-300'}`} />
+                <div>
+                  <div className={`text-2xl font-bold ${errors.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>{errors.length}</div>
+                  <div className="text-xs text-gray-500">エラー</div>
+                </div>
+              </div>
+              <div className={`flex-1 rounded-lg border-2 p-3 flex items-center gap-3 ${
+                warnings.length > 0 ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <AlertCircle className={`h-8 w-8 flex-shrink-0 ${warnings.length > 0 ? 'text-yellow-500' : 'text-gray-300'}`} />
+                <div>
+                  <div className={`text-2xl font-bold ${warnings.length > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>{warnings.length}</div>
+                  <div className="text-xs text-gray-500">警告</div>
+                </div>
+              </div>
+              <div className="flex-1 rounded-lg border-2 border-gray-200 bg-gray-50 p-3 flex items-center gap-3">
+                <Info className="h-8 w-8 flex-shrink-0 text-gray-300" />
+                <div>
+                  <div className="text-2xl font-bold text-gray-400">{ruleViolations.length}</div>
+                  <div className="text-xs text-gray-500">合計</div>
+                </div>
+              </div>
+            </div>
+
+            {/* アコーディオン */}
+            <div className="overflow-y-auto flex-1 pr-1">
+              <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-2">
+                {categorized.map(cat => (
+                  <AccordionItem
+                    key={cat.type}
+                    value={cat.type}
+                    className={`rounded-lg border ${
+                      cat.severity === 'error'
+                        ? 'border-red-200 bg-red-50/30'
+                        : 'border-yellow-200 bg-yellow-50/30'
+                    }`}
+                  >
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        {cat.severity === 'error' ? (
+                          <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                        )}
+                        <span className={cat.severity === 'error' ? 'text-red-700' : 'text-yellow-700'}>
+                          {cat.label}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={`ml-1 text-xs ${
+                            cat.severity === 'error'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}
+                        >
+                          {cat.items.length}件
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-3">
+                      <div className="rounded-md overflow-hidden border border-gray-200">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className={`${
+                              cat.severity === 'error' ? 'bg-red-100' : 'bg-yellow-100'
+                            }`}>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600 w-28">日付</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600 w-32">従業員</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600">内容</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cat.items.map((v, i) => (
+                              <tr key={i} className={`border-t border-gray-100 ${
+                                i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                              }`}>
+                                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{v.date}</td>
+                                <td className="px-3 py-2 font-medium whitespace-nowrap">{v.employeeName}</td>
+                                <td className="px-3 py-2">
+                                  <span>{v.description}</span>
+                                  {v.details && (
+                                    <span className="block text-xs text-gray-500 mt-0.5">{v.details}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          </div>
+        );
+      })()}
+
+      <DialogFooter className="flex-shrink-0 pt-2">
         <Button onClick={() => setShowRuleCheckDialog(false)}>
           閉じる
         </Button>
