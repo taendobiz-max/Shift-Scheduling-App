@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabaseClient';
 import { OFFICES, TOKYO_TEAMS, SHIFT_DEFAULTS } from '@/constants';
@@ -20,7 +21,8 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
     name: '',
     office: '',
     team: '',
-    display_order: SHIFT_DEFAULTS.DISPLAY_ORDER_MAX
+    display_order: SHIFT_DEFAULTS.DISPLAY_ORDER_MAX,
+    roll_call_capable: false
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -65,7 +67,8 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
       name: '',
       office: '',
       team: '',
-      display_order: SHIFT_DEFAULTS.DISPLAY_ORDER_MAX
+      display_order: SHIFT_DEFAULTS.DISPLAY_ORDER_MAX,
+      roll_call_capable: false
     });
     onClose();
   };
@@ -157,6 +160,23 @@ export function AddEmployeeModal({ isOpen, onClose, onEmployeeAdded }: AddEmploy
               onChange={(e) => handleInputChange('display_order', parseInt(e.target.value) || 9999)}
               placeholder="9999"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">点呼対応可能</Label>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="roll_call_capable"
+                checked={formData.roll_call_capable || false}
+                onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, roll_call_capable: checked }))}
+              />
+              <Label htmlFor="roll_call_capable" className="text-sm">
+                この従業員は点呼業務に対応可能です
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              チェックを入れると点呼業務に対応可能な従業員として設定されます
+            </p>
           </div>
         </div>
         
