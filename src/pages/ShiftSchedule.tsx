@@ -2226,10 +2226,8 @@ export default function ShiftSchedule() {
           }))
           .filter(c => c.items.length > 0);
 
-        // デフォルトで開くアコーディオン（エラーカテゴリのみ）
-        const defaultOpen = categorized
-          .filter(c => c.severity === 'error')
-          .map(c => c.type);
+        // デフォルトは全て折りたたみ
+        const defaultOpen: string[] = [];
 
         return (
           <div className="flex flex-col gap-4 overflow-hidden">
