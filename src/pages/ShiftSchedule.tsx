@@ -289,7 +289,7 @@ export default function ShiftSchedule() {
       // 選択拠点の全従業員を取得（シフトの有無に関わらず）
       const employees = allEmployees
         .filter(e => e.office === selectedLocation)
-        .sort((a, b) => (a.display_order || 9999) - (b.display_order || 9999))
+        .sort((a, b) => (a.employee_id || '').localeCompare(b.employee_id || ''))
         .map(e => e.name);
       console.log('🔍 [DEBUG] All employees for location:', employees);
       
@@ -1833,23 +1833,7 @@ export default function ShiftSchedule() {
                 {/* Employee Rows */}
                 {allEmployees
                   .filter(emp => emp.office === selectedLocation)
-                  .sort((a, b) => {
-                    // Sort employees with roll call shifts to the top
-                    const aHasRollCall = shifts.some(s => 
-                      s.employee_id === a.employee_id && 
-                      (s.business_name?.includes('点呼') || s.business_group?.includes('点呼'))
-                    );
-                    const bHasRollCall = shifts.some(s => 
-                      s.employee_id === b.employee_id && 
-                      (s.business_name?.includes('点呼') || s.business_group?.includes('点呼'))
-                    );
-                    
-                    if (aHasRollCall && !bHasRollCall) return -1;
-                    if (!aHasRollCall && bHasRollCall) return 1;
-                    
-                    // Otherwise, sort by name
-                    return (a.name || '').localeCompare(b.name || '');
-                  })
+                                    .sort((a, b) => (a.employee_id || '').localeCompare(b.employee_id || ''))
                   .map((employee) => {
                     const employeeShifts = shifts.filter(s => {
                       // 当日のシフト
