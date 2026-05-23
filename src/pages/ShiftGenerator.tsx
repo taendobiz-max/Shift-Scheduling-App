@@ -303,6 +303,16 @@ export default function ShiftGenerator() {
     
     // For business cells, we need to find the last occurrence of '-' followed by a date pattern
     // Date pattern: YYYY-MM-DD
+    // Also handle slot IDs: {businessMaster}-{date}-slot-{slotIdx}
+    const slotPattern = /^(.*?)-(\d{4}-\d{2}-\d{2})-slot-\d+$/;
+    const slotMatch = cellId.match(slotPattern);
+    if (slotMatch) {
+      const businessName = slotMatch[1];
+      const date = slotMatch[2];
+      console.log('📝 Slot cell parsed:', { businessName, date });
+      return { businessName, date };
+    }
+
     const datePattern = /(\d{4}-\d{2}-\d{2})$/;
     const match = cellId.match(datePattern);
     
@@ -1229,15 +1239,24 @@ export default function ShiftGenerator() {
         return a.localeCompare(b);
       });
 
-    const matrix: { [key: string]: { [key: string]: { employeeName: string; shift?: ShiftResult } } } = {};
+    // 必要人数を取得するヘルパー
+    const getRequiredPeople = (bmName: string): number => {
+      const bm = businessMasters.find(b => (b.name || b.業務名) === bmName);
+      return (bm as any)?.必要人数 || 1;
+    };
+
+    const matrix: { [key: string]: { [key: string]: { shifts: (ShiftResult | null)[] } } } = {};
     businessMasterNames.forEach(bm => {
       matrix[bm] = {};
+      const required = getRequiredPeople(bm);
       dates.forEach(date => {
-        const result = shiftResults.find(r => r.date === date && r.businessMaster === bm);
-        matrix[bm][date] = {
-          employeeName: result ? result.employeeName : '-',
-          shift: result
-        };
+        const results = shiftResults.filter(r => r.date === date && r.businessMaster === bm);
+        // 必要人数分のスロットを確保（足りない分はnull）
+        const slots: (ShiftResult | null)[] = [];
+        for (let i = 0; i < Math.max(required, results.length); i++) {
+          slots.push(results[i] || null);
+        }
+        matrix[bm][date] = { shifts: slots };
       });
     });
 
@@ -1417,14 +1436,26 @@ export default function ShiftGenerator() {
                       {dates.map(date => (
                         <td 
                           key={`${businessMaster}-${date}`} 
-                          className="border-b border-r border-gray-300 px-2 py-2 text-center"
+                          className="border-b border-r border-gray-300 px-2 py-2"
                         >
-                          {renderDraggableCell(
-                            businessMaster, 
-                            date, 
-                            matrix[businessMaster][date].employeeName,
-                            matrix[businessMaster][date].shift
-                          )}
+                          <div className="space-y-1">
+                            {matrix[businessMaster][date].shifts.map((shift, slotIdx) => (
+                              <div key={`${businessMaster}-${date}-slot-${slotIdx}`}>
+                                {shift ? (
+                                  renderDraggableCell(
+                                    businessMaster,
+                                    date,
+                                    shift.employeeName,
+                                    shift
+                                  )
+                                ) : (
+                                  <DroppableCell id={`${businessMaster}-${date}-slot-${slotIdx}`} isEmpty={true}>
+                                    <span className="text-gray-400">空き</span>
+                                  </DroppableCell>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </td>
                       ))}
                     </tr>

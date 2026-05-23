@@ -93,6 +93,7 @@ interface BusinessMasterForm {
   班ローテーション: boolean;
   班指定: string;
   方向: string;
+  必要人数: number;
   display_order: number;
 }
 
@@ -133,6 +134,7 @@ export default function MasterDataManagement() {
     班ローテーション: false,
     班指定: 'none',
     方向: 'none',
+    必要人数: 1,
     display_order: 9999,
   });
 
@@ -414,6 +416,7 @@ export default function MasterDataManagement() {
       班ローテーション: (master as any).班ローテーション || false,
       班指定: (master as any).班指定 || 'none',
       方向: (master as any).方向 || 'none',
+      必要人数: (master as any).必要人数 ?? 1,
       display_order: master.display_order ?? 9999,
     });
     setEditingBusinessMasterId(master.業務id || null);
@@ -438,6 +441,7 @@ export default function MasterDataManagement() {
       班ローテーション: false,
       班指定: '',
       方向: '',
+      必要人数: 1,
       display_order: 9999,
     });
     setEditingBusinessMasterId(null);
@@ -500,6 +504,7 @@ export default function MasterDataManagement() {
       班ローテーション: false,
       班指定: 'none',
       方向: 'none',
+      必要人数: 1,
       display_order: 9999,
     });
     setEditingBusinessMasterId(null);
@@ -1020,14 +1025,27 @@ export default function MasterDataManagement() {
                 <Label htmlFor="深夜手当" className="cursor-pointer">深夜手当</Label>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="ペア業務id">ペア業務ID</Label>
-              <Input
-                id="ペア業務id"
-                value={businessMasterForm.ペア業務id}
-                onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
-                placeholder="例: TKS_PAIR"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ペア業務id">ペア業務ID</Label>
+                <Input
+                  id="ペア業務id"
+                  value={businessMasterForm.ペア業務id}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, ペア業務id: e.target.value })}
+                  placeholder="例: TKS_PAIR"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="必要人数">必要人数 <span className="text-xs text-muted-foreground">(1名=通常、2名以上=ツーマン等)</span></Label>
+                <Input
+                  id="必要人数"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={businessMasterForm.必要人数}
+                  onChange={(e) => setBusinessMasterForm({ ...businessMasterForm, 必要人数: parseInt(e.target.value) || 1 })}
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="displayOrder">表示順 <span className="text-xs text-muted-foreground">(小さい値ほど上に表示、未設定は9999)</span></Label>
