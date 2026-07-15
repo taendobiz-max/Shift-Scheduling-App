@@ -509,6 +509,16 @@ export default function ShiftSchedule() {
       return;
     }
     
+    // 空セルクリック かつ 入れ替え元が未選択の場合 → 業務割り当てポップアップを表示
+    if (cell.isEmpty && !firstCell) {
+      handleAssignPopupOpen(
+        cell.date,
+        cell.employeeId,
+        cell.employeeName
+      );
+      return;
+    }
+    
     // 通常のクリックはシフト入れ替え用
     // 削除用の選択をクリア
     setSelectedShiftIds(new Set());
@@ -2066,8 +2076,9 @@ export default function ShiftSchedule() {
                                 key={`${businessGroup.key}-${index}`}
                                 className="min-h-[40px] p-1 border-r border-b bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
-                                  // 未アサイン業務をクリックした場合、従業員選択ポップアップを表示
-                                  if (businessShifts.length === 0) {
+                                  // 入れ替え元が未選択の場合は従業員選択ポップアップを表示
+                                  // 入れ替え元が選択済みの場合は入れ替え機能に任せる（シフトバーをクリックすることで対応）
+                                  if (!firstCell) {
                                     handleUnassignedBusinessClick(business, businessGroup.key);
                                   }
                                 }}
