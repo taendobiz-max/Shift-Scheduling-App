@@ -2446,34 +2446,46 @@ export default function ShiftSchedule() {
         {assignTarget?.employeeId ? (
           // 従業員が選択されている場合：業務一覧を表示
           (() => {
-            const filteredBusinesses = businessMasters.filter(business => business.営業所 === selectedLocation);
-            console.log('🔍 [DEBUG] Filtered businesses:', {
-              totalBusinesses: businessMasters.length,
-              selectedLocation,
-              filteredCount: filteredBusinesses.length,
-              sampleBusiness: filteredBusinesses[0]
+                        // is_active=falseの業務を除外（有効な業務のみ表示）
+            const filteredBusinesses = businessMasters.filter(business => 
+              business.営業所 === selectedLocation && business.is_active !== false
+            );
+            // 未アサイン業務を先頭に表示するためにソート
+            const currentShiftsForDate = (activeTab === 'daily' ? shifts : periodShifts).filter(
+              shift => shift.date === assignTarget?.date
+            );
+            const sortedBusinesses = [...filteredBusinesses].sort((a, b) => {
+              const aHasAssign = currentShiftsForDate.some(s => s.business_name === a.業務名);
+              const bHasAssign = currentShiftsForDate.some(s => s.business_name === b.業務名);
+              if (!aHasAssign && bHasAssign) return -1;
+              if (aHasAssign && !bHasAssign) return 1;
+              return 0;
             });
-            return filteredBusinesses.map((business) => {
-            // 既にアサインされているか確認
-            const isAssigned = assignTarget && periodShifts.some(shift => 
+            return sortedBusinesses.map((business) => {
+            // この従業員が既にこの業務にアサインされているか確認
+            const isAssigned = assignTarget && (activeTab === 'daily' ? shifts : periodShifts).some(shift => 
               shift.employee_id === assignTarget.employeeId && 
               shift.date === assignTarget.date && 
               shift.business_name === business.業務名
             );
-            
+            // この日にこの業務に誰もアサインされていないか確認（未アサイン業務）
+            const isUnassigned = !currentShiftsForDate.some(s => s.business_name === business.業務名);
             return (
             <Button
               key={business.業務id}
               variant="outline"
               className={`h-auto py-3 px-4 text-left justify-start ${
-                isAssigned ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white hover:bg-gray-50'
+                isAssigned ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                : isUnassigned ? 'bg-blue-50 border-blue-300 hover:bg-blue-100' 
+                : 'bg-white hover:bg-gray-50'
               }`}
               onClick={() => !isAssigned && handleAssignBusiness(business)}
               disabled={isAssigned}
             >
               <div className="flex flex-col gap-1">
-                <div className="font-semibold">
+                <div className="font-semibold flex items-center gap-2">
                   {business.業務名}
+                  {isUnassigned && !isAssigned && <span className="text-xs text-blue-600 font-normal border border-blue-400 rounded px-1">未アサイン</span>}
                   {isAssigned && <span className="ml-2 text-xs text-gray-500">(アサイン済)</span>}
                 </div>
                 <div className="text-xs text-gray-500">
