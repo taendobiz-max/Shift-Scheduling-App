@@ -1477,16 +1477,30 @@ export async function generateShifts(
   options?: {
     targetBusinessNames?: string[];  // 指定時はこの業務のみ生成対象（優先生成・残り生成用）
     skipAssignedBusinesses?: boolean; // trueの場合、DBに既存シフトがある業務をスキップ（残り生成用）
+    suspendedDates?: string[];        // 東京拠点: 運休日リスト（YYYY-MM-DD形式）
+    tokyoCycleState?: {               // 東京拠点: 前月から引き継ぐサイクル状態
+      nextDepartingTeam: 'Galaxy' | 'Aube';
+      employeeTripCounts: { [employeeId: string]: number };
+      employeeRestDaysRemaining: { [employeeId: string]: number };
+    };
   }
 ): Promise<GenerationResult> {
   console.log('🚀 Starting multi-day shift generation');
   const targetBusinessNames = options?.targetBusinessNames;
   const skipAssignedBusinesses = options?.skipAssignedBusinesses ?? false;
+  const suspendedDates = options?.suspendedDates;
+  const tokyoCycleState = options?.tokyoCycleState;
   if (targetBusinessNames && targetBusinessNames.length > 0) {
     console.log(`🎯 Target businesses (${targetBusinessNames.length}):`, targetBusinessNames);
   }
   if (skipAssignedBusinesses) {
     console.log('⏭️ Skip assigned businesses mode: ON');
+  }
+  if (suspendedDates && suspendedDates.length > 0) {
+    console.log(`🚫 Suspended dates (${suspendedDates.length}):`, suspendedDates);
+  }
+  if (tokyoCycleState) {
+    console.log(`🏙️ Tokyo cycle state provided: nextDepartingTeam=${tokyoCycleState.nextDepartingTeam}`);
   }
   
   // Convert single date to array for uniform processing
@@ -1543,13 +1557,17 @@ export async function generateShifts(
   }
   
   // Preprocess multi-day businesses with filtered employees
+  // For Tokyo location, pass tokyoCycleState and suspendedDates
+  const isTokyoLocation = location === '東京';
   const multiDayResult = await preprocessMultiDayBusinesses(
     businessMasters,
     dates,
     availableEmployeesForMultiDay,
     batchId,
     employeeSkillMatrix,
-    location
+    location,
+    isTokyoLocation ? tokyoCycleState : undefined,
+    isTokyoLocation ? suspendedDates : undefined
   );
   
   // Filter out processed multi-day businesses from the regular flow

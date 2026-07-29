@@ -1,16 +1,27 @@
 /**
- * Multi-Day Business Pair Handler (Fixed Version)
- * 
- * Handles round-trip overnight bus operations where:
- * - Same employee(s) handle both outbound and return legs
- * - Galaxy team departs on odd dates, Aube team on even dates
- * - Supports both one-person and two-person operations
- * 
- * [Fix] Added skill matrix check to prevent assigning employees without required skills
- * [Fix] Added roll_call_capable protection to preserve roll call capable employees for roll call duties
+ * Multi-Day Business Pair Handler (Tokyo Cycle Version v3)
+ *
+ * Key insight from Excel analysis:
+ * - The SAME employee handles BOTH the outbound (day 1) and return (day 2) legs
+ * - Galaxy team departs on odd cycle-days (day 1,3,5,7), Aube on even (day 2,4,6,8)
+ * - After 4 consecutive round-trips, each employee takes 2 consecutive days off
+ * - Cycle state is carried over from the previous month
+ * - Suspended (運休) dates pause the cycle without advancing it
+ *
+ * For businesses with fixed team assignment (班指定 = Galaxy/Aube):
+ * - The business is assigned when the specified team is the departing team for that day
+ * - e.g., "名古屋往路" (班指定=Galaxy) is used on Galaxy departing days
+ * - e.g., "名古屋復路" (班指定=Aube) is used on Aube departing days
+ *
+ * For businesses with no fixed team (班指定 = none/null):
+ * - The business is assigned based on the current cycle's departing team
+ *
+ * [Tokyo-specific rule] This logic applies only to the 東京 (Tokyo) location.
+ * For other locations, the original date-parity logic is preserved.
  */
 
 interface Employee {
+  id?: string;
   employee_id?: string;
   従業員id?: string;
   name?: string;
@@ -26,6 +37,7 @@ interface Employee {
 interface Business {
   業務id?: string;
   business_id?: string;
+  id?: string;
   業務名?: string;
   business_name?: string;
   運行日数?: number;
@@ -38,6 +50,8 @@ interface Business {
   business_group?: string;
   必要人数?: number;
   required_people?: number;
+  班指定?: string;
+  班ローテーション?: boolean;
   [key: string]: any;
 }
 
@@ -45,150 +59,462 @@ interface BusinessPair {
   baseName: string;
   outbound: Business;
   return: Business;
-  requiredPeople: number; // 1 for one-person, 2 for two-person
+  requiredPeople: number;
+  /** Fixed team for this pair's outbound leg (null = use cycle) */
+  fixedTeam: 'Galaxy' | 'Aube' | null;
+}
+
+/**
+ * Tokyo cycle state - carries over from previous month
+ */
+export interface TokyoCycleState {
+  /** Which team departs on the NEXT active (non-suspended) cycle day: 'Galaxy' or 'Aube' */
+  nextDepartingTeam: 'Galaxy' | 'Aube';
+  /**
+   * Per-employee trip count within the current 4-trip cycle.
+   * Key: employee_id (numeric string like '00001150'), Value: 0-3
+   * When tripCount reaches 4, the employee takes 2 rest days, then resets to 0.
+   */
+  employeeTripCounts: { [employeeId: string]: number };
+  /**
+   * Per-employee rest days remaining.
+   * Key: employee_id, Value: 0, 1, or 2
+   */
+  employeeRestDaysRemaining: { [employeeId: string]: number };
+}
+
+function getEmpId(employee: Employee): string {
+  return employee.employee_id || employee.従業員id || employee.id || '';
+}
+
+function getEmpTeam(employee: Employee): string {
+  return employee.班 || employee.team || '';
 }
 
 /**
  * Detect business pairs (outbound + return)
+ * Returns pairs grouped by base name.
+ * Each pair has a fixedTeam if one of the businesses has 班指定 set.
  */
 export function detectBusinessPairs(businesses: Business[]): BusinessPair[] {
   const pairs: Map<string, { outbound?: Business; return?: Business }> = new Map();
-  
+
   businesses.forEach(business => {
     const name = business.業務名 || business.business_name || '';
     const direction = business.方向 || business.direction || '';
-    const duration = business.運行日数 || business.duration || 1;
-    
+    const duration = Number(business.運行日数 || business.duration || 1);
+
     // Only process 2-day businesses
     if (duration !== 2) return;
-    
+
     // Extract base name by removing direction suffix
-    const baseName = name.replace(/[（(]往路[）)]/, '').replace(/[（(]復路[）)]/, '').trim();
-    
+    const baseName = name
+      .replace(/[（(]往路[）)]/, '')
+      .replace(/[（(]復路[）)]/, '')
+      .replace(/往路$/, '')
+      .replace(/復路$/, '')
+      .trim();
+
     if (!pairs.has(baseName)) {
       pairs.set(baseName, {});
     }
-    
+
     const pair = pairs.get(baseName)!;
-    
     if (direction === 'outbound' || name.includes('往路')) {
       pair.outbound = business;
     } else if (direction === 'return' || name.includes('復路')) {
       pair.return = business;
     }
   });
-  
-  // Convert to array of complete pairs
-  const completePairs: BusinessPair[] = [];
-  
-  for (const [baseName, pair] of Array.from(pairs.entries())) {
+
+  const result: BusinessPair[] = [];
+  pairs.forEach((pair, baseName) => {
     if (pair.outbound && pair.return) {
-      const requiredPeople = pair.outbound.必要人数 || pair.outbound.required_people || 1;
-      completePairs.push({
+      const requiredPeople = Number(pair.outbound.必要人数 || pair.outbound.required_people || 1);
+
+      // Determine fixed team from 班指定 field on the outbound business
+      const outboundTeamSpec = pair.outbound.班指定;
+      let fixedTeam: 'Galaxy' | 'Aube' | null = null;
+      if (outboundTeamSpec === 'Galaxy') {
+        fixedTeam = 'Galaxy';
+      } else if (outboundTeamSpec === 'Aube') {
+        fixedTeam = 'Aube';
+      }
+
+      result.push({
         baseName,
         outbound: pair.outbound,
         return: pair.return,
-        requiredPeople
+        requiredPeople,
+        fixedTeam
       });
+
+      console.log(`📋 Business pair: ${baseName} (fixedTeam: ${fixedTeam ?? 'cycle-based'}, requiredPeople: ${requiredPeople})`);
     }
-  }
-  
-  console.log(`📊 Detected ${completePairs.length} business pairs`);
-  completePairs.forEach(p => {
-    console.log(`  - ${p.baseName} (${p.requiredPeople}名)`);
   });
-  
-  return completePairs;
+
+  return result;
 }
 
 /**
- * Determine which team departs on a given date
- * - Odd dates: Galaxy team departs
- * - Even dates: Aube team departs
+ * Select employees for a specific team
+ * The SAME employees will handle both outbound and return legs
  */
-function getDepartingTeam(date: Date): 'Galaxy' | 'Aube' {
-  const day = date.getDate();
-  return day % 2 === 1 ? 'Galaxy' : 'Aube';
-}
-
-/**
- * Select employees for a round-trip operation
- * [Fix] Added employeeSkillMatrix and rollCallProtectionCount parameters
- */
-function selectEmployeesForRoundTrip(
+function selectEmployeesForTeam(
   employees: Employee[],
   team: 'Galaxy' | 'Aube',
   requiredPeople: number,
   businessGroup: string,
   usedEmployees: Set<string>,
   employeeSkillMatrix?: Map<string, Set<string>>,
-  rollCallProtectionCount?: number
+  rollCallProtectionCount?: number,
+  restingEmployees?: Set<string>
 ): Employee[] {
-  // Count roll call capable employees in the pool
   const totalRollCallCapable = employees.filter(emp => {
-    const empId = emp.employee_id || emp.従業員ID || emp.従業員id || emp.id || '';
+    const empId = getEmpId(emp);
     return !usedEmployees.has(empId) && (emp.roll_call_capable === true || emp.roll_call_duty === '1');
   }).length;
-  
+
   const protectCount = rollCallProtectionCount ?? 0;
-  
+
   const teamEmployees = employees.filter(emp => {
-    // Use UUID (emp.id) first as it matches the skill matrix key
-    const empId = emp.id || emp.employee_id || emp.従業員ID || emp.従業員id || '';
-    const empTeam = emp.班 || emp.team || '';
-    
-    // Must be in the specified team and not already used
-    // 「無し」の従業員はどちらのチームにも割り当て可能
-    const isInTeam = empTeam === team || empTeam === '無し' || empTeam === '';
+    const empId = getEmpId(emp);
+    const empTeam = getEmpTeam(emp);
+
+    // Must be in the specified team
+    const isInTeam = empTeam === team;
     if (!isInTeam || usedEmployees.has(empId)) return false;
-    
-    // [Fix] Check skill matrix - employee must have the required business group skill
-    // Try UUID first (as skill matrix uses UUID as key), then numeric employee_id
+
+    // Skip employees on rest days
+    if (restingEmployees && restingEmployees.has(empId)) {
+      console.log(`  💤 [REST] ${empId} is on rest day, skipping`);
+      return false;
+    }
+
+    // Check skill matrix
     if (employeeSkillMatrix && businessGroup) {
       const uuidId = emp.id || empId;
       const empSkills = employeeSkillMatrix.get(uuidId) || employeeSkillMatrix.get(empId) || new Set<string>();
       if (!empSkills.has(businessGroup)) {
-        console.log(`  ⛔ [SKILL_CHECK] ${empId} does not have skill for ${businessGroup}`);
         return false;
       }
     }
-    
-    // [Fix] Protect roll call capable employees if needed
-    // If this employee is roll_call_capable and we need to protect some, skip them
+
+    // Protect roll call capable employees if needed
     const isRollCallCapable = emp.roll_call_capable === true || emp.roll_call_duty === '1';
     if (isRollCallCapable && totalRollCallCapable <= protectCount) {
-      console.log(`  🛡️ [ROLL_CALL_PROTECT] Protecting ${empId} (roll call capable) - ${totalRollCallCapable} available, need to protect ${protectCount}`);
+      console.log(`  🛡️ [ROLL_CALL_PROTECT] Protecting ${empId}`);
       return false;
     }
-    
+
     return true;
   });
-  
-  console.log(`  🔍 Available ${team} team members (with skill check): ${teamEmployees.length}`);
-  
+
+  console.log(`  🔍 Available ${team} team members for ${businessGroup}: ${teamEmployees.length}`);
+
   if (teamEmployees.length < requiredPeople) {
     console.log(`  ⚠️ Not enough ${team} team members (need ${requiredPeople}, have ${teamEmployees.length})`);
     return [];
   }
-  
-  // Select the required number of employees
+
   const selected = teamEmployees.slice(0, requiredPeople);
-  
-  // Mark as used
   selected.forEach(emp => {
-    // Use UUID (emp.id) first as it matches the skill matrix key
-    const empId = emp.id || emp.employee_id || emp.従業員ID || emp.従業員id || '';
+    const empId = getEmpId(emp);
     usedEmployees.add(empId);
   });
-  
+
   return selected;
 }
 
 /**
- * Assign a business pair (round-trip) to employees
- * [Fix] Added employeeSkillMatrix and rollCallProtectionCount parameters
+ * Main function to assign multi-day business pairs
+ * Supports Tokyo-specific cycle rules when tokyoCycleState is provided.
  */
-function assignBusinessPair(
+export function assignMultiDayBusinessPairs(
+  employees: Employee[],
+  businesses: Business[],
+  dateRange: { start: Date | string; end: Date | string },
+  batchId: string,
+  employeeSkillMatrix?: Map<string, Set<string>>,
+  rollCallProtectionCount?: number,
+  tokyoCycleState?: TokyoCycleState,
+  suspendedDates?: string[]
+): any[] {
+  console.log('\n🚀 Starting multi-day business pair assignment (v3)');
+
+  const startDate = typeof dateRange.start === 'string' ? new Date(dateRange.start) : dateRange.start;
+  const endDate = typeof dateRange.end === 'string' ? new Date(dateRange.end) : dateRange.end;
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    console.error('❌ Invalid date range detected!');
+    return [];
+  }
+
+  console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+
+  const pairs = detectBusinessPairs(businesses);
+  if (pairs.length === 0) {
+    console.log('⚠️ No business pairs detected');
+    return [];
+  }
+
+  // Normalize suspended dates to YYYY-MM-DD strings
+  const suspendedSet = new Set<string>(
+    (suspendedDates || []).map(d => d.split('T')[0])
+  );
+
+  if (suspendedSet.size > 0) {
+    console.log(`🚫 Suspended dates: ${Array.from(suspendedSet).join(', ')}`);
+  }
+
+  const isTokyoMode = !!tokyoCycleState;
+  console.log(`🏙️ Tokyo cycle mode: ${isTokyoMode ? 'ON' : 'OFF'}`);
+
+  const allShifts: any[] = [];
+
+  if (isTokyoMode) {
+    // ===== TOKYO CYCLE MODE =====
+    allShifts.push(...assignWithTokyoCycle(
+      employees,
+      pairs,
+      startDate,
+      endDate,
+      batchId,
+      employeeSkillMatrix,
+      rollCallProtectionCount,
+      tokyoCycleState!,
+      suspendedSet
+    ));
+  } else {
+    // ===== LEGACY MODE (non-Tokyo) =====
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      const usedEmployees: Set<string> = new Set();
+      pairs.forEach(pair => {
+        const shifts = assignBusinessPairLegacy(
+          pair,
+          employees,
+          new Date(currentDate),
+          usedEmployees,
+          batchId,
+          employeeSkillMatrix,
+          rollCallProtectionCount
+        );
+        allShifts.push(...shifts);
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+  }
+
+  console.log(`\n🎉 Multi-day generation complete: ${allShifts.length} total shifts`);
+  return allShifts;
+}
+
+/**
+ * Tokyo cycle mode assignment
+ *
+ * Key logic:
+ * - Each day, select the departing team (Galaxy or Aube, alternating)
+ * - Assign employees from that team to handle BOTH outbound (today) and return (tomorrow)
+ * - Track each employee's trip count; after 4 trips, schedule 2 rest days
+ * - Suspended dates pause the cycle
+ */
+function assignWithTokyoCycle(
+  employees: Employee[],
+  pairs: BusinessPair[],
+  startDate: Date,
+  endDate: Date,
+  batchId: string,
+  employeeSkillMatrix: Map<string, Set<string>> | undefined,
+  rollCallProtectionCount: number | undefined,
+  initialCycleState: TokyoCycleState,
+  suspendedSet: Set<string>
+): any[] {
+  // Deep copy the cycle state so we don't mutate the original
+  const cycleState: TokyoCycleState = {
+    nextDepartingTeam: initialCycleState.nextDepartingTeam,
+    employeeTripCounts: { ...initialCycleState.employeeTripCounts },
+    employeeRestDaysRemaining: { ...initialCycleState.employeeRestDaysRemaining }
+  };
+
+  console.log(`\n🔄 [TOKYO CYCLE] Initial state:`);
+  console.log(`  Next departing team: ${cycleState.nextDepartingTeam}`);
+  console.log(`  Employee trip counts:`, JSON.stringify(cycleState.employeeTripCounts));
+  console.log(`  Employee rest days remaining:`, JSON.stringify(cycleState.employeeRestDaysRemaining));
+
+  const allShifts: any[] = [];
+  const currentDate = new Date(startDate);
+  let isFirstDay = true;
+
+  while (currentDate <= endDate) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+
+    // Advance rest day counters at the START of each day (except the first day)
+    // This ensures that restDaysRemaining=2 means "rest for the next 2 days"
+    if (!isFirstDay) {
+      advanceRestDayCounters(cycleState);
+    }
+    isFirstDay = false;
+
+    // Check if this date is suspended (運休)
+    if (suspendedSet.has(dateStr)) {
+      console.log(`\n🚫 [SUSPENDED] ${dateStr} is a suspended date - pausing cycle`);
+      currentDate.setDate(currentDate.getDate() + 1);
+      continue;
+    }
+
+    const departingTeam = cycleState.nextDepartingTeam;
+    console.log(`\n📆 [TOKYO CYCLE] Processing date: ${dateStr}, departing team: ${departingTeam}`);
+
+    // Determine which employees are on rest today
+    const restingEmployees = new Set<string>();
+    for (const [empId, restDays] of Object.entries(cycleState.employeeRestDaysRemaining)) {
+      if (restDays > 0) {
+        restingEmployees.add(empId);
+        console.log(`  💤 [REST] ${empId} has ${restDays} rest day(s) remaining`);
+      }
+    }
+
+    // Assign business pairs for this date
+    const usedEmployees: Set<string> = new Set();
+
+    for (const pair of pairs) {
+      const businessGroup = pair.outbound.業務グループ || pair.outbound.business_group || '';
+
+      // Determine which team should handle this pair today
+      // If fixedTeam is set, only assign on days when that team is departing
+      const pairTeam: 'Galaxy' | 'Aube' = pair.fixedTeam ?? departingTeam;
+
+      // Skip this pair if it's fixed to a different team than today's departing team
+      if (pair.fixedTeam && pair.fixedTeam !== departingTeam) {
+        console.log(`  ⏭️ Skipping ${pair.baseName} (fixed to ${pair.fixedTeam}, today is ${departingTeam})`);
+        continue;
+      }
+
+      console.log(`\n  📋 ${dateStr} - ${pair.baseName} (team: ${pairTeam})`);
+
+      // Select employees from the departing team
+      const selectedEmployees = selectEmployeesForTeam(
+        employees,
+        pairTeam,
+        pair.requiredPeople,
+        businessGroup,
+        usedEmployees,
+        employeeSkillMatrix,
+        rollCallProtectionCount,
+        restingEmployees
+      );
+
+      if (selectedEmployees.length === 0) {
+        console.log(`  ❌ No eligible employees found for ${pair.baseName}`);
+        continue;
+      }
+
+      console.log(`  ✅ Selected: ${selectedEmployees.map(e => e.name || e.氏名 || e.従業員名).join(', ')}`);
+
+      const pairSetId = `ROUNDTRIP_${pair.baseName}_${dateStr}_${pairTeam}`;
+
+      // Day 2 date (return leg)
+      const day2Date = new Date(currentDate);
+      day2Date.setDate(day2Date.getDate() + 1);
+
+      selectedEmployees.forEach(employee => {
+        const empId = getEmpId(employee);
+
+        // Day 1: Outbound (today) - same employee
+        const day1Shift = {
+          date: new Date(currentDate),
+          employee_id: empId,
+          business_name: pair.outbound.業務名 || pair.outbound.business_name,
+          business_master_id: pair.outbound.業務id || pair.outbound.business_id || pair.outbound.id,
+          location: pair.outbound.営業所 || pair.outbound.location,
+          multi_day_set_id: pairSetId,
+          multi_day_info: {
+            day: 1,
+            total_days: 2,
+            direction: 'outbound',
+            team: pairTeam,
+            pair_name: pair.baseName,
+            required_people: pair.requiredPeople
+          }
+        };
+
+        // Day 2: Return (next day) - same employee
+        const day2Shift = {
+          date: day2Date,
+          employee_id: empId,
+          business_name: pair.return.業務名 || pair.return.business_name,
+          business_master_id: pair.return.業務id || pair.return.business_id || pair.return.id,
+          location: pair.return.営業所 || pair.return.location,
+          multi_day_set_id: pairSetId,
+          multi_day_info: {
+            day: 2,
+            total_days: 2,
+            direction: 'return',
+            team: pairTeam,
+            pair_name: pair.baseName,
+            required_people: pair.requiredPeople
+          }
+        };
+
+        allShifts.push(day1Shift, day2Shift);
+
+        // Update trip count for this employee
+        updateTripCount(cycleState, empId);
+      });
+    }
+
+    // Alternate departing team for next active day
+    cycleState.nextDepartingTeam = departingTeam === 'Galaxy' ? 'Aube' : 'Galaxy';
+    console.log(`  🔄 [CYCLE] Next departing team: ${cycleState.nextDepartingTeam}`);
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return allShifts;
+}
+
+/**
+ * Update trip count for an employee and schedule rest if needed
+ */
+function updateTripCount(cycleState: TokyoCycleState, empId: string): void {
+  const currentTripCount = cycleState.employeeTripCounts[empId] ?? 0;
+  const newTripCount = currentTripCount + 1;
+  console.log(`  📊 [CYCLE] ${empId}: tripCount ${currentTripCount} → ${newTripCount}`);
+
+  if (newTripCount >= 4) {
+    // Completed 4 trips - schedule 2 rest days
+    // Set to 3 because advanceRestDayCounters is called at START of next day:
+    //   day+1: 3→2 (rest), day+2: 2→1 (rest), day+3: 1→0 (work resumes)
+    cycleState.employeeTripCounts[empId] = 0;
+    cycleState.employeeRestDaysRemaining[empId] = 3;
+    console.log(`  🛌 [CYCLE] ${empId}: completed 4 trips, scheduling 2 rest days`);
+  } else {
+    cycleState.employeeTripCounts[empId] = newTripCount;
+  }
+}
+
+/**
+ * Advance rest day counters for all employees (called once per day)
+ */
+function advanceRestDayCounters(cycleState: TokyoCycleState): void {
+  for (const empId of Object.keys(cycleState.employeeRestDaysRemaining)) {
+    if (cycleState.employeeRestDaysRemaining[empId] > 0) {
+      cycleState.employeeRestDaysRemaining[empId]--;
+      console.log(`  📅 [REST] ${empId}: rest days remaining → ${cycleState.employeeRestDaysRemaining[empId]}`);
+    }
+  }
+}
+
+/**
+ * Legacy assignment for non-Tokyo locations (date parity based)
+ */
+function getDepartingTeamByDate(date: Date): 'Galaxy' | 'Aube' {
+  const dayOfMonth = date.getDate();
+  return dayOfMonth % 2 === 1 ? 'Galaxy' : 'Aube';
+}
+
+function assignBusinessPairLegacy(
   pair: BusinessPair,
   employees: Employee[],
   startDate: Date,
@@ -197,16 +523,13 @@ function assignBusinessPair(
   employeeSkillMatrix?: Map<string, Set<string>>,
   rollCallProtectionCount?: number
 ): any[] {
-  const team = getDepartingTeam(startDate);
+  const team = getDepartingTeamByDate(startDate);
   const businessGroup = pair.outbound.業務グループ || pair.outbound.business_group || '';
-  
+
   console.log(`\n📅 ${startDate.toISOString().split('T')[0]} - ${pair.baseName}`);
   console.log(`  🚌 Departing team: ${team}`);
-  console.log(`  👥 Required people: ${pair.requiredPeople}`);
-  console.log(`  🏷️ Business group: ${businessGroup}`);
-  
-  // Select employees
-  const selectedEmployees = selectEmployeesForRoundTrip(
+
+  const selectedEmployees = selectEmployeesForTeam(
     employees,
     team,
     pair.requiredPeople,
@@ -215,28 +538,25 @@ function assignBusinessPair(
     employeeSkillMatrix,
     rollCallProtectionCount
   );
-  
+
   if (selectedEmployees.length === 0) {
     console.log(`  ❌ No eligible employees found`);
     return [];
   }
-  
+
   console.log(`  ✅ Selected: ${selectedEmployees.map(e => e.name || e.氏名 || e.従業員名).join(', ')}`);
-  
-  // Generate shifts for each employee
+
   const shifts: any[] = [];
   const pairSetId = `ROUNDTRIP_${pair.baseName}_${startDate.toISOString().split('T')[0]}_${team}`;
-  
+
   selectedEmployees.forEach(employee => {
-    // Use UUID (emp.id) first to match skill matrix key; fall back to numeric employee_id for DB storage
-    const empId = employee.employee_id || employee.従業員ID || employee.従業員id || employee.id || '';
-    
-    // Day 1: Outbound (departure from Tokyo)
+    const empId = getEmpId(employee);
+
     const day1Shift = {
       date: startDate,
       employee_id: empId,
       business_name: pair.outbound.業務名 || pair.outbound.business_name,
-      business_master_id: pair.outbound.業務id || pair.outbound.business_id,
+      business_master_id: pair.outbound.業務id || pair.outbound.business_id || pair.outbound.id,
       location: pair.outbound.営業所 || pair.outbound.location,
       multi_day_set_id: pairSetId,
       multi_day_info: {
@@ -248,16 +568,15 @@ function assignBusinessPair(
         required_people: pair.requiredPeople
       }
     };
-    
-    // Day 2: Return (arrival back to Tokyo)
+
     const day2Date = new Date(startDate);
     day2Date.setDate(day2Date.getDate() + 1);
-    
+
     const day2Shift = {
       date: day2Date,
       employee_id: empId,
       business_name: pair.return.業務名 || pair.return.business_name,
-      business_master_id: pair.return.業務id || pair.return.business_id,
+      business_master_id: pair.return.業務id || pair.return.business_id || pair.return.id,
       location: pair.return.営業所 || pair.return.location,
       multi_day_set_id: pairSetId,
       multi_day_info: {
@@ -269,98 +588,9 @@ function assignBusinessPair(
         required_people: pair.requiredPeople
       }
     };
-    
+
     shifts.push(day1Shift, day2Shift);
   });
-  
-  console.log(`  📝 Generated ${shifts.length} shifts (${pair.requiredPeople} employees × 2 days)`);
-  
-  return shifts;
-}
 
-/**
- * Main function to assign multi-day business pairs
- * [Fix] Added employeeSkillMatrix and rollCallProtectionCount parameters
- */
-export function assignMultiDayBusinessPairs(
-  employees: Employee[],
-  businesses: Business[],
-  dateRange: { start: Date | string; end: Date | string },
-  batchId: string,
-  employeeSkillMatrix?: Map<string, Set<string>>,
-  rollCallProtectionCount?: number
-): any[] {
-  console.log('\n🚀 Starting multi-day business pair assignment');
-  console.log('🔍 DEBUG - dateRange.start type:', typeof dateRange.start, 'value:', dateRange.start);
-  console.log('🔍 DEBUG - dateRange.end type:', typeof dateRange.end, 'value:', dateRange.end);
-  
-  // Convert string dates to Date objects if needed
-  const startDate = typeof dateRange.start === 'string' ? new Date(dateRange.start) : dateRange.start;
-  const endDate = typeof dateRange.end === 'string' ? new Date(dateRange.end) : dateRange.end;
-  
-  console.log('🔍 DEBUG - startDate:', startDate, 'isValid:', !isNaN(startDate.getTime()));
-  console.log('🔍 DEBUG - endDate:', endDate, 'isValid:', !isNaN(endDate.getTime()));
-  
-  if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-    console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-  } else {
-    console.error('❌ Invalid date range detected!');
-    return [];
-  }
-  
-  const pairs = detectBusinessPairs(businesses);
-  
-  // Update dateRange to use Date objects
-  const normalizedDateRange = { start: startDate, end: endDate };
-  
-  if (pairs.length === 0) {
-    console.log('⚠️ No business pairs detected');
-    return [];
-  }
-  
-  // Log skill matrix info
-  if (employeeSkillMatrix) {
-    console.log(`📊 Skill matrix available for ${employeeSkillMatrix.size} employees`);
-  } else {
-    console.warn('⚠️ No skill matrix provided - skill check will be skipped');
-  }
-  
-  // Log roll call protection info
-  if (rollCallProtectionCount && rollCallProtectionCount > 0) {
-    console.log(`🛡️ Roll call protection: at least ${rollCallProtectionCount} roll call capable employees will be preserved`);
-  }
-  
-  const allShifts: any[] = [];
-  // Generate shifts for each day in the range
-  const currentDate = new Date(normalizedDateRange.start);
-  
-  while (currentDate <= normalizedDateRange.end) {
-    console.log(`\n📆 Processing date: ${currentDate.toISOString().split('T')[0]}`);
-    
-    // Reset usedEmployees for each day so employees can be reused across different days
-    // (Same employee can work on different days, just not multiple businesses on the same day)
-    const usedEmployees: Set<string> = new Set();
-    
-    // For each business pair, try to assign
-    pairs.forEach(pair => {
-      const shifts = assignBusinessPair(
-        pair,
-        employees,
-        new Date(currentDate),
-        usedEmployees,
-        batchId,
-        employeeSkillMatrix,
-        rollCallProtectionCount
-      );
-      
-      allShifts.push(...shifts);
-    });
-    
-    // Move to next date
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-  
-  console.log(`\n🎉 Multi-day generation complete: ${allShifts.length} total shifts`);
-  
-  return allShifts;
+  return shifts;
 }

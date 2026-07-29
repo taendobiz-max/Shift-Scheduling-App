@@ -251,6 +251,14 @@ export default function ShiftGenerator() {
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [generationMode, setGenerationMode] = useState<'all' | 'priority' | 'remaining'>('all');
   const [selectedBusinessNames, setSelectedBusinessNames] = useState<string[]>([]);
+  // 東京拠点専用: 運休日・サイクル状態
+  const [suspendedDates, setSuspendedDates] = useState<string[]>([]);
+  const [suspendedDateInput, setSuspendedDateInput] = useState<string>('');
+  const [showTokyoCycleSettings, setShowTokyoCycleSettings] = useState(false);
+  const [tokyoNextDepartingTeam, setTokyoNextDepartingTeam] = useState<'Galaxy' | 'Aube'>('Galaxy');
+  const [tokyoEmployeeTripCounts, setTokyoEmployeeTripCounts] = useState<string>('{}');
+  const [tokyoEmployeeRestDays, setTokyoEmployeeRestDays] = useState<string>('{}');
+  const [tokyoCycleStateError, setTokyoCycleStateError] = useState<string>('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -566,16 +574,47 @@ export default function ShiftGenerator() {
       console.log('📋 Multi-day businesses:', filteredBusinessMasters.filter((b: any) => (b.運行日数 || b.duration) === 2));
       
       // 生成モードに応じてoptionsを設定
-      const generationOptions: { targetBusinessNames?: string[]; skipAssignedBusinesses?: boolean } = {};
+      const generationOptions: {
+        targetBusinessNames?: string[];
+        skipAssignedBusinesses?: boolean;
+        suspendedDates?: string[];
+        tokyoCycleState?: {
+          nextDepartingTeam: 'Galaxy' | 'Aube';
+          employeeTripCounts: { [employeeId: string]: number };
+          employeeRestDaysRemaining: { [employeeId: string]: number };
+        };
+      } = {};
       if (generationMode === 'priority') {
         if (selectedBusinessNames.length === 0) {
-          alert('優先生成する業務を1つ以上選択してください。');
+          alert('優先生成する業務を１つ以上選択してください。');
           setIsGenerating(false);
           return;
         }
         generationOptions.targetBusinessNames = selectedBusinessNames;
       } else if (generationMode === 'remaining') {
         generationOptions.skipAssignedBusinesses = true;
+      }
+
+      // 東京拠点専用: 運休日とサイクル状態を追加
+      if (selectedLocation === '東京') {
+        if (suspendedDates.length > 0) {
+          generationOptions.suspendedDates = suspendedDates;
+        }
+        if (showTokyoCycleSettings) {
+          try {
+            const tripCounts = JSON.parse(tokyoEmployeeTripCounts || '{}');
+            const restDays = JSON.parse(tokyoEmployeeRestDays || '{}');
+            generationOptions.tokyoCycleState = {
+              nextDepartingTeam: tokyoNextDepartingTeam,
+              employeeTripCounts: tripCounts,
+              employeeRestDaysRemaining: restDays,
+            };
+          } catch (e) {
+            alert('サイクル状態JSONの形式が不正です。入力内容を確認してください。');
+            setIsGenerating(false);
+            return;
+          }
+        }
       }
 
       const response = await fetch('/api/generate-shifts', {
@@ -1922,6 +1961,128 @@ export default function ShiftGenerator() {
               </div>
             )}
           </div>
+
+          {/* 東京拠点専用: 運休日・サイクル設定 */}
+          {selectedLocation === '東京' && (
+            <div className="space-y-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                東京拠点専用設定（Galaxy班・Aube班循環ルール）
+              </p>
+
+              {/* 運休日指定 */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-amber-700">運休日の指定（循環を一時停止する日）：</p>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={suspendedDateInput}
+                    onChange={(e) => setSuspendedDateInput(e.target.value)}
+                    className="flex-1 text-sm"
+                    min={startDate}
+                    max={endDate}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (suspendedDateInput && !suspendedDates.includes(suspendedDateInput)) {
+                        setSuspendedDates(prev => [...prev, suspendedDateInput].sort());
+                        setSuspendedDateInput('');
+                      }
+                    }}
+                    className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                  >
+                    追加
+                  </Button>
+                </div>
+                {suspendedDates.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {suspendedDates.map(d => (
+                      <span key={d} className="inline-flex items-center gap-1 bg-amber-200 text-amber-800 text-xs px-2 py-1 rounded">
+                        {d}
+                        <button
+                          onClick={() => setSuspendedDates(prev => prev.filter(x => x !== d))}
+                          className="hover:text-red-600 font-bold"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* サイクル状態設定（前月からの引き継ぎ） */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTokyoCycleSettings(prev => !prev)}
+                  className="text-xs text-amber-700 underline hover:text-amber-900"
+                >
+                  {showTokyoCycleSettings ? '▲ サイクル状態設定を閉じる' : '▼ 前月からのサイクル状態を設定する（任意）'}
+                </button>
+                {showTokyoCycleSettings && (
+                  <div className="space-y-3 p-3 bg-white rounded border border-amber-200">
+                    <p className="text-xs text-gray-600">
+                      前月末の状態を入力することで、月をまたいで正しいサイクルが継続されます。
+                      未設定の場合は Galaxy班が往路から開始されます。
+                    </p>
+                    <div className="space-y-1">
+                      <Label className="text-xs">次の往路担当班</Label>
+                      <div className="flex gap-4">
+                        {(['Galaxy', 'Aube'] as const).map(team => (
+                          <label key={team} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="tokyoNextTeam"
+                              value={team}
+                              checked={tokyoNextDepartingTeam === team}
+                              onChange={() => setTokyoNextDepartingTeam(team)}
+                              className="accent-amber-600"
+                            />
+                            <span className="text-sm">{team}班</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">従業員別連続往復回数（JSON）</Label>
+                      <textarea
+                        className="w-full text-xs font-mono border rounded p-2 h-20 resize-none"
+                        value={tokyoEmployeeTripCounts}
+                        onChange={(e) => {
+                          setTokyoEmployeeTripCounts(e.target.value);
+                          try { JSON.parse(e.target.value); setTokyoCycleStateError(''); }
+                          catch { setTokyoCycleStateError('従業員別往復回数のJSON形式が不正です'); }
+                        }}
+                        placeholder='{"123": 2, "456": 0}'
+                      />
+                      <p className="text-xs text-gray-500">形式: {'"{employee_id}": 連続往復回数(0-3)'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">従業員別残り連休日数（JSON）</Label>
+                      <textarea
+                        className="w-full text-xs font-mono border rounded p-2 h-20 resize-none"
+                        value={tokyoEmployeeRestDays}
+                        onChange={(e) => {
+                          setTokyoEmployeeRestDays(e.target.value);
+                          try { JSON.parse(e.target.value); setTokyoCycleStateError(''); }
+                          catch { setTokyoCycleStateError('残り連休日数のJSON形式が不正です'); }
+                        }}
+                        placeholder='{"123": 1, "456": 0}'
+                      />
+                      <p className="text-xs text-gray-500">形式: {'"{employee_id}": 残り連休日数(0-2)'}</p>
+                    </div>
+                    {tokyoCycleStateError && (
+                      <p className="text-xs text-red-600">{tokyoCycleStateError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <Button 
             onClick={handleGenerateShifts} 
