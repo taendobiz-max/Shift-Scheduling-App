@@ -408,7 +408,8 @@ async function generateShiftsForSingleDate(
   targetDate: string,
   pairGroups?: { [key: string]: any[] },
   location?: string,
-  existingBusinessHistory?: Map<string, Set<string>>
+  existingBusinessHistory?: Map<string, Set<string>>,
+  previousShifts?: Shift[]
 ): Promise<GenerationResult> {
   console.log('🚀 Starting enhanced shift generation with multi-assignment for:', targetDate);
   console.log('👥 Available employees:', employees.length);
@@ -435,7 +436,8 @@ async function generateShiftsForSingleDate(
   
   try {
     const batchId = uuidv4();
-    const shifts: Shift[] = [];
+    // Include previous shifts for consecutive days check
+    const shifts: Shift[] = previousShifts ? [...previousShifts] : [];
     const violations: string[] = [];
     const unassigned_businesses: string[] = [];
     const constraintViolations: any[] = [];
@@ -890,6 +892,27 @@ async function generateShiftsForSingleDate(
               violations.push(v.message || '');
             }
           });
+          continue;
+        }
+        
+        // Check constraint engine (max consecutive days, etc.)
+        const testShiftForConstraint: Shift = {
+          shift_date: targetDate,
+          employee_id: empId,
+          business_group: business.業務グループ || '点呼',
+          shift_type: 'regular',
+          start_time: business.開始時間 || '06:00:00',
+          end_time: business.終了時間 || '23:00:00',
+          status: 'scheduled'
+        };
+        const constraintResult = await constraintEngine.validateShiftAssignment({
+          id: empId,
+          name: emp.name || emp.氏名 || '名前不明',
+          location: (emp as any).location || (emp as any).拠点 || location || '',
+          employee_id: empId
+        }, testShiftForConstraint, shifts as any);
+        if (!constraintResult.canProceed) {
+          console.log(`🚫 [CONSTRAINT] ${emp.name || empId} blocked by constraint: ${constraintResult.violations.map(v => v.violation_description).join(', ')}`);
           continue;
         }
         
@@ -1389,12 +1412,15 @@ async function generateShiftsForSingleDate(
     console.log(`\n📋 Unassigned employees: ${unassignedEmployees.length}`);
     
     // Consider it successful if we assigned at least some shifts
-    const isSuccessful = shifts.length > 0;
+    // Return only new shifts (exclude previousShifts passed in for consecutive days check)
+    const previousShiftsCount = previousShifts ? previousShifts.length : 0;
+    const newShifts = shifts.slice(previousShiftsCount);
+    const isSuccessful = newShifts.length > 0;
     
     return {
       success: isSuccessful,
       batch_id: batchId,
-      shifts,
+      shifts: newShifts,
       violations,
       generation_time: 0.1,
       unassigned_businesses,
@@ -1447,9 +1473,21 @@ export async function generateShifts(
   businessMasters: any[],
   dateRange: string | string[],
   pairGroups?: { [key: string]: any[] },
-  location?: string
+  location?: string,
+  options?: {
+    targetBusinessNames?: string[];  // 指定時はこの業務のみ生成対象（優先生成・残り生成用）
+    skipAssignedBusinesses?: boolean; // trueの場合、DBに既存シフトがある業務をスキップ（残り生成用）
+  }
 ): Promise<GenerationResult> {
   console.log('🚀 Starting multi-day shift generation');
+  const targetBusinessNames = options?.targetBusinessNames;
+  const skipAssignedBusinesses = options?.skipAssignedBusinesses ?? false;
+  if (targetBusinessNames && targetBusinessNames.length > 0) {
+    console.log(`🎯 Target businesses (${targetBusinessNames.length}):`, targetBusinessNames);
+  }
+  if (skipAssignedBusinesses) {
+    console.log('⏭️ Skip assigned businesses mode: ON');
+  }
   
   // Convert single date to array for uniform processing
   const dates = Array.isArray(dateRange) ? dateRange : [dateRange];
@@ -1522,7 +1560,43 @@ export async function generateShifts(
   
   console.log(`\n📊 Business split: ${multiDayResult.processedBusinessIds.size} multi-day, ${regularBusinessMasters.length} regular`);
   // === END MULTI-DAY PREPROCESSING ===
-  
+
+  // === TARGET BUSINESS FILTERING (優先生成 / 残り生成モード) ===
+  let filteredRegularBusinessMasters = regularBusinessMasters;
+
+  if (targetBusinessNames && targetBusinessNames.length > 0) {
+    // 優先生成モード: 指定業務のみ対象
+    filteredRegularBusinessMasters = regularBusinessMasters.filter((bm: any) => {
+      const name = bm.業務名 || bm.name || '';
+      return targetBusinessNames.includes(name);
+    });
+    console.log(`🎯 Filtered to ${filteredRegularBusinessMasters.length} target businesses (from ${regularBusinessMasters.length})`);
+  } else if (skipAssignedBusinesses) {
+    // 残り生成モード: DBに既存シフトがある業務をスキップ
+    const normalizedDates = dates.map(d => d.split('T')[0]);
+    const { data: existingShifts } = await supabase
+      .from('shifts')
+      .select('business_name, date')
+      .in('date', normalizedDates)
+      .eq('location', location || '');
+
+    const assignedBusinessByDate = new Map<string, Set<string>>();
+    if (existingShifts) {
+      existingShifts.forEach((s: any) => {
+        if (!assignedBusinessByDate.has(s.date)) assignedBusinessByDate.set(s.date, new Set());
+        assignedBusinessByDate.get(s.date)!.add(s.business_name);
+      });
+    }
+    // 全対象日でアサイン済みの業務を除外（1日でも未アサインなら残す）
+    filteredRegularBusinessMasters = regularBusinessMasters.filter((bm: any) => {
+      const name = bm.業務名 || bm.name || '';
+      const allDatesAssigned = normalizedDates.every(d => assignedBusinessByDate.get(d)?.has(name));
+      return !allDatesAssigned;
+    });
+    console.log(`⏭️ Skipped assigned businesses: ${regularBusinessMasters.length - filteredRegularBusinessMasters.length} skipped, ${filteredRegularBusinessMasters.length} remaining`);
+  }
+  // === END TARGET BUSINESS FILTERING ===
+
   // Accumulate results across all dates
   const allShifts: Shift[] = [...multiDayResult.multiDayShifts];
   const allViolations: string[] = [];
@@ -1555,11 +1629,12 @@ export async function generateShifts(
     
     const result = await generateShiftsForSingleDate(
       availableEmployeesForThisDate,
-      regularBusinessMasters,
+      filteredRegularBusinessMasters,
       targetDate,
       pairGroups,
       location,
-      cumulativeBusinessHistory
+      cumulativeBusinessHistory,
+      allShifts  // Pass accumulated shifts for consecutive days check
     );
     
     // Accumulate results

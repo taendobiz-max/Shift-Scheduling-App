@@ -54,6 +54,9 @@ interface Employee {
   従業員ID?: string;
   氏名?: string;
   拠点?: string;
+  roll_call_capable?: boolean;
+  roll_call_duty?: string;
+  [key: string]: unknown;
 }
 
 interface GenerationSummary {
@@ -246,6 +249,8 @@ export default function ShiftGenerator() {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [panelSearch, setPanelSearch] = useState('');
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const [generationMode, setGenerationMode] = useState<'all' | 'priority' | 'remaining'>('all');
+  const [selectedBusinessNames, setSelectedBusinessNames] = useState<string[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -343,7 +348,9 @@ export default function ShiftGenerator() {
         location: emp.office || emp.拠点 || '',
         従業員ID: emp.employee_id,
         氏名: emp.name || emp.氏名,
-        拠点: emp.office || emp.拠点
+        拠点: emp.office || emp.拠点,
+        roll_call_capable: emp.roll_call_capable || false,
+        roll_call_duty: emp.roll_call_duty as string | undefined
       }));
       
       setEmployees(convertedEmployees);
@@ -487,22 +494,42 @@ export default function ShiftGenerator() {
 
       console.log(`👥 Filtered employees for location ${selectedLocation} (before exclusion):`, filteredEmployees);
 
-      // 除外従業員をフィルタリング
+      // 除外従業員をフィルタリング（can_handle_roll_call=trueの従業員は除外しない）
       try {
-        const excludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIds(selectedLocation);
-        console.log(`🚫 Excluded employee IDs for ${selectedLocation}:`, excludedIds);
+        // 通常業務用：can_handle_roll_call=trueの従業員は除外しない
+        const regularExcludedIds = await ExcludedEmployeesManager.getExcludedEmployeeIdsForRegularShifts(selectedLocation);
+        console.log(`🚫 Regular excluded employee IDs for ${selectedLocation}:`, regularExcludedIds);
+        
+        // 点呼対応可能な除外従業員を取得（点呼業務のみアサイン可能）
+        const rollCallCapableExcluded = await ExcludedEmployeesManager.getRollCallCapableExcludedEmployees(selectedLocation);
+        console.log(`📞 Roll call capable excluded employees for ${selectedLocation}:`, rollCallCapableExcluded.map(e => e.employee_id));
         
         const beforeCount = filteredEmployees.length;
+        // 通常業務除外IDでフィルタリング（点呼対応可能な除外従業員はここでは除外しない）
         filteredEmployees = filteredEmployees.filter(emp => {
           const empId = emp.従業員ID || emp.id;
-          return !excludedIds.includes(empId);
+          return !regularExcludedIds.includes(empId);
         });
+        
+        // 点呼対応可能な除外従業員がfilteredEmployeesに含まれていない場合は追加
+        for (const excluded of rollCallCapableExcluded) {
+          const alreadyIncluded = filteredEmployees.some(emp => (emp.従業員ID || emp.id) === excluded.employee_id);
+          if (!alreadyIncluded) {
+            // 元のemployeesリストから該当従業員を探す
+            const empData = employees.find(emp => (emp.従業員ID || emp.id) === excluded.employee_id);
+            if (empData) {
+              filteredEmployees.push({ ...empData, roll_call_capable: true });
+              console.log(`✅ Added roll-call-capable excluded employee: ${excluded.employee_id} ${excluded.employee_name}`);
+            }
+          }
+        }
+        
         const afterCount = filteredEmployees.length;
-        const excludedCount = beforeCount - afterCount;
+        const excludedCount = beforeCount - afterCount + rollCallCapableExcluded.length;
         
         if (excludedCount > 0) {
-          console.log(`✅ Excluded ${excludedCount} employees from shift generation`);
-          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名`);
+          console.log(`✅ Excluded ${excludedCount} employees from regular shifts (${rollCallCapableExcluded.length} added back for roll call)`);
+          setGenerationResult(prev => prev + `\n除外従業員: ${excludedCount}名（うち点呼対応: ${rollCallCapableExcluded.length}名）`);
         }
       } catch (error) {
         console.warn('⚠️ Could not load excluded employees:', error);
@@ -538,6 +565,19 @@ export default function ShiftGenerator() {
       console.log('📋 businessMasters being sent:', filteredBusinessMasters);
       console.log('📋 Multi-day businesses:', filteredBusinessMasters.filter((b: any) => (b.運行日数 || b.duration) === 2));
       
+      // 生成モードに応じてoptionsを設定
+      const generationOptions: { targetBusinessNames?: string[]; skipAssignedBusinesses?: boolean } = {};
+      if (generationMode === 'priority') {
+        if (selectedBusinessNames.length === 0) {
+          alert('優先生成する業務を1つ以上選択してください。');
+          setIsGenerating(false);
+          return;
+        }
+        generationOptions.targetBusinessNames = selectedBusinessNames;
+      } else if (generationMode === 'remaining') {
+        generationOptions.skipAssignedBusinesses = true;
+      }
+
       const response = await fetch('/api/generate-shifts', {
         method: 'POST',
         headers: {
@@ -548,7 +588,8 @@ export default function ShiftGenerator() {
           businessMasters: filteredBusinessMasters,
           dateRange: dateRange,
           pairGroups: pairGroups,
-          location: selectedLocation
+          location: selectedLocation,
+          options: Object.keys(generationOptions).length > 0 ? generationOptions : undefined
         })
       });
       
@@ -1821,6 +1862,67 @@ export default function ShiftGenerator() {
             </div>
           </div>
 
+          {/* 生成モード選択 */}
+          <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
+            <p className="text-sm font-medium text-gray-700">生成モード</p>
+            <div className="space-y-2">
+              {(['all', 'priority', 'remaining'] as const).map((mode) => (
+                <label key={mode} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="generationMode"
+                    value={mode}
+                    checked={generationMode === mode}
+                    onChange={() => {
+                      setGenerationMode(mode);
+                      if (mode !== 'priority') setSelectedBusinessNames([]);
+                    }}
+                    className="accent-cyan-600"
+                  />
+                  <span className="text-sm">
+                    {mode === 'all' && '全生成（全業務を一括生成）'}
+                    {mode === 'priority' && '優先生成（選択した業務を先に生成）'}
+                    {mode === 'remaining' && '残り生成（未アサインの業務のみ生成）'}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {/* 優先生成時の業務選択チェックボックス */}
+            {generationMode === 'priority' && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs font-medium text-gray-600">優先生成する業務を選択：</p>
+                <div className="max-h-48 overflow-y-auto space-y-1 border rounded p-2 bg-white">
+                  {businessMasters
+                    .filter(bm => (bm.is_active !== false) && (bm.営業所 === selectedLocation || !selectedLocation))
+                    .map(bm => {
+                      const name = bm.name || bm.業務名 || '';
+                      return (
+                        <label key={name} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={selectedBusinessNames.includes(name)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBusinessNames(prev => [...prev, name]);
+                              } else {
+                                setSelectedBusinessNames(prev => prev.filter(n => n !== name));
+                              }
+                            }}
+                            className="accent-cyan-600"
+                          />
+                          <span className="text-sm">{name}</span>
+                        </label>
+                      );
+                    })}
+                </div>
+                {selectedBusinessNames.length > 0 && (
+                  <p className="text-xs text-cyan-600">{selectedBusinessNames.length}件選択中</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <Button 
             onClick={handleGenerateShifts} 
             disabled={isGenerating || !selectedLocation || !startDate || !endDate}
@@ -1834,7 +1936,9 @@ export default function ShiftGenerator() {
             ) : (
               <>
                 <Users className="w-4 h-4 mr-2" />
-                シフトを生成
+                {generationMode === 'all' && 'シフトを全生成'}
+                {generationMode === 'priority' && 'シフトを優先生成'}
+                {generationMode === 'remaining' && 'シフトを残り生成'}
               </>
             )}
           </Button>

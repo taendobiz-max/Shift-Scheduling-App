@@ -2,6 +2,9 @@
  * Multi-Day Business Integration Patch (Fixed Version)
  * 
  * Integrates round-trip multi-day business handling into the main shift generation flow
+ * 
+ * [Fix] Pass employeeSkillMatrix to assignMultiDayBusinessPairs for skill checking
+ * [Fix] Pass rollCallProtectionCount to protect roll call capable employees
  */
 
 import { assignMultiDayBusinessPairs } from './multi-day-pair-handler';
@@ -9,6 +12,8 @@ import { assignMultiDayBusinessPairs } from './multi-day-pair-handler';
 interface Employee {
   employee_id?: string;
   従業員id?: string;
+  roll_call_capable?: boolean;
+  roll_call_duty?: string;
   [key: string]: any;
 }
 
@@ -101,12 +106,32 @@ export function preprocessMultiDayBusinesses(
     };
   }
   
-  // Assign multi-day businesses
+  // [Fix] Count roll call capable employees to determine protection count
+  // Count how many roll call businesses exist in single-day businesses
+  const rollCallBusinessCount = singleDayBusinesses.filter(b => {
+    const name = b.業務名 || b.business_name || '';
+    return name.includes('点呼');
+  }).length;
+  
+  // Count currently available roll call capable employees
+  const rollCallCapableCount = employees.filter(emp => 
+    emp.roll_call_capable === true || emp.roll_call_duty === '1'
+  ).length;
+  
+  // Protect at least as many roll call capable employees as there are roll call businesses
+  // (minimum 1 to ensure at least one roll call can be covered)
+  const rollCallProtectionCount = Math.min(rollCallBusinessCount, rollCallCapableCount);
+  
+  console.log(`🛡️ [ROLL_CALL_PROTECT] Roll call businesses: ${rollCallBusinessCount}, capable employees: ${rollCallCapableCount}, protection count: ${rollCallProtectionCount}`);
+  
+  // [Fix] Pass employeeSkillMatrix and rollCallProtectionCount to assignMultiDayBusinessPairs
   const multiDayShifts = assignMultiDayBusinessPairs(
     employees,
     multiDayBusinesses,
     dateRange,
-    batchId
+    batchId,
+    employeeSkillMatrix instanceof Map ? employeeSkillMatrix : undefined,
+    rollCallProtectionCount
   );
   
   // Collect employee IDs that were assigned to multi-day businesses

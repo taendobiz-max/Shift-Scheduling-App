@@ -48,10 +48,13 @@ interface EmployeeData {
   employee_id: string;
   name: string;
   office?: string;
+  team?: string;
+  display_order?: number;
 }
 
 interface BusinessMaster {
   業務id?: string;
+  id?: string;
   業務名?: string;
   開始時間?: string;
   終了時間?: string;
@@ -59,6 +62,7 @@ interface BusinessMaster {
   業務タイプ?: string;
   is_active?: boolean;
   営業所?: string;
+  display_order?: number;
 }
 
 interface TimeSlot {
@@ -261,6 +265,15 @@ export default function ShiftSchedule() {
     businessName?: string;
     date: string;
   } | null>(null);
+
+  // 部分再生成機能のstate
+  const [showRegenDialog, setShowRegenDialog] = useState(false);
+  const [regenTargetDate, setRegenTargetDate] = useState<string>('');
+  const [regenSelectedBusinesses, setRegenSelectedBusinesses] = useState<string[]>([]);
+  const [regenMode, setRegenMode] = useState<'selected' | 'remaining'>('selected');
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenPreviewShifts, setRegenPreviewShifts] = useState<ShiftData[]>([]);
+  const [showRegenPreview, setShowRegenPreview] = useState(false);
 
 
   const timeSlots = generateTimeSlots();
@@ -641,6 +654,164 @@ export default function ShiftSchedule() {
   
   const handleSwapCancel = () => {
     clearSelection();
+  };
+
+  // 部分再生成機能のハンドラー
+  const handleOpenRegenDialog = () => {
+    // 現在の日付をデフォルトに設定
+    const defaultDate = activeTab === 'daily' ? selectedDate : periodStartDate;
+    setRegenTargetDate(defaultDate || new Date().toISOString().split('T')[0]);
+    setRegenSelectedBusinesses([]);
+    setRegenMode('selected');
+    setShowRegenPreview(false);
+    setRegenPreviewShifts([]);
+    setShowRegenDialog(true);
+  };
+
+  const handleRegenBusinessToggle = (businessName: string) => {
+    setRegenSelectedBusinesses(prev => 
+      prev.includes(businessName)
+        ? prev.filter(b => b !== businessName)
+        : [...prev, businessName]
+    );
+  };
+
+  const handlePartialRegenerate = async () => {
+    if (!regenTargetDate) {
+      toast.error('対象日付を選択してください');
+      return;
+    }
+    if (regenMode === 'selected' && regenSelectedBusinesses.length === 0) {
+      toast.error('再生成する業務を選択してください');
+      return;
+    }
+
+    setIsRegenerating(true);
+    try {
+      // 対象日の従業員・業務マスタを取得
+      const filteredEmployees = allEmployees
+        .filter(emp => emp.office === selectedLocation)
+        .map(emp => ({
+          id: emp.employee_id,
+          name: emp.name,
+          location: emp.office || selectedLocation,
+          従業員ID: emp.employee_id,
+        }));
+
+      const filteredBusinessMasters = businessMasters
+        .filter(b => b.営業所 === selectedLocation && b.is_active !== false);
+
+      // ペア業務グループを構築
+      const pairGroups: Record<string, string[]> = {};
+      filteredBusinessMasters.forEach(b => {
+        if (b.業務グループ) {
+          if (!pairGroups[b.業務グループ]) {
+            pairGroups[b.業務グループ] = [];
+          }
+          if (b.業務名) pairGroups[b.業務グループ].push(b.業務名);
+        }
+      });
+
+      // 生成オプションを設定
+      const generationOptions: { targetBusinessNames?: string[]; skipAssignedBusinesses?: boolean } = {};
+      if (regenMode === 'selected') {
+        generationOptions.targetBusinessNames = regenSelectedBusinesses;
+      } else {
+        generationOptions.skipAssignedBusinesses = true;
+      }
+
+      // 対象業務のDBシフトを削除（選択済み業務のみ）
+      if (regenMode === 'selected' && regenSelectedBusinesses.length > 0) {
+        const { data: existingShiftsForDate } = await supabase
+          .from('shifts')
+          .select('id, business_name')
+          .eq('date', regenTargetDate);
+
+        if (existingShiftsForDate) {
+          const shiftsToDelete = existingShiftsForDate.filter(s => 
+            regenSelectedBusinesses.includes(s.business_name)
+          );
+          if (shiftsToDelete.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('shifts')
+              .delete()
+              .in('id', shiftsToDelete.map(s => s.id));
+            if (deleteError) {
+              console.error('❌ Error deleting shifts for regen:', deleteError);
+              toast.error('既存シフトの削除に失敗しました');
+              setIsRegenerating(false);
+              return;
+            }
+            console.log(`✅ Deleted ${shiftsToDelete.length} shifts for partial regen`);
+          }
+        }
+      }
+
+      // APIで再生成実行
+      const response = await fetch('/api/generate-shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employees: filteredEmployees,
+          businessMasters: filteredBusinessMasters,
+          dateRange: [regenTargetDate],
+          pairGroups,
+          location: selectedLocation,
+          options: generationOptions,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`APIエラー: ${response.statusText}`);
+      }
+
+      const apiResult = await response.json();
+      if (!apiResult.success) {
+        throw new Error(apiResult.error || '再生成に失敗しました');
+      }
+
+      // 生成結果をDBに保存
+      if (apiResult.shifts && apiResult.shifts.length > 0) {
+        const shiftsToInsert = apiResult.shifts.map((shift: any) => ({
+          employee_id: shift.employee_id,
+          business_master_id: shift.business_master_id,
+          business_name: shift.business_name,
+          date: shift.shift_date || shift.date || regenTargetDate,
+          location: selectedLocation,
+          created_at: new Date().toISOString(),
+          multi_day_set_id: shift.multi_day_set_id || null,
+          multi_day_info: shift.multi_day_info || null,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('shifts')
+          .insert(shiftsToInsert);
+
+        if (insertError) {
+          console.error('❌ Error inserting regenerated shifts:', insertError);
+          toast.error('再生成シフトの保存に失敗しました');
+          setIsRegenerating(false);
+          return;
+        }
+
+        toast.success(`部分再生成完了！${shiftsToInsert.length}件のシフトを生成しました`);
+      } else {
+        toast.warning('再生成できるシフトがありませんでした（従業員不足または制約条件による）');
+      }
+
+      // ダイアログを閉じてデータを再読み込み
+      setShowRegenDialog(false);
+      if (activeTab === 'daily') {
+        await loadData();
+      } else {
+        await loadPeriodShifts();
+      }
+    } catch (error) {
+      console.error('❌ Error in partial regeneration:', error);
+      toast.error(`再生成中にエラーが発生しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
   // 右クリックメニューのハンドラー
@@ -1363,6 +1534,10 @@ export default function ShiftSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">シフト管理（マトリクス表示）</h1>
         <div className="flex items-center gap-2">
+          <Button onClick={handleOpenRegenDialog} className="bg-orange-500 hover:bg-orange-600 text-white">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            部分再生成
+          </Button>
           <Button onClick={() => setShowSpotBusinessDialog(true)} className="bg-cyan-600 hover:bg-cyan-700 text-white">
             <Plus className="h-4 w-4 mr-2" />
             スポット業務登録
@@ -2541,6 +2716,130 @@ export default function ShiftSchedule() {
       <DialogFooter>
         <Button variant="outline" onClick={() => setShowAssignPopup(false)}>
           キャンセル
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  {/* 部分再生成ダイアログ */}
+  <Dialog open={showRegenDialog} onOpenChange={setShowRegenDialog}>
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <RefreshCw className="h-5 w-5 text-orange-500" />
+          部分再生成
+        </DialogTitle>
+        <DialogDescription>
+          指定した日付・業務のシフトを再生成します。既存の該当シフトは削除されます。
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4 mt-4">
+        {/* 対象日付選択 */}
+        <div className="space-y-2">
+          <Label htmlFor="regen-date" className="font-semibold">対象日付</Label>
+          <Input
+            id="regen-date"
+            type="date"
+            value={regenTargetDate}
+            onChange={(e) => setRegenTargetDate(e.target.value)}
+          />
+        </div>
+
+        {/* 再生成モード選択 */}
+        <div className="space-y-2">
+          <Label className="font-semibold">再生成モード</Label>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="regenMode"
+                value="selected"
+                checked={regenMode === 'selected'}
+                onChange={() => setRegenMode('selected')}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">指定業務再生成（選択した業務のシフトを再生成）</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="regenMode"
+                value="remaining"
+                checked={regenMode === 'remaining'}
+                onChange={() => setRegenMode('remaining')}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">未アサイン業務のみ再生成（既存シフトはそのまま維持）</span>
+            </label>
+          </div>
+        </div>
+
+        {/* 指定業務モード時の業務選択 */}
+        {regenMode === 'selected' && (
+          <div className="space-y-2">
+            <Label className="font-semibold">
+              再生成する業務を選択（選択した業務の既存シフトは削除されます）
+            </Label>
+            <div className="border rounded p-3 max-h-[200px] overflow-y-auto bg-gray-50">
+              <div className="grid grid-cols-2 gap-2">
+                {businessMasters
+                  .filter(b => b.営業所 === selectedLocation && b.is_active !== false && b.業務名 !== '無し')
+                  .sort((a, b) => (a.display_order ?? 9999) - (b.display_order ?? 9999))
+                  .map(business => (
+                    <label
+                      key={business.業務id || business.id}
+                      className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-white"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={regenSelectedBusinesses.includes(business.業務名 || '')}
+                        onChange={() => handleRegenBusinessToggle(business.業務名 || '')}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">{business.業務名}</span>
+                    </label>
+                  ))}
+              </div>
+            </div>
+            {regenSelectedBusinesses.length > 0 && (
+              <p className="text-sm text-orange-600">{regenSelectedBusinesses.length}件選択中</p>
+            )}
+          </div>
+        )}
+
+        {/* 警告メッセージ */}
+        <Alert className="border-orange-300 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-500" />
+          <AlertDescription className="text-orange-700">
+            {regenMode === 'selected'
+              ? '選択した業務の既存シフトは削除され、新たに自動生成されます。この操作は元に戻せません。'
+              : '未アサインの業務に対してのみシフトを生成します。既存のシフトは変更されません。'
+            }
+          </AlertDescription>
+        </Alert>
+      </div>
+
+      <DialogFooter className="mt-4">
+        <Button variant="outline" onClick={() => setShowRegenDialog(false)} disabled={isRegenerating}>
+          キャンセル
+        </Button>
+        <Button
+          onClick={handlePartialRegenerate}
+          disabled={isRegenerating || (regenMode === 'selected' && regenSelectedBusinesses.length === 0)}
+          className="bg-orange-500 hover:bg-orange-600 text-white"
+        >
+          {isRegenerating ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              再生成中...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              再生成実行
+            </>
+          )}
         </Button>
       </DialogFooter>
     </DialogContent>

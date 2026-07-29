@@ -34,7 +34,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/generate-shifts', async (req, res) => {
   try {
     console.log('🟢🟢🟢 SERVER.TS - Received shift generation request 🟢🟢🟢');
-    const { employees, businessMasters, dateRange, pairGroups, location } = req.body;
+    const { employees, businessMasters, dateRange, pairGroups, location, options } = req.body;
     
     if (!employees || !businessMasters || !dateRange) {
       console.log('❌ Missing parameters:', { 
@@ -48,13 +48,20 @@ app.post('/api/generate-shifts', async (req, res) => {
     }
     
     console.log(`📊 SERVER.TS - Processing ${dateRange.length} days for ${employees.length} employees`);
+    if (options?.targetBusinessNames?.length > 0) {
+      console.log(`🎯 SERVER.TS - Target businesses: ${options.targetBusinessNames.join(', ')}`);
+    }
+    if (options?.skipAssignedBusinesses) {
+      console.log('⏭️ SERVER.TS - Skip assigned businesses mode: ON');
+    }
     
     const result = await generateShifts(
       employees,
       businessMasters,
       dateRange,
       pairGroups,
-      location
+      location,
+      options
     );
     
     console.log('✅ Shift generation completed');

@@ -5,6 +5,9 @@
  * - Same employee(s) handle both outbound and return legs
  * - Galaxy team departs on odd dates, Aube team on even dates
  * - Supports both one-person and two-person operations
+ * 
+ * [Fix] Added skill matrix check to prevent assigning employees without required skills
+ * [Fix] Added roll_call_capable protection to preserve roll call capable employees for roll call duties
  */
 
 interface Employee {
@@ -15,6 +18,8 @@ interface Employee {
   従業員名?: string;
   班?: string;
   team?: string;
+  roll_call_capable?: boolean;
+  roll_call_duty?: string;
   [key: string]: any;
 }
 
@@ -108,25 +113,58 @@ function getDepartingTeam(date: Date): 'Galaxy' | 'Aube' {
 
 /**
  * Select employees for a round-trip operation
+ * [Fix] Added employeeSkillMatrix and rollCallProtectionCount parameters
  */
 function selectEmployeesForRoundTrip(
   employees: Employee[],
   team: 'Galaxy' | 'Aube',
   requiredPeople: number,
   businessGroup: string,
-  usedEmployees: Set<string>
+  usedEmployees: Set<string>,
+  employeeSkillMatrix?: Map<string, Set<string>>,
+  rollCallProtectionCount?: number
 ): Employee[] {
-  const teamEmployees = employees.filter(emp => {
+  // Count roll call capable employees in the pool
+  const totalRollCallCapable = employees.filter(emp => {
     const empId = emp.employee_id || emp.従業員ID || emp.従業員id || emp.id || '';
+    return !usedEmployees.has(empId) && (emp.roll_call_capable === true || emp.roll_call_duty === '1');
+  }).length;
+  
+  const protectCount = rollCallProtectionCount ?? 0;
+  
+  const teamEmployees = employees.filter(emp => {
+    // Use UUID (emp.id) first as it matches the skill matrix key
+    const empId = emp.id || emp.employee_id || emp.従業員ID || emp.従業員id || '';
     const empTeam = emp.班 || emp.team || '';
     
     // Must be in the specified team and not already used
     // 「無し」の従業員はどちらのチームにも割り当て可能
     const isInTeam = empTeam === team || empTeam === '無し' || empTeam === '';
-    return isInTeam && !usedEmployees.has(empId);
+    if (!isInTeam || usedEmployees.has(empId)) return false;
+    
+    // [Fix] Check skill matrix - employee must have the required business group skill
+    // Try UUID first (as skill matrix uses UUID as key), then numeric employee_id
+    if (employeeSkillMatrix && businessGroup) {
+      const uuidId = emp.id || empId;
+      const empSkills = employeeSkillMatrix.get(uuidId) || employeeSkillMatrix.get(empId) || new Set<string>();
+      if (!empSkills.has(businessGroup)) {
+        console.log(`  ⛔ [SKILL_CHECK] ${empId} does not have skill for ${businessGroup}`);
+        return false;
+      }
+    }
+    
+    // [Fix] Protect roll call capable employees if needed
+    // If this employee is roll_call_capable and we need to protect some, skip them
+    const isRollCallCapable = emp.roll_call_capable === true || emp.roll_call_duty === '1';
+    if (isRollCallCapable && totalRollCallCapable <= protectCount) {
+      console.log(`  🛡️ [ROLL_CALL_PROTECT] Protecting ${empId} (roll call capable) - ${totalRollCallCapable} available, need to protect ${protectCount}`);
+      return false;
+    }
+    
+    return true;
   });
   
-  console.log(`  🔍 Available ${team} team members: ${teamEmployees.length}`);
+  console.log(`  🔍 Available ${team} team members (with skill check): ${teamEmployees.length}`);
   
   if (teamEmployees.length < requiredPeople) {
     console.log(`  ⚠️ Not enough ${team} team members (need ${requiredPeople}, have ${teamEmployees.length})`);
@@ -138,7 +176,8 @@ function selectEmployeesForRoundTrip(
   
   // Mark as used
   selected.forEach(emp => {
-    const empId = emp.employee_id || emp.従業員ID || emp.従業員id || emp.id || '';
+    // Use UUID (emp.id) first as it matches the skill matrix key
+    const empId = emp.id || emp.employee_id || emp.従業員ID || emp.従業員id || '';
     usedEmployees.add(empId);
   });
   
@@ -147,27 +186,34 @@ function selectEmployeesForRoundTrip(
 
 /**
  * Assign a business pair (round-trip) to employees
+ * [Fix] Added employeeSkillMatrix and rollCallProtectionCount parameters
  */
 function assignBusinessPair(
   pair: BusinessPair,
   employees: Employee[],
   startDate: Date,
   usedEmployees: Set<string>,
-  batchId: string
+  batchId: string,
+  employeeSkillMatrix?: Map<string, Set<string>>,
+  rollCallProtectionCount?: number
 ): any[] {
   const team = getDepartingTeam(startDate);
+  const businessGroup = pair.outbound.業務グループ || pair.outbound.business_group || '';
   
   console.log(`\n📅 ${startDate.toISOString().split('T')[0]} - ${pair.baseName}`);
   console.log(`  🚌 Departing team: ${team}`);
   console.log(`  👥 Required people: ${pair.requiredPeople}`);
+  console.log(`  🏷️ Business group: ${businessGroup}`);
   
   // Select employees
   const selectedEmployees = selectEmployeesForRoundTrip(
     employees,
     team,
     pair.requiredPeople,
-    pair.outbound.業務グループ || pair.outbound.business_group || '',
-    usedEmployees
+    businessGroup,
+    usedEmployees,
+    employeeSkillMatrix,
+    rollCallProtectionCount
   );
   
   if (selectedEmployees.length === 0) {
@@ -182,6 +228,7 @@ function assignBusinessPair(
   const pairSetId = `ROUNDTRIP_${pair.baseName}_${startDate.toISOString().split('T')[0]}_${team}`;
   
   selectedEmployees.forEach(employee => {
+    // Use UUID (emp.id) first to match skill matrix key; fall back to numeric employee_id for DB storage
     const empId = employee.employee_id || employee.従業員ID || employee.従業員id || employee.id || '';
     
     // Day 1: Outbound (departure from Tokyo)
@@ -233,12 +280,15 @@ function assignBusinessPair(
 
 /**
  * Main function to assign multi-day business pairs
+ * [Fix] Added employeeSkillMatrix and rollCallProtectionCount parameters
  */
 export function assignMultiDayBusinessPairs(
   employees: Employee[],
   businesses: Business[],
   dateRange: { start: Date | string; end: Date | string },
-  batchId: string
+  batchId: string,
+  employeeSkillMatrix?: Map<string, Set<string>>,
+  rollCallProtectionCount?: number
 ): any[] {
   console.log('\n🚀 Starting multi-day business pair assignment');
   console.log('🔍 DEBUG - dateRange.start type:', typeof dateRange.start, 'value:', dateRange.start);
@@ -268,13 +318,28 @@ export function assignMultiDayBusinessPairs(
     return [];
   }
   
+  // Log skill matrix info
+  if (employeeSkillMatrix) {
+    console.log(`📊 Skill matrix available for ${employeeSkillMatrix.size} employees`);
+  } else {
+    console.warn('⚠️ No skill matrix provided - skill check will be skipped');
+  }
+  
+  // Log roll call protection info
+  if (rollCallProtectionCount && rollCallProtectionCount > 0) {
+    console.log(`🛡️ Roll call protection: at least ${rollCallProtectionCount} roll call capable employees will be preserved`);
+  }
+  
   const allShifts: any[] = [];
-  const usedEmployees: Set<string> = new Set();
   // Generate shifts for each day in the range
   const currentDate = new Date(normalizedDateRange.start);
   
   while (currentDate <= normalizedDateRange.end) {
     console.log(`\n📆 Processing date: ${currentDate.toISOString().split('T')[0]}`);
+    
+    // Reset usedEmployees for each day so employees can be reused across different days
+    // (Same employee can work on different days, just not multiple businesses on the same day)
+    const usedEmployees: Set<string> = new Set();
     
     // For each business pair, try to assign
     pairs.forEach(pair => {
@@ -283,7 +348,9 @@ export function assignMultiDayBusinessPairs(
         employees,
         new Date(currentDate),
         usedEmployees,
-        batchId
+        batchId,
+        employeeSkillMatrix,
+        rollCallProtectionCount
       );
       
       allShifts.push(...shifts);
