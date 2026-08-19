@@ -1307,17 +1307,28 @@ export default function ShiftGenerator() {
   const renderShiftMatrix = () => {
     if (shiftResults.length === 0) return null;
 
-    const dates = [...new Set(shiftResults.map(r => r.date))].sort();
-    // Only show business masters that are in the shift results (filtered by location)
-    const businessMasterNames = [...new Set(shiftResults.map(r => r.businessMaster))]
-      .sort((a, b) => {
-        // 点呼業務を一番上に表示
-        const aIsRollCall = a.includes('点呼');
-        const bIsRollCall = b.includes('点呼');
-        if (aIsRollCall && !bIsRollCall) return -1;
-        if (!aIsRollCall && bIsRollCall) return 1;
-        return a.localeCompare(b);
-      });
+    // 生成対象期間を基準に列を構成する。未アサインの日もプレビューから欠落させない。
+    const dates = generateDateRange(startDate, endDate);
+
+    // 生成結果に存在する業務だけでなく、選択拠点の全業務マスタを表示する。
+    // これにより、担当者を確保できなかった業務も「空き」として確認・手動編集できる。
+    const businessMasterNames = [...new Set(
+      businessMasters
+        .filter(bm => bm.営業所 === selectedLocation)
+        .map(bm => bm.name || bm.業務名)
+        .filter((name): name is string => Boolean(name))
+    )].sort((a, b) => {
+      // 点呼業務を一番上に表示
+      const aIsRollCall = a.includes('点呼');
+      const bIsRollCall = b.includes('点呼');
+      if (aIsRollCall && !bIsRollCall) return -1;
+      if (!aIsRollCall && bIsRollCall) return 1;
+
+      // 業務マスタの並び順を優先し、未設定時のみ名称順にする。
+      const aOrder = businessMasters.find(bm => bm.営業所 === selectedLocation && (bm.name || bm.業務名) === a)?.display_order ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = businessMasters.find(bm => bm.営業所 === selectedLocation && (bm.name || bm.業務名) === b)?.display_order ?? Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder || a.localeCompare(b);
+    });
 
     // 必要人数を取得するヘルパー
     const getRequiredPeople = (bmName: string): number => {
