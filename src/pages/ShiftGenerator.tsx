@@ -262,9 +262,6 @@ export default function ShiftGenerator() {
   const [generationSummary, setGenerationSummary] = useState<GenerationSummary | null>(null);
   const [activeShift, setActiveShift] = useState<ShiftResult | NonWorkingMember | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
-  const [panelSearch, setPanelSearch] = useState('');
-  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [generationMode, setGenerationMode] = useState<'all' | 'priority' | 'remaining'>('all');
   const [selectedBusinessNames, setSelectedBusinessNames] = useState<string[]>([]);
   // 東京拠点専用: 運休日・サイクル状態
@@ -1355,14 +1352,6 @@ export default function ShiftGenerator() {
     setHasChanges(true);
   };
 
-  const toggleDateCollapse = (date: string) => {
-    setCollapsedDates(prev => {
-      const next = new Set(prev);
-      if (next.has(date)) next.delete(date); else next.add(date);
-      return next;
-    });
-  };
-
   const renderDraggableCell = (businessMaster: string, date: string, employeeName: string, slotIndex: number, shift?: ShiftResult) => {
     const cellKey = `${businessMaster}-${date}-slot-${slotIndex}`;
     const isEmpty = employeeName === '-';
@@ -1397,32 +1386,6 @@ export default function ShiftGenerator() {
         </DraggableEmployee>
       </DroppableCell>
     );
-  };
-
-  // Calculate unassigned employees for a specific date (filtered by selected location)
-  const getUnassignedEmployees = (date: string) => {
-    // Get all employees assigned to shifts on this date
-    const assignedEmployeeIds = new Set(
-      shiftResults
-        .filter(shift => shift.date === date)
-        .map(shift => shift.employeeId)
-    );
-    
-    // Get employees in non-working list for this date
-    const nonWorkingEmployeeIds = new Set(
-      nonWorkingMembers
-        .filter(nw => nw.date === date)
-        .map(nw => nw.employeeId)
-    );
-    
-    // Filter employees who are not assigned and not in non-working list
-    // Also filter by selected location
-    return employees.filter(emp => {
-      const empId = emp.従業員ID || emp.id;
-      const empLocation = emp.拠点 || emp.location;
-      const matchesLocation = empLocation === selectedLocation;
-      return matchesLocation && !assignedEmployeeIds.has(empId) && !nonWorkingEmployeeIds.has(empId);
-    });
   };
 
   const renderNonWorkingCell = (date: string) => {
@@ -1696,9 +1659,8 @@ export default function ShiftGenerator() {
             </Alert>
           )}
 
-          {/* Main content: matrix + floating panel */}
-          <div className="flex gap-4 items-start">
-          {/* Scrollable table container */}
+          {/* シフトマトリクス */}
+          {/* スクロール可能な表コンテナ */}
           <div className="flex-1 min-w-0 border border-gray-300 rounded-lg overflow-hidden">
             <div className="max-h-[600px] overflow-y-auto">
               <table className="w-full border-collapse">
@@ -1762,135 +1724,48 @@ export default function ShiftGenerator() {
                       ))}
                     </tr>
                   ))}
-                  {/* 休暇登録済み従業員行 */}
-                  {nonWorkingMembers.some(nw => nw.source === 'vacation_master') && (
-                    <tr className="bg-orange-50">
-                      <td className="border-t-2 border-r border-orange-300 px-4 py-2 bg-orange-100">
-                        <div className="flex items-center space-x-2">
-                          <UserX className="w-4 h-4 text-orange-600" />
-                          <div>
-                            <div className="font-medium text-sm text-orange-800">📅 休暇登録済み</div>
-                            <div className="text-xs text-orange-600">移動不可</div>
-                          </div>
+                  {/* 日付別休暇者欄：休暇がない日も常に表示する */}
+                  <tr className="bg-orange-50">
+                    <td className="border-t-2 border-r border-orange-300 px-4 py-2 bg-orange-100 align-top">
+                      <div className="flex items-center space-x-2">
+                        <UserX className="w-4 h-4 text-orange-600" />
+                        <div>
+                          <div className="font-medium text-sm text-orange-800">休暇者</div>
+                          <div className="text-xs text-orange-600">氏名・休暇区分</div>
                         </div>
-                      </td>
-                      {dates.map(date => {
-                        const vacationMembers = nonWorkingMembers.filter(
-                          nw => nw.date === date && nw.source === 'vacation_master'
-                        );
-                        return (
-                          <td key={`vacation-${date}`} className="border-t-2 border-r border-orange-300 px-2 py-2">
-                            {vacationMembers.length === 0 ? (
-                              <div className="text-center text-orange-300 text-xs py-1">-</div>
-                            ) : (
-                              <div className="space-y-1">
-                                {vacationMembers.map(nw => (
-                                  <div
-                                    key={nw.id}
-                                    className="bg-orange-100 text-orange-800 border border-orange-300 px-2 py-1 rounded text-xs text-center"
-                                    title={nw.reason || '休暇'}
-                                  >
-                                    {nw.employeeName}
-                                    {nw.reason && (
-                                      <span className="ml-1 text-orange-500">({nw.reason})</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
+                      </div>
+                    </td>
+                    {dates.map(date => {
+                      const vacationMembers = nonWorkingMembers.filter(
+                        nw => nw.date === date && nw.source === 'vacation_master'
+                      );
+                      return (
+                        <td key={`vacation-${date}`} className="border-t-2 border-r border-orange-300 px-2 py-2 align-top">
+                          {vacationMembers.length === 0 ? (
+                            <div className="text-center text-orange-300 text-xs py-1">休暇者なし</div>
+                          ) : (
+                            <div className="space-y-1">
+                              {vacationMembers.map(nw => (
+                                <div
+                                  key={nw.id}
+                                  className="bg-orange-100 text-orange-800 border border-orange-300 px-2 py-1 rounded text-xs"
+                                  title={`休暇区分：${nw.reason || '休暇'}`}
+                                >
+                                  <div className="font-medium">{nw.employeeName}</div>
+                                  <div className="text-orange-600">{nw.reason || '休暇'}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Floating panel: Unassigned employees */}
-          <div className={`flex-shrink-0 border border-gray-300 rounded-lg overflow-hidden transition-all duration-200 ${isPanelOpen ? 'w-64' : 'w-10'}`} style={{ position: 'sticky', top: '1rem', maxHeight: '600px' }}>
-            {isPanelOpen ? (
-              <>
-                <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-gray-600" />
-                    <div>
-                      <div className="font-semibold text-gray-800 text-sm">当日状況</div>
-                      <div className="text-xs text-gray-500">業務セルをクリックして割当</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setIsPanelOpen(false)}
-                    className="text-gray-500 hover:text-gray-700 text-xs px-1"
-                    title="閉じる"
-                  >
-                    ►
-                  </button>
-                </div>
-                <div className="px-2 py-2 border-b border-gray-200">
-                  <input
-                    type="text"
-                    placeholder="名前で検索..."
-                    value={panelSearch}
-                    onChange={(e) => setPanelSearch(e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-400"
-                  />
-                </div>
-                <div className="overflow-y-auto" style={{ maxHeight: '500px' }}>
-                  {dates.map(date => {
-                    const unassignedEmps = getUnassignedEmployees(date).filter(emp => {
-                      const name = emp.氏名 || emp.name || '';
-                      return panelSearch === '' || name.includes(panelSearch);
-                    });
-                    const isCollapsed = collapsedDates.has(date);
-                    const dateLabel = new Date(date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' });
-                    return (
-                      <div key={`panel-${date}`} className="border-b border-gray-200 last:border-b-0">
-                        <button
-                          className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 text-xs font-medium text-gray-700"
-                          onClick={() => toggleDateCollapse(date)}
-                        >
-                          <span>{dateLabel}</span>
-                          <span className="flex items-center gap-1">
-                            <span className="bg-blue-100 text-blue-700 rounded-full px-1.5 py-0.5 text-xs">{unassignedEmps.length}</span>
-                            <span>{isCollapsed ? '▼' : '▲'}</span>
-                          </span>
-                        </button>
-                        {!isCollapsed && (
-                          <div className="px-2 py-1 space-y-1">
-                            {unassignedEmps.length === 0 ? (
-                              <div className="text-xs text-gray-400 text-center py-1">全員アサイン済</div>
-                            ) : (
-                              unassignedEmps.map((emp) => (
-                                <div
-                                  key={`${emp.id}-${date}`}
-                                  className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
-                                  title={`従業員ID: ${emp.従業員ID || emp.id}`}
-                                >
-                                  {emp.氏名 || emp.name}
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <button
-                onClick={() => setIsPanelOpen(true)}
-                className="w-full h-full flex flex-col items-center justify-center py-4 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                title="当日状況パネルを開く"
-              >
-                <Users className="w-4 h-4 mb-1" />
-                <span className="text-xs writing-mode-vertical">◄</span>
-              </button>
-            )}
-          </div>
-          </div>{/* end flex */}
 
           {/* Non-working members table (manual only - vacation_master shown in matrix) */}
           {nonWorkingMembers.some(nw => nw.source !== 'vacation_master') && (
