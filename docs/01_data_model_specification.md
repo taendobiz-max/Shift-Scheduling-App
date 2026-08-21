@@ -1,7 +1,7 @@
 # データモデル仕様書
 
 **作成日**: 2026年2月28日  
-**最終更新日**: 2026年8月21日（P0セキュリティ強化・R1原子保存対応）
+**最終更新日**: 2026年8月21日（P0セキュリティ強化・R1原子保存対応・P1ルール実行レポート／品質ゲート）
 **対象システム**: シフト管理アプリケーション（manus-shift-app）  
 **バックエンド**: Supabase（PostgreSQL）
 
@@ -126,7 +126,9 @@
 | `enforcement_level` | `text` | **No** | 強制レベル（`mandatory` / `recommended` / `optional`） |
 | `is_active` | `boolean` | **No** | 有効フラグ（`false`=無効化） |
 | `created_at` | `timestamp with time zone` | **No** | レコード作成日時 |
-| `updated_at` | `timestamp with time zone` | **No** | レコード更新日時 |
+| `updated_at` | `timestamp with time zone` | **No** | 更新日時 |
+
+**P1実行結果の扱い**: `rule_execution_report` はこのテーブルへ保存しないAPI応答DTOです。生成ごとに有効ルールのID、設定入力の要約、評価範囲、判定結果および違反内容を返します。未実装の必須ルールで停止した結果は `shifts` テーブルへ保存されず、生成操作自体は `audit_logs` に最小限のメタデータのみを記録します。
 
 ---
 

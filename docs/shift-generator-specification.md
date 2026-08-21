@@ -626,3 +626,25 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### 11.5. ルールの適用状況
 
 生成結果には、未実装の有効制約を `unsupported_constraints` として返します。画面は対象ルール名と型を表示し、「今回の生成には適用されていない」ことを明示します。これにより、設定済みであるだけの制約を適用済みと誤認しません。
+
+
+## 14. P1ルール適用のフェイルセーフと説明可能性
+
+### 14.1 生成前の必須ルール検証
+
+生成器は拠点ごとの有効制約を読み込み、直接評価、他エンジンへ委譲、未実装の三段階に分類する。未実装の有効制約が `mandatory` の場合、生成器は候補者選定・シフト配置を開始せず、空のシフト結果と停止理由を返す。複数日生成では、いずれかの日付でこの状態になった時点で後続日も処理しない。この結果は保存APIへ渡されないため、既存シフトを変更しない。
+
+| 実装状態 | 強制レベル | 生成時の動作 |
+|---|---|---|
+| `direct` | 任意 | 制約エンジンで候補者ごとに評価し、`mandatory` 違反は候補から除外 |
+| `delegated` | 任意 | 専門ルールエンジンまたは業務マスタ処理へ委譲。個別結果が未連携の場合もその旨を返す |
+| `unsupported` | `mandatory` | 生成を停止し、既存シフトを変更しない |
+| `unsupported` | `recommended` / `optional` | 生成は継続するが、未適用警告を返す |
+
+### 14.2 `rule_execution_report`
+
+`/api/generate-shifts` は、日別の結果を `rule_execution_report` として集約する。各エントリには、`rule_id`、`rule_name`、`rule_type`、`enforcement_level`、`input`、`evaluation_scope`、`outcome`、`violation_count`、`violations`、`evaluation_date` を含める。画面は生成結果の「ルール適用状況」に、ルールID、設定値、評価範囲、判定結果および違反件数を表示する。
+
+### 14.3 書込み前提
+
+生成結果の保存は `/api/shifts/bulk` の原子置換APIだけを使用する。`success: false`、特に `blocked_by_unsupported_mandatory_rule: true` の結果は保存操作を行ってはならない。

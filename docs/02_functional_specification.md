@@ -244,9 +244,13 @@ Supabase Auth を利用したメールアドレスとパスワードによる認
 | `recommended` | 推奨（違反しても警告のみ） |
 | `optional` | 任意（参考情報として表示） |
 
-### 7.4. 実行時の適用状況
+### 7.4. 実行時の適用状況とフェイルセーフ
 
-`max_daily_work_hours`、`max_daily_shifts`、`exclusive_assignment`、`vacation_exclusion`、`overnight_bus_exclusion`、`business_required_staff` は生成エンジンまたは業務マスタの必要人数ロジックで評価されます。現在未実装の有効制約（設定未完了、`allowance_balance`、`monthly_days_off` 等）は、生成を適用済みとして扱わず、生成結果に「今回の生成には適用されていない」と明示警告します。
+`max_daily_work_hours`、`max_daily_shifts`、`exclusive_assignment`、`vacation_exclusion`、`overnight_bus_exclusion`、`business_required_staff` は、生成エンジンまたは業務マスタの必要人数ロジックで評価されます。未実装の有効制約（設定未完了、`allowance_balance`、`monthly_days_off` 等）は、適用済みとは扱いません。
+
+未実装制約の強制レベルが `mandatory` の場合は、**生成を開始せず**、対象ルール名・ID・型を画面に表示します。`recommended` または `optional` の未実装制約は、生成を継続するものの未適用として警告します。必須制約の違反判定は優先度に依存せず、`enforcement_level = mandatory` を正として候補者の配置を停止します。
+
+生成結果には `rule_execution_report` を返します。各エントリにはルールID、ルール名、型、強制レベル、設定入力の要約、評価範囲、判定結果、違反件数および違反説明を含めます。複数日生成では日付ごとに同レポートを集約し、必須未実装ルールが検出された時点で残りの日付の生成も停止します。
 
 ### 7.5. 主要機能
 
@@ -255,6 +259,7 @@ Supabase Auth を利用したメールアドレスとパスワードによる認
 - `rule_config` を JSON エディタで直接編集
 - ルールの有効/無効切り替え
 - 優先度の設定（0〜10）
+- 書込みAPIは `rule_id`、`rule_name`、`rule_type`、`priority`、`enabled`、`営業所`、`conditions`、`actions`、`description` の許可フィールドのみを受理し、未知フィールド・読取り専用フィールド・不正な型・過大なJSONを永続化しない
 
 ---
 
@@ -430,4 +435,10 @@ Supabase Auth を利用したメールアドレスとパスワードによる認
 | `typescript` | ^5.5.3 | TypeScript コンパイラ |
 | `tailwindcss` | ^3.4.11 | CSSフレームワーク |
 | `eslint` | ^9.9.0 | コード品質チェック |
+| `vitest` | ^2.1.9 | APIルール・DTO検証の単体テスト |
+| `@playwright/test` | ^1.62.1 | ビルド済みログイン画面のE2Eスモークテスト |
 | `@vitejs/plugin-react-swc` | ^3.5.0 | React SWC プラグイン |
+
+### 15.3. P1品質ゲート
+
+GitHub Actions の `Quality Gate` は、対象ブランチへのpushおよびPull Requestで、フロントエンドの `lint`、P1変更経路の `typecheck`、Vitest単体テスト、Viteビルド、およびAPIサーバーの型検証を実行します。PlaywrightのE2Eスモークテストは `npm run test:e2e` で実行し、ログイン画面のHTMLタイトルとReact描画を確認します。旧API直下のJavaScript生成物・手動診断スクリプトは本番ランタイムの対象外であるため保全アーカイブへ移し、APIの実行対象は `api-server/dist/server.js` に統一します。
