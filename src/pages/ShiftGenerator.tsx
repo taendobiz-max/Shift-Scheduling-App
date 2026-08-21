@@ -30,6 +30,7 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { VACATION_REASON_REQUESTED } from '@/constants';
+import { apiFetch } from '@/utils/apiClient';
 
 interface ShiftResult {
   date: string;
@@ -501,11 +502,12 @@ export default function ShiftGenerator() {
     const dateRange = generateDateRange(startDate, endDate);
     const { data: existingShifts, error: checkError } = await supabase
       .from('shifts')
-      .select('shift_date')
-      .in('shift_date', dateRange);
+      .select('date')
+      .eq('location', selectedLocation)
+      .in('date', dateRange);
     
     if (!checkError && existingShifts && existingShifts.length > 0) {
-      const existingDates = [...new Set(existingShifts.map((s: any) => s.shift_date))];
+      const existingDates = [...new Set(existingShifts.map((s: any) => s.date))];
       const confirmed = window.confirm(
         `以下の日付に既存のシフトがあります:\n${existingDates.join(', ')}\n\n上書きしてもよろしいですか？`
       );
@@ -516,21 +518,8 @@ export default function ShiftGenerator() {
         return;
       }
       
-      // Delete existing shifts in the date range
-      console.log('🗑️ Deleting existing shifts for dates:', existingDates);
-      const { error: deleteError } = await supabase
-        .from('shifts')
-        .delete()
-        .in('shift_date', dateRange);
-      
-      if (deleteError) {
-        console.error('❌ Failed to delete existing shifts:', deleteError);
-        setGenerationResult(`既存シフトの削除に失敗しました: ${deleteError.message}`);
-        setIsGenerating(false);
-        return;
-      }
-      
-      console.log('✅ Existing shifts deleted successfully');
+      // 既存シフトはここでは削除しない。生成・編集・保存が完了するまで保持し、保存時にAPI側で原子的に置換する。
+      console.log('ℹ️ Existing shifts will be preserved until the generated schedule is saved atomically.');
     }
     try {
     
@@ -659,7 +648,7 @@ export default function ShiftGenerator() {
         }
       }
 
-      const response = await fetch('/api/generate-shifts', {
+      const response = await apiFetch('/api/generate-shifts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -776,6 +765,14 @@ export default function ShiftGenerator() {
         message += `✅ アサイン成功: ${totalAssigned}件\n`;
         if (totalUnassigned > 0) {
           message += `⚠️ アサイン失敗: ${totalUnassigned}件（制約条件または従業員不足）`;
+        }
+        const unsupportedConstraints = Array.isArray(apiResult.unsupported_constraints)
+          ? apiResult.unsupported_constraints
+          : [];
+        if (unsupportedConstraints.length > 0) {
+          message += `\n\n⚠️ 未対応の有効制約（今回の生成には適用されていません）:\n`;
+          message += unsupportedConstraints.map((constraint: any) => `・${constraint.name}（${constraint.type === 'unknown' ? '設定未完了' : constraint.type}）`).join('\n');
+          message += `\nルール管理で設定を見直してください。`;
         }
         setGenerationResult(message);
         setShowResults(true);
@@ -1344,17 +1341,18 @@ export default function ShiftGenerator() {
         };
       });
 
-      console.log('💾 Saving', shiftsToSave.length, 'shifts to database...');
-      const { error } = await supabase
-        .from('shifts')
-        .insert(shiftsToSave);
-
-      if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
+      const targetDates = generateDateRange(startDate, endDate);
+      console.log('💾 Replacing', shiftsToSave.length, 'shifts atomically for', targetDates.length, 'days...');
+      const response = await apiFetch('/api/shifts/bulk', {
+        method: 'POST',
+        body: JSON.stringify({ location: selectedLocation, dates: targetDates, shifts: shiftsToSave })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'シフトの原子的な保存に失敗しました。');
       }
 
-      console.log('✅ Shifts saved successfully!');
+      console.log('✅ Shifts replaced atomically:', result.count);
       setGenerationResult('シフトがデータベースに保存されました。');
       setOriginalShiftResults([...shiftResults]);
       setHasChanges(false);

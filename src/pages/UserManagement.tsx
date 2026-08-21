@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Users, Plus, Edit, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/utils/supabaseClient';
 import { getCurrentUser, isAdmin } from '@/utils/auth';
+import { apiFetch } from '@/utils/apiClient';
 
 interface User {
   id: string;
@@ -47,12 +47,9 @@ export default function UserManagement() {
   const loadUsers = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const response = await apiFetch(`${API_BASE_URL}/users`);
+      if (!response.ok) throw new Error('ユーザー一覧の読み込みに失敗しました');
+      const data = await response.json();
       setUsers(data || []);
     } catch (error: any) {
       console.error('Error loading users:', error);
@@ -70,7 +67,7 @@ export default function UserManagement() {
       }
 
       // バックエンドAPIでユーザーを作成
-      const response = await fetch(`${API_BASE_URL}/users`, {
+      const response = await apiFetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -114,7 +111,7 @@ export default function UserManagement() {
         updateData.password = formData.password;
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/${editingUser.id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData)
@@ -154,7 +151,7 @@ export default function UserManagement() {
 
     try {
       // バックエンドAPIでユーザーを削除
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/users/${user.id}`, {
         method: 'DELETE'
       });
 

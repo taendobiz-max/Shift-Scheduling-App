@@ -67,3 +67,6 @@ api-server/.checkpoints/
 
 # API (legacy, replaced by api-server)
 api/
+# Operational backups and key-rotation remnants (never commit)
+_archive/
+.env*.pre-*

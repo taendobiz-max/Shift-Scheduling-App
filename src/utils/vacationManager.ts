@@ -1,239 +1,90 @@
-import { supabase } from './supabaseClient';
 import { VacationMaster, VacationRequest } from '@/types/vacation';
+import { apiFetch } from './apiClient';
+
+interface VacationListOptions {
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+}
+
+async function parseApiResponse<T>(response: Response): Promise<T> {
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body?.error || '休暇データの処理に失敗しました。');
+  }
+  return body as T;
+}
 
 export class VacationManager {
-  // 休暇データを作成
-  static async createVacation(vacation: VacationRequest): Promise<VacationMaster> {
-    try {
-      // First check if table exists, if not create it
-      await this.ensureTableExists();
-      
-      const { data, error } = await supabase
-        .from('vacation_masters')
-        .insert({
-          employee_id: vacation.employee_id,
-          employee_name: vacation.employee_name,
-          location: vacation.location,
-          vacation_date: vacation.vacation_date,
-          vacation_type: vacation.vacation_type,
-          reason: vacation.reason,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+  private static async getVacations(options: VacationListOptions = {}): Promise<VacationMaster[]> {
+    const query = new URLSearchParams();
+    if (options.startDate) query.set('startDate', options.startDate);
+    if (options.endDate) query.set('endDate', options.endDate);
+    if (options.location) query.set('location', options.location);
 
-      if (error) {
-        console.error('Vacation creation error:', error);
-        throw new Error(`休暇データの作成に失敗しました: ${error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in createVacation:', error);
-      throw error;
-    }
+    const response = await apiFetch(`/api/vacations${query.size ? `?${query}` : ''}`);
+    const body = await parseApiResponse<{ vacations: VacationMaster[] }>(response);
+    return body.vacations ?? [];
   }
 
-  // テーブルの存在確認と作成
-  static async ensureTableExists(): Promise<void> {
-    try {
-      // Try to select from the table to check if it exists
-      const { error } = await supabase
-        .from('vacation_masters')
-        .select('id')
-        .limit(1);
-
-      if (error && error.code === 'PGRST116') {
-        // Table doesn't exist, create it
-        console.log('Creating vacation_masters table...');
-        await this.createVacationTable();
-      }
-    } catch (error) {
-      console.error('Error checking table existence:', error);
-      // Try to create table anyway
-      await this.createVacationTable();
-    }
-  }
-
-  // 休暇テーブルを作成
-  static async createVacationTable(): Promise<void> {
-    try {
-      const { error } = await supabase.rpc('create_vacation_table');
-      
-      if (error) {
-        console.error('Error creating vacation table:', error);
-        // Fallback: try direct SQL execution
-        const createTableSQL = `
-          CREATE TABLE IF NOT EXISTS vacation_masters (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id VARCHAR(50) NOT NULL,
-            employee_name VARCHAR(100) NOT NULL,
-            location VARCHAR(100) NOT NULL,
-            vacation_date DATE NOT NULL,
-            reason TEXT NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          
-          CREATE INDEX IF NOT EXISTS idx_vacation_employee_id ON vacation_masters(employee_id);
-          CREATE INDEX IF NOT EXISTS idx_vacation_date ON vacation_masters(vacation_date);
-          CREATE INDEX IF NOT EXISTS idx_vacation_location ON vacation_masters(location);
-        `;
-        
-        // This will need to be executed via Supabase dashboard or migration
-        console.log('Please execute this SQL in Supabase dashboard:', createTableSQL);
-      }
-    } catch (error) {
-      console.error('Error in createVacationTable:', error);
-    }
-  }
-
-  // 日付範囲で休暇データを取得
   static async getVacationsByDateRange(startDate: string, endDate: string): Promise<VacationMaster[]> {
-    try {
-      await this.ensureTableExists();
-      
-      const { data, error } = await supabase
-        .from('vacation_masters')
-        .select('*')
-        .gte('vacation_date', startDate)
-        .lte('vacation_date', endDate)
-        .order('vacation_date', { ascending: true });
-
-      if (error) {
-        throw new Error(`休暇データの取得に失敗しました: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getVacationsByDateRange:', error);
-      return [];
-    }
+    return this.getVacations({ startDate, endDate });
   }
 
-  // 拠点で休暇データを取得
   static async getVacationsByLocation(location: string): Promise<VacationMaster[]> {
-    try {
-      await this.ensureTableExists();
-      
-      const { data, error } = await supabase
-        .from('vacation_masters')
-        .select('*')
-        .eq('location', location)
-        .order('vacation_date', { ascending: true });
-
-      if (error) {
-        throw new Error(`休暇データの取得に失敗しました: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getVacationsByLocation:', error);
-      return [];
-    }
+    return this.getVacations({ location });
   }
 
-  // 全ての休暇データを取得
   static async getAllVacations(): Promise<VacationMaster[]> {
-    try {
-      await this.ensureTableExists();
-      
-      const { data, error } = await supabase
-        .from('vacation_masters')
-        .select('*')
-        .order('vacation_date', { ascending: true });
-
-      if (error) {
-        throw new Error(`休暇データの取得に失敗しました: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getAllVacations:', error);
-      return [];
-    }
+    return this.getVacations();
   }
 
-  // 休暇データを更新
+  static async createVacation(vacation: VacationRequest): Promise<VacationMaster> {
+    const created = await this.createVacationRange([vacation]);
+    return created[0];
+  }
+
+  /**
+   * 複数日の休暇を1回のAPI要求で登録する。サーバー側で単一insertとして実行され、
+   * 日付重複などで失敗した場合は全日付を登録しない。
+   */
+  static async createVacationRange(vacations: VacationRequest[]): Promise<VacationMaster[]> {
+    const response = await apiFetch('/api/vacations/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ vacations }),
+    });
+    const body = await parseApiResponse<{ vacations: VacationMaster[] }>(response);
+    return body.vacations ?? [];
+  }
+
   static async updateVacation(id: string, vacation: Partial<VacationRequest>): Promise<VacationMaster> {
-    try {
-      await this.ensureTableExists();
-      
-      const { data, error } = await supabase
-        .from('vacation_masters')
-        .update({
-          ...vacation,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`休暇データの更新に失敗しました: ${error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in updateVacation:', error);
-      throw error;
-    }
+    const response = await apiFetch(`/api/vacations/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(vacation),
+    });
+    const body = await parseApiResponse<{ vacation: VacationMaster }>(response);
+    return body.vacation;
   }
 
-  // 休暇データを削除
   static async deleteVacation(id: string): Promise<boolean> {
-    try {
-      await this.ensureTableExists();
-      
-      const { error } = await supabase
-        .from('vacation_masters')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(`休暇データの削除に失敗しました: ${error.message}`);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in deleteVacation:', error);
-      throw error;
-    }
+    const response = await apiFetch(`/api/vacations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await parseApiResponse<{ success: boolean }>(response);
+    return true;
   }
 
-  // 重複チェック（同一従業員・同一日付）
   static async checkDuplicate(employeeId: string, vacationDate: string): Promise<boolean> {
-    try {
-      await this.ensureTableExists();
-      
-      const { data, error } = await supabase
-        .from('vacation_masters')
-        .select('id')
-        .eq('employee_id', employeeId)
-        .eq('vacation_date', vacationDate);
-
-      if (error) {
-        console.warn('重複チェックに失敗しました:', error);
-        return false;
-      }
-
-      return data && data.length > 0;
-    } catch (error) {
-      console.warn('Error in checkDuplicate:', error);
-      return false;
-    }
+    const vacations = await this.getVacations({ startDate: vacationDate, endDate: vacationDate });
+    return vacations.some((vacation) => vacation.employee_id === employeeId);
   }
 
-  // 休暇データをNonWorkingMember形式に変換
   static convertToNonWorkingMembers(vacations: VacationMaster[]) {
-    return vacations.map(vacation => ({
+    return vacations.map((vacation) => ({
       id: `vacation-${vacation.id}`,
       date: vacation.vacation_date,
       employeeName: vacation.employee_name,
       employeeId: vacation.employee_id,
       reason: `【${vacation.vacation_type}】${vacation.reason}`,
-      source: 'vacation_master' as const
+      source: 'vacation_master' as const,
     }));
   }
 }

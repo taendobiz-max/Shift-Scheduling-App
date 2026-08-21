@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Save, X, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { apiFetch } from '@/utils/apiClient';
 
 interface BusinessRule {
   rule_id: string;
@@ -38,7 +39,7 @@ const BusinessRuleManagement = () => {
   const loadRules = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/business-rules');
+      const response = await apiFetch('/api/business-rules');
       if (!response.ok) throw new Error('Failed to load rules');
       const data = await response.json();
       setRules(data.sort((a: BusinessRule, b: BusinessRule) => b.priority - a.priority));
@@ -55,7 +56,7 @@ const BusinessRuleManagement = () => {
       const url = isCreating ? '/api/business-rules' : `/api/business-rules/${rule.rule_id}`;
       const method = isCreating ? 'POST' : 'PUT';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rule)
@@ -77,7 +78,7 @@ const BusinessRuleManagement = () => {
     if (!confirm('このルールを削除してもよろしいですか？')) return;
 
     try {
-      const response = await fetch(`/api/business-rules/${ruleId}`, {
+      const response = await apiFetch(`/api/business-rules/${ruleId}`, {
         method: 'DELETE'
       });
 
@@ -94,7 +95,7 @@ const BusinessRuleManagement = () => {
   const handleToggleEnabled = async (rule: BusinessRule) => {
     try {
       const updatedRule = { ...rule, enabled: !rule.enabled };
-      const response = await fetch(`/api/business-rules/${rule.rule_id}`, {
+      const response = await apiFetch(`/api/business-rules/${rule.rule_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedRule)

@@ -48,6 +48,18 @@ export class ConstraintEngine {
   private constraints: EnhancedConstraint[] = [];
   private violationLog: ConstraintViolation[] = [];
   private cachedConstraintGroups: any[] | null = null;
+  private unsupportedConstraints: EnhancedConstraint[] = [];
+
+  // これらはRuleEngineまたは業務マスタの必要人数ロジックで評価されるため、
+  // ConstraintEngineで重複して評価しない。
+  private readonly delegatedConstraintTypes = new Set([
+    'max_daily_work_hours', 'max_daily_shifts', 'exclusive_assignment',
+    'vacation_exclusion', 'overnight_bus_exclusion', 'business_required_staff'
+  ]);
+  private readonly directlySupportedConstraintTypes = new Set([
+    'max_consecutive_days', 'min_rest_hours', 'max_weekly_hours',
+    'max_monthly_hours', 'max_shifts_per_day', 'daily_coverage'
+  ]);
 
   /**
    * 指定拠点の制約条件を読み込み
@@ -63,8 +75,12 @@ export class ConstraintEngine {
         this.constraints = allConstraints.filter(c => c.is_active);
       }
 
+      this.unsupportedConstraints = this.constraints.filter((constraint) => !this.isConstraintHandled(constraint));
       console.log('✅ [CONSTRAINT] Loaded constraints:', this.constraints.length);
       console.log('📋 [CONSTRAINT] Constraint summary:', this.getConstraintSummary());
+      if (this.unsupportedConstraints.length > 0) {
+        console.warn('⚠️ [CONSTRAINT] Unsupported advisory constraints:', this.unsupportedConstraints.map((constraint) => `${constraint.constraint_name} (${constraint.constraint_type || 'unknown'})`).join(', '));
+      }
       
     } catch (error) {
       console.error('❌ [CONSTRAINT] Failed to load constraints:', error);
@@ -136,9 +152,22 @@ export class ConstraintEngine {
       case 'max_shifts_per_day':
         return this.checkMaxShiftsPerDay(constraint, employee, proposedShift, existingShifts);
       default:
-        console.warn(`⚠️ [CONSTRAINT] Unknown constraint type: ${constraint.constraint_type}`);
+        // 未対応制約はloadConstraints時に1回だけ警告・結果通知する。割当候補ごとの警告は出さない。
         return null;
     }
+  }
+
+  private isConstraintHandled(constraint: EnhancedConstraint): boolean {
+    const type = constraint.constraint_type || 'unknown';
+    return this.delegatedConstraintTypes.has(type) || this.directlySupportedConstraintTypes.has(type);
+  }
+
+  /**
+   * 現在の生成器で評価されない有効制約を返す。
+   * 呼び出し元は成功表示に埋もれないよう利用者へ警告を提示する。
+   */
+  getUnsupportedConstraints(): EnhancedConstraint[] {
+    return this.unsupportedConstraints.map((constraint) => ({ ...constraint }));
   }
 
   /**

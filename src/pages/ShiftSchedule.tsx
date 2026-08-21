@@ -23,6 +23,7 @@ import { AddSpotBusinessDialog } from '@/components/AddSpotBusinessDialog';
 import DeleteShiftsModal from '@/components/DeleteShiftsModal';
 import { AssignEmployeeDialog } from '@/components/AssignEmployeeDialog';
 import { OFFICES } from '@/constants';
+import { apiFetch } from '@/utils/apiClient';
 
 interface ShiftData {
   id: string;
@@ -558,7 +559,7 @@ export default function ShiftSchedule() {
     
     try {
       // APIサーバー経由でアサイン
-      const response = await fetch('/api/shifts', {
+      const response = await apiFetch('/api/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -603,7 +604,7 @@ export default function ShiftSchedule() {
       }
       
       // APIサーバー経由でアサイン
-      const response = await fetch('/api/shifts', {
+      const response = await apiFetch('/api/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -720,35 +721,16 @@ export default function ShiftSchedule() {
         generationOptions.skipAssignedBusinesses = true;
       }
 
-      // 対象業務のDBシフトを削除（選択済み業務のみ）
-      if (regenMode === 'selected' && regenSelectedBusinesses.length > 0) {
-        const { data: existingShiftsForDate } = await supabase
-          .from('shifts')
-          .select('id, business_name')
-          .eq('date', regenTargetDate);
-
-        if (existingShiftsForDate) {
-          const shiftsToDelete = existingShiftsForDate.filter(s => 
-            regenSelectedBusinesses.includes(s.business_name)
-          );
-          if (shiftsToDelete.length > 0) {
-            const { error: deleteError } = await supabase
-              .from('shifts')
-              .delete()
-              .in('id', shiftsToDelete.map(s => s.id));
-            if (deleteError) {
-              console.error('❌ Error deleting shifts for regen:', deleteError);
-              toast.error('既存シフトの削除に失敗しました');
-              setIsRegenerating(false);
-              return;
-            }
-            console.log(`✅ Deleted ${shiftsToDelete.length} shifts for partial regen`);
-          }
-        }
-      }
+      // 既存シフトは削除せず読み込む。生成・保存がすべて成功した時だけ、API側で日単位の原子置換を行う。
+      const { data: existingShiftsForDate, error: existingShiftsError } = await supabase
+        .from('shifts')
+        .select('employee_id, business_master_id, business_name, date, location, created_at, multi_day_set_id, multi_day_info')
+        .eq('date', regenTargetDate)
+        .eq('location', selectedLocation);
+      if (existingShiftsError) throw existingShiftsError;
 
       // APIで再生成実行
-      const response = await fetch('/api/generate-shifts', {
+      const response = await apiFetch('/api/generate-shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -783,15 +765,20 @@ export default function ShiftSchedule() {
           multi_day_info: shift.multi_day_info || null,
         }));
 
-        const { error: insertError } = await supabase
-          .from('shifts')
-          .insert(shiftsToInsert);
+        const existingShifts = existingShiftsForDate || [];
+        const retainedShifts = regenMode === 'selected'
+          ? existingShifts.filter((shift: any) => !regenSelectedBusinesses.includes(shift.business_name))
+          : existingShifts;
+        const shiftsToSave = [...retainedShifts, ...shiftsToInsert];
 
-        if (insertError) {
-          console.error('❌ Error inserting regenerated shifts:', insertError);
-          toast.error('再生成シフトの保存に失敗しました');
-          setIsRegenerating(false);
-          return;
+        const saveResponse = await apiFetch('/api/shifts/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location: selectedLocation, dates: [regenTargetDate], shifts: shiftsToSave }),
+        });
+        const saveResult = await saveResponse.json().catch(() => ({}));
+        if (!saveResponse.ok || !saveResult.success) {
+          throw new Error(saveResult.error || '再生成シフトの原子的な保存に失敗しました');
         }
 
         toast.success(`部分再生成完了！${shiftsToInsert.length}件のシフトを生成しました`);
@@ -900,13 +887,15 @@ export default function ShiftSchedule() {
         console.log('❌ User confirmed delete, proceeding...');
         try {
           console.log('❌ Deleting shift IDs:', Array.from(selectedShiftIds));
-          const { error } = await supabase
-            .from('shifts')
-            .delete()
-            .in('id', Array.from(selectedShiftIds));
+          const response = await apiFetch('/api/shifts/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: Array.from(selectedShiftIds) }),
+          });
+          const result = await response.json().catch(() => ({}));
 
-          console.log('❌ Delete query completed, error:', error);
-          if (error) throw error;
+          console.log('❌ Delete API completed:', result);
+          if (!response.ok || !result.success) throw new Error(result.error || 'シフトの削除に失敗しました');
 
           console.log('❌ Updating local state...');
           if (activeTab === 'period') {

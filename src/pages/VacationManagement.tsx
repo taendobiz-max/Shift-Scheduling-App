@@ -219,19 +219,6 @@ export default function VacationManagement() {
       // 日付範囲を生成
       const dateRange = generateDateRange(formData.vacation_date_from, formData.vacation_date_to);
       
-      // 重複チェック
-      if (!editingVacation) {
-        for (const date of dateRange) {
-          const isDuplicate = await VacationManager.checkDuplicate(formData.employee_id, date);
-          if (isDuplicate) {
-            setMessage(`${date} は既に登録されています。重複する日付を除いて登録してください。`);
-            setMessageType('error');
-            setIsSubmitting(false);
-            return;
-          }
-        }
-      }
-
       if (editingVacation) {
         // 更新（単一日付のみ）
         await VacationManager.updateVacation(editingVacation.id, {
@@ -244,20 +231,16 @@ export default function VacationManagement() {
         });
         setMessage('休暇データを更新しました。');
       } else {
-        // 新規作成（範囲内の各日付に対して）
-        let successCount = 0;
-        for (const date of dateRange) {
-          await VacationManager.createVacation({
-            employee_id: formData.employee_id,
-            employee_name: formData.employee_name,
-            location: formData.location,
-            vacation_date: date,
-            vacation_type: formData.vacation_type,
-            reason: formData.reason
-          });
-          successCount++;
-        }
-        setMessage(`${successCount}日分の休暇データを登録しました。`);
+        // 範囲内の全日付を1回の原子的APIで登録する。重複や入力エラー時は1日も登録しない。
+        const createdVacations = await VacationManager.createVacationRange(dateRange.map((date) => ({
+          employee_id: formData.employee_id,
+          employee_name: formData.employee_name,
+          location: formData.location,
+          vacation_date: date,
+          vacation_type: formData.vacation_type,
+          reason: formData.reason
+        })));
+        setMessage(`${createdVacations.length}日分の休暇データを登録しました。`);
       }
 
       setMessageType('success');

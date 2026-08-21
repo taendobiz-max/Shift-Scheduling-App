@@ -212,6 +212,7 @@ export interface GenerationResult {
   total_businesses?: number;
   constraint_violations?: any[];
   constraint_report?: any;
+  unsupported_constraints?: Array<{ id: string; name: string; type: string; enforcement_level: string }>;
   business_history?: Map<string, Set<string>>;
 }
 
@@ -475,9 +476,13 @@ async function generateShiftsForSingleDate(
     const constraintViolations: any[] = [];
     
     // Initialize constraint engine
-    const constraintEngine = new ConstraintEngine();
+        const constraintEngine = new ConstraintEngine();
     await constraintEngine.loadConstraints(location);
-    
+    const unsupportedConstraints = constraintEngine.getUnsupportedConstraints();
+    const unsupportedConstraintWarnings = unsupportedConstraints.map((constraint) =>
+      `未対応の有効制約「${constraint.constraint_name}」(${constraint.constraint_type || '設定未完了'}) は今回の生成には適用されません。ルール管理で設定を見直してください。`
+    );
+    violations.push(...unsupportedConstraintWarnings);
     // Initialize rule engine for unified rules
     const ruleEngine = new RuleEngine(location || '大阪営業所');
     await ruleEngine.loadRules();
@@ -1413,7 +1418,8 @@ async function generateShiftsForSingleDate(
       total_constraints: constraintEngine.getConstraintCount(),
       constraint_violations: constraintViolations.length,
       mandatory_violations: constraintViolations.filter(v => v.severity_level === 'critical').length,
-      warning_violations: constraintViolations.filter(v => v.severity_level === 'warning').length
+      warning_violations: constraintViolations.filter(v => v.severity_level === 'warning').length,
+      unsupported_constraints: unsupportedConstraints.length
     };
     
     console.log('\n📊 Generation Summary:');
@@ -1465,6 +1471,12 @@ async function generateShiftsForSingleDate(
       total_businesses: businessMasters.length,
       constraint_violations: constraintViolations,
       constraint_report,
+      unsupported_constraints: unsupportedConstraints.map((constraint) => ({
+        id: constraint.id,
+        name: constraint.constraint_name,
+        type: constraint.constraint_type || 'unknown',
+        enforcement_level: constraint.enforcement_level
+      })),
       business_history: employeeBusinessHistory
     };
     
