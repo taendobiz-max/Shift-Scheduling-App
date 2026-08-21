@@ -1760,6 +1760,52 @@ export default function ShiftGenerator() {
       );
     };
 
+    const renderLocationVacationFooter = () => (
+      <div className="sticky bottom-0 z-10 border-t border-orange-300 bg-orange-50 shadow-[0_-2px_6px_rgba(0,0,0,0.08)]">
+        <div
+          ref={vacationFrameRef}
+          className="overflow-x-auto"
+          onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget)}
+        >
+          <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
+            <colgroup>
+              <col style={{ width: '200px' }} />
+              {dates.map(date => <col key={`location-vacation-col-${date}`} style={{ width: '120px' }} />)}
+            </colgroup>
+            <tbody>
+              <tr>
+                <th className="border-r border-orange-300 px-4 py-2 text-left align-top">
+                  <div className="text-sm font-medium text-orange-900">休暇者</div>
+                  <div className="text-xs text-orange-700">氏名・休暇区分</div>
+                </th>
+                {dates.map(date => {
+                  const vacationMembers = nonWorkingMembers.filter(member =>
+                    member.date === date && member.source === 'vacation_master'
+                  );
+                  return (
+                    <td key={`location-vacation-${date}`} className="border-r border-orange-300 px-2 py-2 align-top">
+                      {vacationMembers.length === 0 ? (
+                        <div className="py-1 text-center text-xs text-orange-300">休暇者なし</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {vacationMembers.map(member => (
+                            <div key={member.id} className="rounded border border-orange-300 bg-orange-100 px-2 py-1 text-xs text-orange-800" title={`休暇区分：${member.reason || '休暇'}`}>
+                              <div className="font-medium">{member.employeeName}</div>
+                              <div className="text-orange-600">{member.reason || '休暇'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+
     return (
       <DndContext
         sensors={sensors}
@@ -1890,67 +1936,6 @@ export default function ShiftGenerator() {
             </Alert>
           )}
 
-          {/* 東京は班別の固定休暇者欄を使い、他拠点では従来の全体休暇者フレームを表示する。 */}
-          {selectedLocation !== '東京' && (
-          <div className="sticky top-2 z-20 mb-4 rounded-lg border border-orange-300 bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-orange-200 bg-orange-50 px-4 py-2">
-              <UserX className="h-4 w-4 text-orange-600" />
-              <div>
-                <div className="text-sm font-semibold text-orange-900">日付別休暇者</div>
-                <div className="text-xs text-orange-700">氏名と休暇区分を表示しています。業務表の横スクロールと連動します。</div>
-              </div>
-            </div>
-            <div
-              ref={vacationFrameRef}
-              className="overflow-x-auto"
-              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget)}
-            >
-              <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
-                <colgroup>
-                  <col style={{ width: '200px' }} />
-                  {dates.map(date => <col key={`vacation-col-${date}`} style={{ width: '120px' }} />)}
-                </colgroup>
-                <tbody>
-                  <tr className="bg-orange-50">
-                    <th className="border-r border-orange-300 px-4 py-2 text-left align-top">
-                      <div className="font-medium text-sm text-orange-800">休暇者</div>
-                      <div className="text-xs text-orange-600">氏名・休暇区分</div>
-                    </th>
-                    {dates.map(date => {
-                      const vacationMembers = nonWorkingMembers.filter(
-                        nw => nw.date === date && nw.source === 'vacation_master'
-                      );
-                      return (
-                        <td key={`vacation-frame-${date}`} className="border-r border-orange-300 px-2 py-2 align-top">
-                          <div className="mb-1 text-center text-xs font-medium text-orange-700">
-                            {new Date(date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}
-                          </div>
-                          {vacationMembers.length === 0 ? (
-                            <div className="text-center text-orange-300 text-xs py-1">休暇者なし</div>
-                          ) : (
-                            <div className="space-y-1">
-                              {vacationMembers.map(nw => (
-                                <div
-                                  key={nw.id}
-                                  className="rounded border border-orange-300 bg-orange-100 px-2 py-1 text-xs text-orange-800"
-                                  title={`休暇区分：${nw.reason || '休暇'}`}
-                                >
-                                  <div className="font-medium">{nw.employeeName}</div>
-                                  <div className="text-orange-600">{nw.reason || '休暇'}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          )}
-
           {/* 東京は一括生成結果を班別に表示し、他拠点は従来の単一マトリクスを維持する。 */}
           {selectedLocation === '東京' ? (
             <div className="flex-1 min-w-0">
@@ -2034,6 +2019,7 @@ export default function ShiftGenerator() {
                 </tbody>
               </table>
             </div>
+            {renderLocationVacationFooter()}
           </div>
           )}
 
