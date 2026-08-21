@@ -279,12 +279,20 @@ export default function ShiftGenerator() {
   // 休暇者フレームと業務マトリクスは同じ列幅・横スクロール位置を共有する。
   const vacationFrameRef = useRef<HTMLDivElement>(null);
   const matrixScrollRef = useRef<HTMLDivElement>(null);
+  const teamMatrixScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isSynchronizingScrollRef = useRef(false);
 
-  const synchronizeHorizontalScroll = useCallback((source: HTMLDivElement, target: HTMLDivElement | null) => {
-    if (!target || isSynchronizingScrollRef.current) return;
+  const synchronizeHorizontalScroll = useCallback((source: HTMLDivElement) => {
+    if (isSynchronizingScrollRef.current) return;
     isSynchronizingScrollRef.current = true;
-    target.scrollLeft = source.scrollLeft;
+    const scrollTargets = [
+      vacationFrameRef.current,
+      matrixScrollRef.current,
+      ...Object.values(teamMatrixScrollRefs.current),
+    ];
+    scrollTargets.forEach(target => {
+      if (target && target !== source) target.scrollLeft = source.scrollLeft;
+    });
     requestAnimationFrame(() => {
       isSynchronizingScrollRef.current = false;
     });
@@ -819,6 +827,14 @@ export default function ShiftGenerator() {
     }
   };
 
+  const getEmployeeTeam = (employeeId: string): 'Galaxy' | 'Aube' | '共通' => {
+    const employee = employees.find(emp => (emp.従業員ID || emp.id) === employeeId);
+    const team = String(employee?.team || employee?.班 || '').trim();
+    if (team === 'Galaxy') return 'Galaxy';
+    if (team === 'Aube') return 'Aube';
+    return '共通';
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     console.log('🔄 Drag start:', active.id);
@@ -841,28 +857,33 @@ export default function ShiftGenerator() {
 
     console.log('🔄 Drag end:', { activeId, overId });
 
-    // Parse the target cell ID
-    const targetCell = parseCellId(overId);
-    if (!targetCell) {
+    // 班別セクションでは担当済みシフトIDを直接含むドロップ先を使う。
+    const teamCellMatch = overId.match(/^team-cell-(Galaxy|Aube|common)-(.+)$/);
+    const targetCell = teamCellMatch ? null : parseCellId(overId);
+    if (!teamCellMatch && !targetCell) {
       console.error('❌ Could not parse target cell ID:', overId);
       return;
     }
 
-    const { businessName: targetBusiness, date: targetDate } = targetCell;
+    // ドラッグは担当済みセル同士の入れ替え専用とする。
+    const draggableShift = shiftResults.find(shift => shift.id === activeId);
+    const swapTargetShift = teamCellMatch
+      ? shiftResults.find(shift => shift.id === teamCellMatch[2])
+      : shiftResults.find(shift => shift.businessMaster === targetCell!.businessName && shift.date === targetCell!.date);
+    const targetBusiness = swapTargetShift?.businessMaster || targetCell?.businessName || '';
+    const targetDate = swapTargetShift?.date || targetCell?.date || '';
     console.log('📝 Parsed target:', { targetBusiness, targetDate });
 
-    // ドラッグは担当済みセル同士の入れ替え専用とする。
-    // 空きセルへの移動、未アサイン者・非出勤者からのドラッグはセルクリック編集に統一する。
-    const draggableShift = shiftResults.find(shift => shift.id === activeId);
     if (!draggableShift || targetBusiness === 'non-working') {
       console.log('ℹ️ Drag is limited to swapping assigned shift cells');
       return;
     }
-    const swapTargetShift = shiftResults.find(shift =>
-      shift.businessMaster === targetBusiness && shift.date === targetDate
-    );
     if (!swapTargetShift || swapTargetShift.id === draggableShift.id) {
       console.log('ℹ️ Drag target must be another assigned shift cell');
+      return;
+    }
+    if (selectedLocation === '東京' && getEmployeeTeam(draggableShift.employeeId) !== getEmployeeTeam(swapTargetShift.employeeId)) {
+      console.log('ℹ️ Tokyo cross-team drag swaps are blocked; use the cell editor with eligibility checks');
       return;
     }
 
@@ -1367,8 +1388,15 @@ export default function ShiftGenerator() {
     setHasChanges(true);
   };
 
-  const renderDraggableCell = (businessMaster: string, date: string, employeeName: string, slotIndex: number, shift?: ShiftResult) => {
-    const cellKey = `${businessMaster}-${date}-slot-${slotIndex}`;
+  const renderDraggableCell = (
+    businessMaster: string,
+    date: string,
+    employeeName: string,
+    slotIndex: number,
+    shift?: ShiftResult,
+    cellId?: string
+  ) => {
+    const cellKey = cellId || `${businessMaster}-${date}-slot-${slotIndex}`;
     const isEmpty = employeeName === '-';
 
     if (isEmpty) {
@@ -1544,6 +1572,88 @@ export default function ShiftGenerator() {
     const vacationCount = nonWorkingMembers.filter(nw => nw.source === 'vacation_master').length;
     const timeConflicts = detectTimeConflicts();
 
+    type TeamSection = 'Galaxy' | 'Aube' | '共通';
+    const teamSectionConfig: Array<{ key: TeamSection; title: string; description: string; accent: string }> = [
+      { key: 'Galaxy', title: 'Galaxy班シフト', description: 'Galaxy班に割り当てられた乗務員のシフトです。', accent: 'border-indigo-300 bg-indigo-50 text-indigo-900' },
+      { key: 'Aube', title: 'Aube班シフト', description: 'Aube班に割り当てられた乗務員のシフトです。', accent: 'border-emerald-300 bg-emerald-50 text-emerald-900' },
+      { key: '共通', title: '共通・未アサイン業務', description: '点呼などの班未指定業務と未アサイン業務です。', accent: 'border-slate-300 bg-slate-50 text-slate-900' },
+    ];
+
+    const getTeamSlots = (businessMaster: string, date: string, team: TeamSection) => {
+      const allSlots = matrix[businessMaster][date].shifts;
+      if (team === '共通') {
+        return allSlots
+          .map((shift, index) => ({ shift, index }))
+          .filter(({ shift }) => !shift || getEmployeeTeam(shift.employeeId) === '共通');
+      }
+      return allSlots
+        .map((shift, index) => ({ shift, index }))
+        .filter(({ shift }) => Boolean(shift) && getEmployeeTeam(shift!.employeeId) === team);
+    };
+
+    const getTeamBusinessRows = (team: TeamSection) => businessMasterNames.filter(businessMaster =>
+      dates.some(date => getTeamSlots(businessMaster, date, team).length > 0)
+    );
+
+    const renderTeamMatrix = (team: TeamSection, title: string, description: string, accent: string) => {
+      const rows = getTeamBusinessRows(team);
+      if (rows.length === 0) return null;
+      const sectionKey = team === '共通' ? 'common' : team;
+      return (
+        <section key={team} className="mb-6 rounded-lg border border-gray-300 bg-white shadow-sm overflow-hidden">
+          <div className={`flex items-center justify-between border-b px-4 py-3 ${accent}`}>
+            <div>
+              <h4 className="font-semibold">{title}</h4>
+              <p className="text-xs opacity-80">{description}</p>
+            </div>
+            <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-medium">{rows.length}業務</span>
+          </div>
+          <div
+            ref={(element) => { teamMatrixScrollRefs.current[sectionKey] = element; }}
+            className="max-h-[520px] overflow-auto"
+            onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget)}
+          >
+            <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
+              <colgroup>
+                <col style={{ width: '200px' }} />
+                {dates.map(date => <col key={`${sectionKey}-col-${date}`} style={{ width: '120px' }} />)}
+              </colgroup>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-50">
+                  <th className="border-b border-r border-gray-300 px-4 py-3 text-left font-medium min-w-[200px] bg-gray-50">業務マスタ<div className="mt-1 text-xs text-gray-500">業務時間</div></th>
+                  {dates.map(date => <th key={`${sectionKey}-header-${date}`} className="border-b border-r border-gray-300 px-4 py-3 text-center font-medium min-w-[120px] bg-gray-50">{new Date(date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(businessMaster => (
+                  <tr key={`${sectionKey}-${businessMaster}`} className="hover:bg-gray-50">
+                    <td className="border-b border-r border-gray-300 bg-gray-50 px-4 py-2 font-medium">
+                      <div className="flex items-center space-x-2">
+                        {isPairBusiness(businessMaster) && <div className="h-6 w-1 rounded bg-purple-400" />}
+                        <div><div className="text-sm font-medium">{businessMaster}</div><div className="mt-1 flex items-center text-xs text-gray-500"><Clock className="mr-1 h-3 w-3" />{getBusinessHours(businessMaster)}</div></div>
+                      </div>
+                    </td>
+                    {dates.map(date => {
+                      const slots = getTeamSlots(businessMaster, date, team);
+                      return (
+                        <td key={`${sectionKey}-${businessMaster}-${date}`} className="border-b border-r border-gray-300 px-2 py-2 align-top">
+                          {slots.length === 0 ? <div className="py-1 text-center text-xs text-gray-300">—</div> : <div className="space-y-1">{slots.map(({ shift, index }) => (
+                            <div key={`${sectionKey}-${businessMaster}-${date}-slot-${index}`}>
+                              {shift ? renderDraggableCell(businessMaster, date, shift.employeeName, index, shift, `team-cell-${sectionKey}-${shift.id}`) : renderDraggableCell(businessMaster, date, '-', index)}
+                            </div>
+                          ))}</div>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      );
+    };
+
     return (
       <DndContext
         sensors={sensors}
@@ -1686,7 +1796,7 @@ export default function ShiftGenerator() {
             <div
               ref={vacationFrameRef}
               className="overflow-x-auto"
-              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget, matrixScrollRef.current)}
+              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget)}
             >
               <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
                 <colgroup>
@@ -1733,12 +1843,20 @@ export default function ShiftGenerator() {
             </div>
           </div>
 
-          {/* シフトマトリクス */}
+          {/* 東京は一括生成結果を班別に表示し、他拠点は従来の単一マトリクスを維持する。 */}
+          {selectedLocation === '東京' ? (
+            <div className="flex-1 min-w-0">
+              <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                東京は一括生成の結果をGalaxy班・Aube班で分けて表示しています。班をまたぐ担当変更はセルクリックから候補者を選択してください。
+              </div>
+              {teamSectionConfig.map(section => renderTeamMatrix(section.key, section.title, section.description, section.accent))}
+            </div>
+          ) : (
           <div className="flex-1 min-w-0 border border-gray-300 rounded-lg overflow-hidden">
             <div
               ref={matrixScrollRef}
               className="max-h-[600px] overflow-auto"
-              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget, vacationFrameRef.current)}
+              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget)}
             >
               <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
                 <colgroup>
@@ -1809,6 +1927,7 @@ export default function ShiftGenerator() {
               </table>
             </div>
           </div>
+          )}
 
 
           {/* Non-working members table (manual only - vacation_master shown in matrix) */}
