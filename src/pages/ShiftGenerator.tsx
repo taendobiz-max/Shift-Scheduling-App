@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, Calendar, Users, Building2, CheckCircle, ArrowLeft, AlertTriangle, Info, Move, Clock, UserX, RotateCcw, Home, Trash2 } from 'lucide-react';
 // ContextMenu replaced with custom implementation
 import { supabase } from '@/lib/supabase';
@@ -36,6 +37,15 @@ interface ShiftResult {
   employeeName: string;
   employeeId: string;
   id?: string;
+  multi_day_set_id?: string;
+  multi_day_info?: unknown;
+}
+
+interface CellEditTarget {
+  businessMaster: string;
+  date: string;
+  slotIndex: number;
+  shift?: ShiftResult;
 }
 
 interface NonWorkingMember {
@@ -56,6 +66,8 @@ interface Employee {
   拠点?: string;
   roll_call_capable?: boolean;
   roll_call_duty?: string;
+  team?: string;
+  班?: string;
   [key: string]: unknown;
 }
 
@@ -96,12 +108,13 @@ const CustomContextMenu = ({ x, y, onDelete, onClose }: { x: number, y: number, 
 };
 
 // Draggable Employee Component
-const DraggableEmployee = ({ shift, children, hasChanges, isPair, onDelete }: { 
+const DraggableEmployee = ({ shift, children, hasChanges, isPair, onDelete, onClick }: {
   shift: ShiftResult | NonWorkingMember, 
   children: React.ReactNode, 
   hasChanges: boolean,
   isPair: boolean,
-  onDelete?: (shiftId: string) => void
+  onDelete?: (shiftId: string) => void,
+  onClick?: () => void
 }) => {
   const {
     attributes,
@@ -135,6 +148,7 @@ const DraggableEmployee = ({ shift, children, hasChanges, isPair, onDelete }: {
         {...listeners}
         {...attributes}
         onContextMenu={handleContextMenu}
+        onClick={onClick}
         className={`
           ${isDragging ? 'opacity-50' : ''}
           ${hasChanges ? 'ring-2 ring-orange-300' : ''}
@@ -196,11 +210,12 @@ const DraggableNonWorking = ({ member, children }: {
 };
 
 // Droppable Cell Component
-const DroppableCell = ({ id, children, isEmpty = false, isNonWorking = false }: { 
+const DroppableCell = ({ id, children, isEmpty = false, isNonWorking = false, onClick }: {
   id: string, 
   children: React.ReactNode, 
   isEmpty?: boolean,
-  isNonWorking?: boolean 
+  isNonWorking?: boolean,
+  onClick?: () => void
 }) => {
   const { isOver, setNodeRef } = useDroppable({
     id: id,
@@ -209,6 +224,7 @@ const DroppableCell = ({ id, children, isEmpty = false, isNonWorking = false }: 
   return (
     <div
       ref={setNodeRef}
+      onClick={onClick}
       className={`
         min-h-[${isNonWorking ? '60px' : '40px'}] 
         ${isOver ? (isNonWorking ? 'bg-red-100 border-red-400' : 'bg-blue-100 border-blue-400') : ''}
@@ -259,6 +275,10 @@ export default function ShiftGenerator() {
   const [tokyoEmployeeTripCounts, setTokyoEmployeeTripCounts] = useState<string>('{}');
   const [tokyoEmployeeRestDays, setTokyoEmployeeRestDays] = useState<string>('{}');
   const [tokyoCycleStateError, setTokyoCycleStateError] = useState<string>('');
+  // プレビュー編集: ドラッグは入れ替え専用、変更・削除・追加はセルクリックで行う
+  const [cellEditTarget, setCellEditTarget] = useState<CellEditTarget | null>(null);
+  const [cellEditMode, setCellEditMode] = useState<'menu' | 'candidates'>('menu');
+  const [candidateSearch, setCandidateSearch] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -790,12 +810,9 @@ export default function ShiftGenerator() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     console.log('🔄 Drag start:', active.id);
-    
-    // Find the dragged item (either shift or non-working member)
+    // ドラッグ対象は担当済みシフトだけ。非出勤・未アサイン者はクリック操作に統一する。
     const activeShift = shiftResults.find(shift => shift.id === active.id);
-    const activeNonWorking = nonWorkingMembers.find(nw => nw.id === active.id);
-    
-    setActiveShift(activeShift || activeNonWorking || null);
+    setActiveShift(activeShift || null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -821,6 +838,21 @@ export default function ShiftGenerator() {
 
     const { businessName: targetBusiness, date: targetDate } = targetCell;
     console.log('📝 Parsed target:', { targetBusiness, targetDate });
+
+    // ドラッグは担当済みセル同士の入れ替え専用とする。
+    // 空きセルへの移動、未アサイン者・非出勤者からのドラッグはセルクリック編集に統一する。
+    const draggableShift = shiftResults.find(shift => shift.id === activeId);
+    if (!draggableShift || targetBusiness === 'non-working') {
+      console.log('ℹ️ Drag is limited to swapping assigned shift cells');
+      return;
+    }
+    const swapTargetShift = shiftResults.find(shift =>
+      shift.businessMaster === targetBusiness && shift.date === targetDate
+    );
+    if (!swapTargetShift || swapTargetShift.id === draggableShift.id) {
+      console.log('ℹ️ Drag target must be another assigned shift cell');
+      return;
+    }
 
     // Handle dropping to non-working area
     if (targetBusiness === 'non-working') {
@@ -1048,6 +1080,181 @@ export default function ShiftGenerator() {
     return s1 < e2 && s2 < e1;
   };
 
+  const getEmployeeKey = (employee: Employee) => String(employee.従業員ID || employee.id);
+
+  const getBusinessData = (businessName: string) => businessMasters.find(
+    business => (business.name || business.業務名) === businessName
+  ) as any;
+
+  const addDays = (date: string, days: number) => {
+    const next = new Date(`${date}T00:00:00`);
+    next.setDate(next.getDate() + days);
+    return next.toISOString().split('T')[0];
+  };
+
+  const getPairContext = (target: CellEditTarget) => {
+    const business = getBusinessData(target.businessMaster);
+    const pairId = business?.ペア業務ID || business?.pair_business_id;
+    const pairedName = target.businessMaster.includes('往路')
+      ? target.businessMaster.replace('往路', '復路')
+      : target.businessMaster.includes('復路')
+        ? target.businessMaster.replace('復路', '往路')
+        : null;
+    if (!pairId && !pairedName) return null;
+
+    let pairBusiness = pairId
+      ? businessMasters.find((candidate: any) => {
+          const candidatePairId = candidate.ペア業務ID || candidate.pair_business_id;
+          return candidatePairId === pairId && (candidate.業務名 || candidate.name) !== target.businessMaster;
+        }) as any
+      : undefined;
+
+    // 名古屋便のようにペアID未設定でも、往路／復路の業務名が対応する場合は一括編集する。
+    if (!pairBusiness && pairedName) {
+      pairBusiness = businessMasters.find((candidate: any) =>
+        (candidate.業務名 || candidate.name) === pairedName
+      ) as any;
+    }
+    if (!pairBusiness) return null;
+
+    const direction = business?.方向 || business?.direction || (target.businessMaster.includes('復路') ? 'return' : 'outbound');
+    const pairedDate = direction === 'return' ? addDays(target.date, -1) : addDays(target.date, 1);
+    return {
+      business: pairBusiness,
+      businessName: pairBusiness.業務名 || pairBusiness.name,
+      date: pairedDate
+    };
+  };
+
+  const getBusinessDurationMinutes = (businessName: string) => {
+    const business = getBusinessData(businessName);
+    const start = business?.開始時間 || business?.start_time || '09:00';
+    const end = business?.終了時間 || business?.end_time || '17:00';
+    const toMinutes = (time: string) => {
+      const [hour, minute] = time.slice(0, 5).split(':').map(Number);
+      return hour * 60 + minute;
+    };
+    let duration = toMinutes(end) - toMinutes(start);
+    if (duration <= 0) duration += 24 * 60;
+    return duration;
+  };
+
+  const getEmployeeCandidateStatus = (employee: Employee, target: CellEditTarget) => {
+    const employeeId = getEmployeeKey(employee);
+    const pairContext = getPairContext(target);
+    const targetDates = pairContext ? [target.date, pairContext.date] : [target.date];
+    const ignoredIds = new Set(
+      target.shift?.multi_day_set_id
+        ? shiftResults.filter(shift => shift.multi_day_set_id === target.shift?.multi_day_set_id).map(shift => shift.id)
+        : target.shift?.id ? [target.shift.id] : []
+    );
+
+    for (const date of targetDates) {
+      if (nonWorkingMembers.some(member => member.date === date && member.employeeId === employeeId)) {
+        return { allowed: false, reason: '休暇・非出勤に登録済み', assignments: [] as ShiftResult[] };
+      }
+    }
+
+    const assignments = shiftResults.filter(shift =>
+      targetDates.includes(shift.date) && shift.employeeId === employeeId && !ignoredIds.has(shift.id)
+    );
+
+    if (pairContext && assignments.length > 0) {
+      return { allowed: false, reason: '往復業務と重複する既存担当あり', assignments };
+    }
+
+    if (!pairContext) {
+      const targetBusiness = getBusinessData(target.businessMaster);
+      const targetStart = targetBusiness?.開始時間 || targetBusiness?.start_time || '09:00';
+      const targetEnd = targetBusiness?.終了時間 || targetBusiness?.end_time || '17:00';
+      const existingSameDate = assignments.filter(shift => shift.date === target.date);
+      const targetIsOvernight = targetEnd.slice(0, 5) <= targetStart.slice(0, 5);
+
+      for (const assignment of existingSameDate) {
+        const existingBusiness = getBusinessData(assignment.businessMaster);
+        const existingStart = existingBusiness?.開始時間 || existingBusiness?.start_time || '09:00';
+        const existingEnd = existingBusiness?.終了時間 || existingBusiness?.end_time || '17:00';
+        const existingIsOvernight = existingEnd.slice(0, 5) <= existingStart.slice(0, 5);
+        if (targetIsOvernight || existingIsOvernight || timeRangesOverlap(targetStart, targetEnd, existingStart, existingEnd)) {
+          return { allowed: false, reason: `時間重複の可能性（${assignment.businessMaster}）`, assignments };
+        }
+      }
+
+      const totalMinutes = getBusinessDurationMinutes(target.businessMaster) + existingSameDate.reduce(
+        (total, assignment) => total + getBusinessDurationMinutes(assignment.businessMaster), 0
+      );
+      if (totalMinutes > 15 * 60) {
+        return { allowed: false, reason: '1日の最大労働時間（15時間）を超過', assignments };
+      }
+    }
+
+    return { allowed: true, reason: assignments.length > 0 ? '別業務を担当済み（追加可能）' : '割当可能', assignments };
+  };
+
+  const openCellEditor = (businessMaster: string, date: string, slotIndex: number, shift?: ShiftResult) => {
+    setCellEditTarget({ businessMaster, date, slotIndex, shift });
+    setCellEditMode(shift ? 'menu' : 'candidates');
+    setCandidateSearch('');
+  };
+
+  const closeCellEditor = () => {
+    setCellEditTarget(null);
+    setCellEditMode('menu');
+    setCandidateSearch('');
+  };
+
+  const handleDeleteFromCellEditor = () => {
+    if (!cellEditTarget?.shift) return;
+    const target = cellEditTarget.shift;
+    setShiftResults(previous => target.multi_day_set_id
+      ? previous.filter(shift => shift.multi_day_set_id !== target.multi_day_set_id)
+      : previous.filter(shift => shift.id !== target.id)
+    );
+    setHasChanges(true);
+    closeCellEditor();
+  };
+
+  const handleAssignFromCellEditor = (employee: Employee) => {
+    if (!cellEditTarget) return;
+    const target = cellEditTarget;
+    const employeeId = getEmployeeKey(employee);
+    const employeeName = String(employee.氏名 || employee.name || '名前不明');
+    const pairContext = getPairContext(target);
+    const status = getEmployeeCandidateStatus(employee, target);
+    if (!status.allowed) return;
+
+    const updateAssignment = (shift: ShiftResult): ShiftResult => ({ ...shift, employeeId, employeeName });
+    if (target.shift) {
+      setShiftResults(previous => target.shift?.multi_day_set_id
+        ? previous.map(shift => shift.multi_day_set_id === target.shift?.multi_day_set_id ? updateAssignment(shift) : shift)
+        : previous.map(shift => shift.id === target.shift?.id ? updateAssignment(shift) : shift)
+      );
+    } else {
+      const manualPairId = pairContext ? `MANUAL_PAIR_${target.businessMaster}_${target.date}_${Date.now()}` : undefined;
+      const newShifts: ShiftResult[] = [{
+        id: `shift_${target.date}_${target.businessMaster}_${Date.now()}`,
+        date: target.date,
+        businessMaster: target.businessMaster,
+        employeeName,
+        employeeId,
+        multi_day_set_id: manualPairId
+      }];
+      if (pairContext) {
+        newShifts.push({
+          id: `shift_${pairContext.date}_${pairContext.businessName}_${Date.now() + 1}`,
+          date: pairContext.date,
+          businessMaster: pairContext.businessName,
+          employeeName,
+          employeeId,
+          multi_day_set_id: manualPairId
+        });
+      }
+      setShiftResults(previous => [...previous, ...newShifts]);
+    }
+    setHasChanges(true);
+    closeCellEditor();
+  };
+
   const resetShifts = () => {
     setShiftResults([...originalShiftResults]);
     // 休暇マスタからのデータは保持し、手動追加分のみリセット
@@ -1156,31 +1363,36 @@ export default function ShiftGenerator() {
     });
   };
 
-  const renderDraggableCell = (businessMaster: string, date: string, employeeName: string, shift?: ShiftResult) => {
-    const cellKey = `${businessMaster}-${date}`;
+  const renderDraggableCell = (businessMaster: string, date: string, employeeName: string, slotIndex: number, shift?: ShiftResult) => {
+    const cellKey = `${businessMaster}-${date}-slot-${slotIndex}`;
     const isEmpty = employeeName === '-';
 
     if (isEmpty) {
-      // Empty droppable cell
       return (
-        <DroppableCell id={cellKey} isEmpty={true}>
-          <span className="text-gray-400">空き</span>
+        <DroppableCell
+          id={cellKey}
+          isEmpty={true}
+          onClick={() => openCellEditor(businessMaster, date, slotIndex)}
+        >
+          <button type="button" className="w-full text-gray-400 hover:text-blue-600" title="クリックして乗務員を割り当て">
+            空き
+          </button>
         </DroppableCell>
       );
     }
 
-    // Draggable employee cell
+    // 担当済みセル：クリックで変更・削除、ドラッグで別の担当済みセルと入れ替え。
     return (
       <DroppableCell id={cellKey}>
-        <DraggableEmployee 
-          shift={shift!} 
-          hasChanges={hasChanges} 
+        <DraggableEmployee
+          shift={shift!}
+          hasChanges={hasChanges}
           isPair={isPairBusiness(businessMaster)}
-          onDelete={handleDeleteShift}
+          onClick={() => openCellEditor(businessMaster, date, slotIndex, shift)}
         >
           <div className="flex items-center justify-center space-x-1">
             <Move className="w-3 h-3 opacity-50" />
-            <span>{employeeName}</span>
+            <span title="クリック: 変更・削除／ドラッグ: 担当済みセルと入れ替え">{employeeName}</span>
           </div>
         </DraggableEmployee>
       </DroppableCell>
@@ -1412,13 +1624,13 @@ export default function ShiftGenerator() {
           <Alert className="mb-4">
             <Move className="h-4 w-4" />
             <AlertDescription>
-              <strong>ドラッグ&ドロップ操作:</strong> 従業員名をドラッグして他の日付や業務に移動できます。各日付の最下段の非出勤者欄にドロップすると希望休に設定されます。
+              <strong>セルクリック:</strong> 空きセルをクリックすると乗務員を割り当てられます。担当済みセルでは担当変更・削除を選べます。
               <br />
-              <strong>右クリック削除:</strong> 従業員名を右クリックすると「削除」メニューが表示されます。削除するとセルが空きになります。
+              <strong>ドラッグ操作:</strong> 担当済みセルを別の担当済みセルへドラッグすると、担当を入れ替えます。空きセル・非出勤欄への移動には使用しません。
               <br />
-              <strong>ペア業務:</strong> 紫色の左線があるセルはペア業務です。同じ従業員にアサインされます。
+              <strong>ペア業務:</strong> 紫色の左線がある往復業務は、往路・復路を同じ乗務員へ一括で変更または削除します。
               <br />
-              <strong>休暇登録:</strong> オレンジ色のセルは休暇管理で登録された休暇です（📅アイコン付き）。これらは移動できません。
+              <strong>休暇登録:</strong> オレンジ色のセルは休暇管理で登録された休暇です（📅アイコン付き）。候補として選択できません。
             </AlertDescription>
           </Alert>
 
@@ -1537,12 +1749,11 @@ export default function ShiftGenerator() {
                                     businessMaster,
                                     date,
                                     shift.employeeName,
+                                    slotIdx,
                                     shift
                                   )
                                 ) : (
-                                  <DroppableCell id={`${businessMaster}-${date}-slot-${slotIdx}`} isEmpty={true}>
-                                    <span className="text-gray-400">空き</span>
-                                  </DroppableCell>
+                                  renderDraggableCell(businessMaster, date, '-', slotIdx)
                                 )}
                               </div>
                             ))}
@@ -1605,8 +1816,8 @@ export default function ShiftGenerator() {
                   <div className="flex items-center space-x-2">
                     <Users className="w-4 h-4 text-gray-600" />
                     <div>
-                      <div className="font-semibold text-gray-800 text-sm">未アサイン</div>
-                      <div className="text-xs text-gray-500">ドラッグでアサイン</div>
+                      <div className="font-semibold text-gray-800 text-sm">当日状況</div>
+                      <div className="text-xs text-gray-500">業務セルをクリックして割当</div>
                     </div>
                   </div>
                   <button
@@ -1651,30 +1862,15 @@ export default function ShiftGenerator() {
                             {unassignedEmps.length === 0 ? (
                               <div className="text-xs text-gray-400 text-center py-1">全員アサイン済</div>
                             ) : (
-                              unassignedEmps.map((emp, idx) => {
-                                const tempShift: ShiftResult = {
-                                  id: `unassigned-${emp.id}-${date}-${idx}`,
-                                  date: date,
-                                  businessMaster: '',
-                                  employeeName: emp.氏名 || emp.name,
-                                  employeeId: emp.従業員ID || emp.id
-                                };
-                                return (
-                                  <DraggableEmployee
-                                    key={tempShift.id}
-                                    shift={tempShift}
-                                    hasChanges={false}
-                                    isPair={false}
-                                  >
-                                    <div className="flex items-center space-x-1">
-                                      <Move className="w-3 h-3 opacity-50" />
-                                      <span className="text-xs" title={`従業員ID: ${emp.従業員ID || emp.id}`}>
-                                        {emp.氏名 || emp.name}
-                                      </span>
-                                    </div>
-                                  </DraggableEmployee>
-                                );
-                              })
+                              unassignedEmps.map((emp) => (
+                                <div
+                                  key={`${emp.id}-${date}`}
+                                  className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                                  title={`従業員ID: ${emp.従業員ID || emp.id}`}
+                                >
+                                  {emp.氏名 || emp.name}
+                                </div>
+                              ))
                             )}
                           </div>
                         )}
@@ -1687,7 +1883,7 @@ export default function ShiftGenerator() {
               <button
                 onClick={() => setIsPanelOpen(true)}
                 className="w-full h-full flex flex-col items-center justify-center py-4 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                title="未アサイン従業員パネルを開く"
+                title="当日状況パネルを開く"
               >
                 <Users className="w-4 h-4 mb-1" />
                 <span className="text-xs writing-mode-vertical">◄</span>
@@ -1750,6 +1946,13 @@ export default function ShiftGenerator() {
             </div>
           )}
 
+          <Alert className="mb-4 border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              担当済みセルは<strong>クリックで変更・削除</strong>、別の担当済みセルへ<strong>ドラッグで入れ替え</strong>できます。空きセルはクリックして乗務員を選択してください。
+            </AlertDescription>
+          </Alert>
+
           <div className="mt-4 text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
@@ -1780,6 +1983,111 @@ export default function ShiftGenerator() {
             )}
           </div>
         </div>
+
+        <Dialog open={!!cellEditTarget} onOpenChange={(open) => !open && closeCellEditor()}>
+          <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
+            {cellEditTarget && (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {cellEditMode === 'candidates'
+                      ? '乗務員を選択'
+                      : 'シフトを編集'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {cellEditTarget.date}／{cellEditTarget.businessMaster}
+                    {cellEditTarget.shift ? `（現在: ${cellEditTarget.shift.employeeName}）` : '（空きスロット）'}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {cellEditMode === 'menu' && cellEditTarget.shift ? (
+                  <div className="space-y-3 pt-2">
+                    <p className="text-sm text-slate-600">
+                      担当を変更する場合は、現在の担当者を外して候補者から選び直します。
+                      {cellEditTarget.shift.multi_day_set_id && ' 往復業務は往路・復路を一括で変更または削除します。'}
+                    </p>
+                    <Button className="w-full" onClick={() => setCellEditMode('candidates')}>
+                      担当者を変更
+                    </Button>
+                    <Button className="w-full" variant="destructive" onClick={handleDeleteFromCellEditor}>
+                      割当を削除
+                    </Button>
+                    <Button className="w-full" variant="outline" onClick={closeCellEditor}>
+                      キャンセル
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={candidateSearch}
+                        onChange={(event) => setCandidateSearch(event.target.value)}
+                        placeholder="氏名または従業員IDで検索"
+                      />
+                      {cellEditTarget.shift && (
+                        <Button variant="outline" onClick={() => setCellEditMode('menu')}>戻る</Button>
+                      )}
+                    </div>
+                    {getPairContext(cellEditTarget) && (
+                      <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription>
+                          往復業務のため、対応する往路・復路も同じ乗務員へ一括反映します。
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
+                      {(() => {
+                        const candidates = employees
+                          .filter(employee => (employee.拠点 || employee.location) === selectedLocation)
+                          .filter(employee => {
+                            const keyword = candidateSearch.trim();
+                            if (!keyword) return true;
+                            return `${employee.氏名 || employee.name} ${employee.従業員ID || employee.id}`.includes(keyword);
+                          });
+                        if (candidates.length === 0) {
+                          return <p className="py-6 text-center text-sm text-slate-500">条件に一致する乗務員がいません。</p>;
+                        }
+                        return candidates.map(employee => {
+                          const status = getEmployeeCandidateStatus(employee, cellEditTarget);
+                          const employeeId = getEmployeeKey(employee);
+                          const assignments = status.assignments.map(assignment => assignment.businessMaster).filter((value, index, all) => all.indexOf(value) === index);
+                          return (
+                            <button
+                              key={employeeId}
+                              type="button"
+                              disabled={!status.allowed}
+                              onClick={() => handleAssignFromCellEditor(employee)}
+                              className={`w-full rounded border px-3 py-2 text-left transition-colors ${
+                                status.allowed
+                                  ? 'border-slate-200 hover:border-blue-400 hover:bg-blue-50'
+                                  : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="font-medium">{employee.氏名 || employee.name}</span>
+                                <span className={`text-xs ${status.allowed ? 'text-emerald-700' : 'text-slate-500'}`}>
+                                  {status.reason}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                ID: {employeeId}
+                                {assignments.length > 0 && ` ／ 当日担当: ${assignments.join('、')}`}
+                              </div>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={closeCellEditor}>キャンセル</Button>
+                    </DialogFooter>
+                  </div>
+                )}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <DragOverlay>
           {activeShift ? (
