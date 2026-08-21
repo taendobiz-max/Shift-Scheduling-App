@@ -1,7 +1,7 @@
 # データモデル仕様書
 
 **作成日**: 2026年2月28日  
-**最終更新日**: 2026年2月28日（リファクタリング反映）  
+**最終更新日**: 2026年8月21日（P0セキュリティ強化・R1原子保存対応）
 **対象システム**: シフト管理アプリケーション（manus-shift-app）  
 **バックエンド**: Supabase（PostgreSQL）
 
@@ -18,6 +18,7 @@
 | トランザクション系 | `shifts` | 確定済みシフト実績 |
 | トランザクション系 | `vacation_masters` | 休暇申請・確定情報 |
 | ルール系 | `unified_shift_rules` | シフト生成ルール定義 |
+| 監査系 | `audit_logs` | 認証済みAPIによる更新操作の監査証跡 |
 
 ---
 
@@ -78,13 +79,13 @@
 | `employee_id` | `text` | **No** | 従業員ID（`employees.employee_id`参照） |
 | `business_master_id` | `text` | **No** | 業務マスタID（`business_master.業務id`参照） |
 | `business_name` | `text` | Yes | 業務名（冗長保持） |
-| `shift_date` | `date` | **No** | 勤務日 |
+| `date` | `date` | **No** | 勤務日 |
 | `location` | `text` | **No** | 勤務地（営業所） |
 | `multi_day_set_id` | `text` | Yes | 連勤・複数日業務のセットID |
 | `multi_day_info` | `text` | Yes | 連勤情報（例: "1/2"、"2/2"） |
 | `created_at` | `timestamp with time zone` | **No** | レコード作成日時 |
 
-**備考**: `multi_day_set_id` と `multi_day_info` は、複数日にまたがる業務（例: 2日連続の業務）を管理するために使用されます。同一セットIDを持つレコードが連勤を構成します。
+**備考**: `multi_day_set_id` と `multi_day_info` は、複数日にまたがる業務（例: 2日連続の業務）を管理するために使用されます。同一セットIDを持つレコードが連勤を構成します。生成済みシフトの期間保存は、データベース関数 `replace_shifts_atomically(p_location text, p_dates date[], p_shifts jsonb)` を使用します。同一拠点・対象日付の削除と挿入は単一トランザクションで実行され、途中失敗時は既存データが保持されます。
 
 ---
 
@@ -102,7 +103,9 @@
 | `vacation_type` | `text` | **No** | 休暇種別（`公休` / `私用` / `病欠` / `忌引` / `その他`） |
 | `reason` | `text` | **No** | 休暇理由・備考 |
 | `created_at` | `timestamp with time zone` | **No** | レコード作成日時 |
-| `updated_at` | `timestamp with time zone` | **No** | レコード更新日時 |
+| `updated_at` | `timestamp with time zone` | **No** | 更新日時 |
+
+**一意性制約**: `employee_id` と `vacation_date` の複合一意インデックスを持ち、同一従業員・同一日の重複休暇を防止します。期間登録は一括INSERTとして実行し、制約違反時はトランザクション全体を失敗させます。
 
 ---
 
@@ -124,6 +127,26 @@
 | `is_active` | `boolean` | **No** | 有効フラグ（`false`=無効化） |
 | `created_at` | `timestamp with time zone` | **No** | レコード作成日時 |
 | `updated_at` | `timestamp with time zone` | **No** | レコード更新日時 |
+
+---
+
+### 2.6. `audit_logs` — 監査ログ
+
+認証済みAPI経由で実行した重要操作を記録します。監査ログは管理者のみが参照できます。
+
+| カラム名 | 説明 |
+|---|---|
+| `actor_user_id` | 操作したSupabase AuthユーザーID |
+| `actor_email` / `actor_role` | 操作者のメールアドレス・ロール |
+| `action` | `create` / `update` / `delete` / `replace` / `generate` 等の操作種別 |
+| `entity_type` / `entity_id` | 対象エンティティと識別子 |
+| `metadata` | 件数・対象日付等の最小限の操作要約（JSON） |
+| `request_method` / `request_path` | APIリクエスト情報 |
+| `created_at` | 記録日時 |
+
+### 2.7. Row Level Security
+
+業務データのRLSポリシーは `authenticated` ロールを前提とし、匿名ロール・公開ロールには権限を付与しません。APIサーバーはバックエンド専用の環境変数でSupabaseへ接続し、旧anon/service_roleキーをソースコードに保持しません。
 
 ---
 
