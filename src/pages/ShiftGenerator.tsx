@@ -280,6 +280,7 @@ export default function ShiftGenerator() {
   const vacationFrameRef = useRef<HTMLDivElement>(null);
   const matrixScrollRef = useRef<HTMLDivElement>(null);
   const teamMatrixScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const teamVacationScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isSynchronizingScrollRef = useRef(false);
 
   const synchronizeHorizontalScroll = useCallback((source: HTMLDivElement) => {
@@ -289,6 +290,7 @@ export default function ShiftGenerator() {
       vacationFrameRef.current,
       matrixScrollRef.current,
       ...Object.values(teamMatrixScrollRefs.current),
+      ...Object.values(teamVacationScrollRefs.current),
     ];
     scrollTargets.forEach(target => {
       if (target && target !== source) target.scrollLeft = source.scrollLeft;
@@ -858,7 +860,7 @@ export default function ShiftGenerator() {
     console.log('🔄 Drag end:', { activeId, overId });
 
     // 班別セクションでは担当済みシフトIDを直接含むドロップ先を使う。
-    const teamCellMatch = overId.match(/^team-cell-(Galaxy|Aube|common)-(.+)$/);
+    const teamCellMatch = overId.match(/^team-cell-(Galaxy|Aube|common|rollcall)-(.+)$/);
     const targetCell = teamCellMatch ? null : parseCellId(overId);
     if (!teamCellMatch && !targetCell) {
       console.error('❌ Could not parse target cell ID:', overId);
@@ -1572,33 +1574,131 @@ export default function ShiftGenerator() {
     const vacationCount = nonWorkingMembers.filter(nw => nw.source === 'vacation_master').length;
     const timeConflicts = detectTimeConflicts();
 
-    type TeamSection = 'Galaxy' | 'Aube' | '共通';
+    type TeamSection = 'Galaxy' | 'Aube' | '共通' | '点呼';
     const teamSectionConfig: Array<{ key: TeamSection; title: string; description: string; accent: string }> = [
-      { key: 'Galaxy', title: 'Galaxy班シフト', description: 'Galaxy班に割り当てられた乗務員のシフトです。', accent: 'border-indigo-300 bg-indigo-50 text-indigo-900' },
-      { key: 'Aube', title: 'Aube班シフト', description: 'Aube班に割り当てられた乗務員のシフトです。', accent: 'border-emerald-300 bg-emerald-50 text-emerald-900' },
-      { key: '共通', title: '共通・未アサイン業務', description: '点呼などの班未指定業務と未アサイン業務です。', accent: 'border-slate-300 bg-slate-50 text-slate-900' },
+      { key: 'Galaxy', title: 'Galaxy班シフト', description: 'Galaxy班が担当する夜行バス業務と未アサイン枠です。', accent: 'border-indigo-300 bg-indigo-50 text-indigo-900' },
+      { key: 'Aube', title: 'Aube班シフト', description: 'Aube班が担当する夜行バス業務と未アサイン枠です。', accent: 'border-emerald-300 bg-emerald-50 text-emerald-900' },
+      { key: '共通', title: '共通業務', description: '点呼業務・夜行バス以外の通常業務です。', accent: 'border-slate-300 bg-slate-50 text-slate-900' },
+      { key: '点呼', title: '点呼業務', description: '東京点呼の早番・昼番・遅番です。', accent: 'border-amber-300 bg-amber-50 text-amber-900' },
     ];
+
+    const isRollCallBusiness = (businessMaster: string) => businessMaster.includes('点呼');
+    const isNightBusBusiness = (businessMaster: string) => {
+      const business = getBusinessData(businessMaster);
+      const direction = String(business?.方向 || business?.direction || '');
+      return Number(business?.運行日数 || business?.operation_days || 1) > 1
+        || Boolean(business?.班ローテーション || business?.team_rotation)
+        || direction === 'outbound'
+        || direction === 'return'
+        || businessMaster.includes('往路')
+        || businessMaster.includes('復路');
+    };
+    const oppositeTeam = (team: 'Galaxy' | 'Aube'): 'Galaxy' | 'Aube' => team === 'Galaxy' ? 'Aube' : 'Galaxy';
+    const getExpectedNightBusTeam = (businessMaster: string, date: string): 'Galaxy' | 'Aube' => {
+      const business = getBusinessData(businessMaster);
+      const direction = String(business?.方向 || business?.direction || (businessMaster.includes('復路') ? 'return' : 'outbound'));
+      const pairedName = direction === 'return'
+        ? businessMaster.replace('復路', '往路')
+        : businessMaster.replace('往路', '復路');
+      if (direction === 'return') {
+        const pairedShift = shiftResults.find(shift =>
+          shift.date === addDays(date, -1)
+          && shift.businessMaster === pairedName
+          && getEmployeeTeam(shift.employeeId) !== '共通'
+        );
+        if (pairedShift) return getEmployeeTeam(pairedShift.employeeId) as 'Galaxy' | 'Aube';
+        return oppositeTeam(tokyoNextDepartingTeam);
+      }
+      const sameDayOutbound = shiftResults.find(shift =>
+        shift.date === date
+        && isNightBusBusiness(shift.businessMaster)
+        && String(getBusinessData(shift.businessMaster)?.方向 || getBusinessData(shift.businessMaster)?.direction || '').toLowerCase() !== 'return'
+        && getEmployeeTeam(shift.employeeId) !== '共通'
+      );
+      if (sameDayOutbound) return getEmployeeTeam(sameDayOutbound.employeeId) as 'Galaxy' | 'Aube';
+      return tokyoNextDepartingTeam;
+    };
 
     const getTeamSlots = (businessMaster: string, date: string, team: TeamSection) => {
       const allSlots = matrix[businessMaster][date].shifts;
-      if (team === '共通') {
-        return allSlots
-          .map((shift, index) => ({ shift, index }))
-          .filter(({ shift }) => !shift || getEmployeeTeam(shift.employeeId) === '共通');
+      const isRollCall = isRollCallBusiness(businessMaster);
+      const isNightBus = isNightBusBusiness(businessMaster);
+      if (team === '点呼') {
+        return isRollCall ? allSlots.map((shift, index) => ({ shift, index })) : [];
       }
+      if (team === '共通') {
+        return !isRollCall && !isNightBus ? allSlots.map((shift, index) => ({ shift, index })) : [];
+      }
+      if (!isNightBus) return [];
       return allSlots
         .map((shift, index) => ({ shift, index }))
-        .filter(({ shift }) => Boolean(shift) && getEmployeeTeam(shift!.employeeId) === team);
+        .filter(({ shift }) => shift
+          ? getEmployeeTeam(shift.employeeId) === team
+          : getExpectedNightBusTeam(businessMaster, date) === team);
     };
 
     const getTeamBusinessRows = (team: TeamSection) => businessMasterNames.filter(businessMaster =>
       dates.some(date => getTeamSlots(businessMaster, date, team).length > 0)
     );
 
+    const getTeamVacationMembers = (team: 'Galaxy' | 'Aube', date: string) => nonWorkingMembers.filter(member =>
+      member.source === 'vacation_master'
+      && member.date === date
+      && getEmployeeTeam(member.employeeId) === team
+    );
+
+    const renderTeamVacationFooter = (team: TeamSection, sectionKey: string) => {
+      if (team !== 'Galaxy' && team !== 'Aube') return null;
+      return (
+        <div className="sticky bottom-0 z-10 border-t border-orange-300 bg-orange-50 shadow-[0_-2px_6px_rgba(0,0,0,0.08)]">
+          <div
+            ref={(element) => { teamVacationScrollRefs.current[sectionKey] = element; }}
+            className="overflow-x-auto"
+            onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget)}
+          >
+            <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
+              <colgroup>
+                <col style={{ width: '200px' }} />
+                {dates.map(date => <col key={`${sectionKey}-vacation-col-${date}`} style={{ width: '120px' }} />)}
+              </colgroup>
+              <tbody>
+                <tr>
+                  <th className="border-r border-orange-300 px-4 py-2 text-left align-top">
+                    <div className="text-sm font-medium text-orange-900">{team}班の休暇者</div>
+                    <div className="text-xs text-orange-700">氏名・休暇区分</div>
+                  </th>
+                  {dates.map(date => {
+                    const vacationMembers = getTeamVacationMembers(team, date);
+                    return (
+                      <td key={`${sectionKey}-vacation-${date}`} className="border-r border-orange-300 px-2 py-2 align-top">
+                        {vacationMembers.length === 0 ? (
+                          <div className="py-1 text-center text-xs text-orange-300">休暇者なし</div>
+                        ) : (
+                          <div className="space-y-1">
+                            {vacationMembers.map(member => (
+                              <div key={member.id} className="rounded border border-orange-300 bg-orange-100 px-2 py-1 text-xs text-orange-800" title={`休暇区分：${member.reason || '休暇'}`}>
+                                <div className="font-medium">{member.employeeName}</div>
+                                <div className="text-orange-600">{member.reason || '休暇'}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    };
+
     const renderTeamMatrix = (team: TeamSection, title: string, description: string, accent: string) => {
       const rows = getTeamBusinessRows(team);
-      if (rows.length === 0) return null;
-      const sectionKey = team === '共通' ? 'common' : team;
+      // 東京では当日の業務がない班も、休暇者と班の状態を確認できるよう常に表示する。
+      if (rows.length === 0 && team !== 'Galaxy' && team !== 'Aube') return null;
+      const sectionKey = team === '共通' ? 'common' : team === '点呼' ? 'rollcall' : team;
       return (
         <section key={team} className="mb-6 rounded-lg border border-gray-300 bg-white shadow-sm overflow-hidden">
           <div className={`flex items-center justify-between border-b px-4 py-3 ${accent}`}>
@@ -1625,6 +1725,11 @@ export default function ShiftGenerator() {
                 </tr>
               </thead>
               <tbody>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={dates.length + 1} className="border-b border-gray-300 px-4 py-4 text-center text-sm text-gray-400">この期間に表示対象の業務はありません</td>
+                  </tr>
+                )}
                 {rows.map(businessMaster => (
                   <tr key={`${sectionKey}-${businessMaster}`} className="hover:bg-gray-50">
                     <td className="border-b border-r border-gray-300 bg-gray-50 px-4 py-2 font-medium">
@@ -1650,6 +1755,7 @@ export default function ShiftGenerator() {
               </tbody>
             </table>
           </div>
+          {renderTeamVacationFooter(team, sectionKey)}
         </section>
       );
     };
@@ -1784,7 +1890,8 @@ export default function ShiftGenerator() {
             </Alert>
           )}
 
-          {/* 常時表示する日付別休暇者フレーム。業務表と列幅・横スクロールを同期する。 */}
+          {/* 東京は班別の固定休暇者欄を使い、他拠点では従来の全体休暇者フレームを表示する。 */}
+          {selectedLocation !== '東京' && (
           <div className="sticky top-2 z-20 mb-4 rounded-lg border border-orange-300 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 border-b border-orange-200 bg-orange-50 px-4 py-2">
               <UserX className="h-4 w-4 text-orange-600" />
@@ -1842,6 +1949,7 @@ export default function ShiftGenerator() {
               </table>
             </div>
           </div>
+          )}
 
           {/* 東京は一括生成結果を班別に表示し、他拠点は従来の単一マトリクスを維持する。 */}
           {selectedLocation === '東京' ? (
