@@ -213,6 +213,7 @@ export interface GenerationResult {
   constraint_violations?: any[];
   constraint_report?: any;
   unsupported_constraints?: Array<{ id: string; name: string; type: string; enforcement_level: string }>;
+  rule_execution_report?: any[];
   business_history?: Map<string, Set<string>>;
 }
 
@@ -483,6 +484,39 @@ async function generateShiftsForSingleDate(
       `未対応の有効制約「${constraint.constraint_name}」(${constraint.constraint_type || '設定未完了'}) は今回の生成には適用されません。ルール管理で設定を見直してください。`
     );
     violations.push(...unsupportedConstraintWarnings);
+    const unsupportedMandatoryConstraints = constraintEngine.getUnsupportedMandatoryConstraints();
+    const initialRuleExecutionReport = constraintEngine.getRuleExecutionReport([]);
+    if (unsupportedMandatoryConstraints.length > 0) {
+      const blockedRuleNames = unsupportedMandatoryConstraints
+        .map((constraint) => `「${constraint.constraint_name}」(${constraint.constraint_type || '設定未完了'})`)
+        .join('、');
+      const blockedMessage = `未実装の必須ルール ${blockedRuleNames} が有効です。安全のため生成を開始しません。ルール管理で無効化するか、ルール実装後に再実行してください。`;
+      console.error(`🚫 [CONSTRAINT] ${blockedMessage}`);
+      return {
+        success: false,
+        batch_id: batchId,
+        shifts: [],
+        violations: [...violations, blockedMessage],
+        generation_time: 0,
+        unassigned_businesses: [],
+        constraint_violations: [],
+        constraint_report: {
+          total_constraints: constraintEngine.getConstraintCount(),
+          constraint_violations: 0,
+          mandatory_violations: 0,
+          warning_violations: 0,
+          unsupported_constraints: unsupportedConstraints.length,
+          blocked_by_unsupported_mandatory_rule: true
+        },
+        unsupported_constraints: unsupportedConstraints.map((constraint) => ({
+          id: constraint.id,
+          name: constraint.constraint_name,
+          type: constraint.constraint_type || 'unknown',
+          enforcement_level: constraint.enforcement_level
+        })),
+        rule_execution_report: initialRuleExecutionReport
+      };
+    }
     // Initialize rule engine for unified rules
     const ruleEngine = new RuleEngine(location || '大阪営業所');
     await ruleEngine.loadRules();
@@ -1419,8 +1453,10 @@ async function generateShiftsForSingleDate(
       constraint_violations: constraintViolations.length,
       mandatory_violations: constraintViolations.filter(v => v.severity_level === 'critical').length,
       warning_violations: constraintViolations.filter(v => v.severity_level === 'warning').length,
-      unsupported_constraints: unsupportedConstraints.length
+      unsupported_constraints: unsupportedConstraints.length,
+      blocked_by_unsupported_mandatory_rule: false
     };
+    const ruleExecutionReport = constraintEngine.getRuleExecutionReport(constraintViolations);
     
     console.log('\n📊 Generation Summary:');
     console.log('✅ Assigned businesses:', assignedBusinesses);
@@ -1477,6 +1513,7 @@ async function generateShiftsForSingleDate(
         type: constraint.constraint_type || 'unknown',
         enforcement_level: constraint.enforcement_level
       })),
+      rule_execution_report: ruleExecutionReport,
       business_history: employeeBusinessHistory
     };
     

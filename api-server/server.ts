@@ -33,6 +33,73 @@ const authRequired = requireAuth(supabase);
 const managerRequired = requireRole(2);
 const adminRequired = requireRole(3);
 
+const BUSINESS_RULE_TYPES = new Set(['employee_filter', 'pair_business', 'constraint_check', 'custom']);
+
+type BusinessRuleWritePayload = {
+  rule_id?: string;
+  rule_name: string;
+  rule_type: 'employee_filter' | 'pair_business' | 'constraint_check' | 'custom';
+  priority: number;
+  enabled: boolean;
+  営業所: string | null;
+  conditions: Record<string, unknown>;
+  actions: Record<string, unknown>;
+  description: string | null;
+};
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * business_rulesの書込みに使うDTOを許可フィールドだけで構成する。
+ * 画面から送られるcreated_at等の読み取り専用値や未知プロパティは永続化しない。
+ */
+function sanitizeBusinessRulePayload(payload: unknown, requireRuleId: boolean): BusinessRuleWritePayload | null {
+  if (!isJsonRecord(payload)) return null;
+  const ruleId = requireRuleId ? validateString(payload.rule_id, 'rule_id', 128) : undefined;
+  const ruleName = validateString(payload.rule_name, 'rule_name', 200);
+  const ruleType = validateString(payload.rule_type, 'rule_type', 64);
+  const priority = Number(payload.priority);
+  const enabled = payload.enabled;
+  const officeValue = payload['営業所'];
+  const office = officeValue === null || officeValue === undefined || officeValue === ''
+    ? null
+    : validateString(officeValue, '営業所', 64);
+  const conditions = payload.conditions;
+  const actions = payload.actions;
+  const descriptionValue = payload.description;
+  const description = descriptionValue === null || descriptionValue === undefined || descriptionValue === ''
+    ? null
+    : validateString(descriptionValue, 'description', 1000);
+
+  if ((requireRuleId && !ruleId) || !ruleName || !ruleType || !BUSINESS_RULE_TYPES.has(ruleType)
+    || !Number.isInteger(priority) || priority < 0 || priority > 100 || typeof enabled !== 'boolean'
+    || (officeValue !== null && officeValue !== undefined && officeValue !== '' && !office)
+    || !isJsonRecord(conditions) || !isJsonRecord(actions)
+    || (descriptionValue !== null && descriptionValue !== undefined && descriptionValue !== '' && !description)) {
+    return null;
+  }
+
+  try {
+    if (JSON.stringify(conditions).length > 20000 || JSON.stringify(actions).length > 20000) return null;
+  } catch {
+    return null;
+  }
+
+  return {
+    ...(requireRuleId ? { rule_id: ruleId! } : {}),
+    rule_name: ruleName,
+    rule_type: ruleType as BusinessRuleWritePayload['rule_type'],
+    priority,
+    enabled,
+    営業所: office,
+    conditions,
+    actions,
+    description
+  };
+}
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`🔵🔵🔵 MIDDLEWARE - Request received: [${req.method}] ${req.url} 🔵🔵🔵`);
@@ -343,9 +410,11 @@ app.get('/api/business-rules/:id', authRequired, async (req, res) => {
 
 app.post('/api/business-rules', authRequired, managerRequired, async (req, res) => {
   try {
+    const payload = sanitizeBusinessRulePayload(req.body, true);
+    if (!payload) return res.status(400).json({ error: 'Invalid business rule parameters' });
     const { data, error } = await supabase
       .from('business_rules')
-      .insert([req.body])
+      .insert([payload])
       .select();
     
     if (error) throw error;
@@ -360,15 +429,18 @@ app.post('/api/business-rules', authRequired, managerRequired, async (req, res) 
 
 app.put('/api/business-rules/:id', authRequired, managerRequired, async (req, res) => {
   try {
+    const ruleId = validateString(req.params.id, 'rule_id', 128);
+    const payload = sanitizeBusinessRulePayload(req.body, false);
+    if (!ruleId || !payload) return res.status(400).json({ error: 'Invalid business rule parameters' });
     const { data, error } = await supabase
       .from('business_rules')
-      .update(req.body)
-      .eq('rule_id', req.params.id)
+      .update(payload)
+      .eq('rule_id', ruleId)
       .select();
     
     if (error) throw error;
     const updatedRule = (data as any[])[0];
-    await writeAuditLog(supabase, req as AuthenticatedRequest, 'update', 'business_rule', req.params.id);
+    await writeAuditLog(supabase, req as AuthenticatedRequest, 'update', 'business_rule', ruleId, { ruleName: payload.rule_name, ruleType: payload.rule_type });
     res.json(updatedRule);
   } catch (error: any) {
     console.error('Error updating business rule:', error);

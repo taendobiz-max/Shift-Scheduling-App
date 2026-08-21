@@ -27,6 +27,21 @@ export interface ConstraintValidationResult {
   violations: ConstraintViolation[];
 }
 
+/**
+ * 生成結果で返すルール適用状況。適用されていないルールを成功扱いしないための説明可能性DTO。
+ */
+export interface RuleExecutionReportEntry {
+  rule_id: string;
+  rule_name: string;
+  rule_type: string;
+  enforcement_level: string;
+  implementation_status: 'direct' | 'delegated' | 'unsupported';
+  evaluation_scope: string;
+  outcome: 'passed' | 'violated' | 'delegated_unreported' | 'blocked_before_generation' | 'not_supported';
+  violation_count: number;
+  violations: string[];
+}
+
 interface Employee {
   id: string;
   name: string;
@@ -110,8 +125,8 @@ export class ConstraintEngine {
         violations.push(violation);
         console.log(`⚠️ [VALIDATE] Constraint violation: ${violation.violation_description}`);
         
-        // 必須制約(priority_level = 0, enforcement_level = 'mandatory')の場合は配置不可
-        if (constraint.priority_level === 0 && constraint.enforcement_level === 'mandatory') {
+        // enforcement_levelがmandatoryの場合は優先度にかかわらず配置不可
+        if (constraint.enforcement_level === 'mandatory') {
           canProceed = false;
           console.log(`🚫 [VALIDATE] Mandatory constraint violated, assignment blocked`);
           break;
@@ -168,6 +183,60 @@ export class ConstraintEngine {
    */
   getUnsupportedConstraints(): EnhancedConstraint[] {
     return this.unsupportedConstraints.map((constraint) => ({ ...constraint }));
+  }
+
+  /**
+   * 有効な必須ルールが未実装のまま生成を開始することを防ぐ。
+   * priority_levelではなくenforcement_levelを正とする。
+   */
+  getUnsupportedMandatoryConstraints(): EnhancedConstraint[] {
+    return this.unsupportedConstraints
+      .filter((constraint) => constraint.enforcement_level === 'mandatory')
+      .map((constraint) => ({ ...constraint }));
+  }
+
+  /**
+   * ルールID、評価方式、評価結果を統一形式で返す。
+   * delegatedは別の専門エンジンが扱うが、この制約エンジンから個別結果を取得できないため、
+   * 結果未報告として明示する。
+   */
+  getRuleExecutionReport(violations: ConstraintViolation[]): RuleExecutionReportEntry[] {
+    return this.constraints.map((constraint) => {
+      const matchingViolations = violations.filter((violation) =>
+        violation.constraint_id === constraint.id || violation.constraint?.id === constraint.id
+      );
+      const type = constraint.constraint_type || 'unknown';
+      const implementationStatus = this.directlySupportedConstraintTypes.has(type)
+        ? 'direct'
+        : this.delegatedConstraintTypes.has(type)
+          ? 'delegated'
+          : 'unsupported';
+      const isUnsupportedMandatory = implementationStatus === 'unsupported' && constraint.enforcement_level === 'mandatory';
+      const outcome: RuleExecutionReportEntry['outcome'] = isUnsupportedMandatory
+        ? 'blocked_before_generation'
+        : implementationStatus === 'unsupported'
+          ? 'not_supported'
+          : implementationStatus === 'delegated'
+            ? 'delegated_unreported'
+            : matchingViolations.length > 0
+              ? 'violated'
+              : 'passed';
+      return {
+        rule_id: constraint.id,
+        rule_name: constraint.constraint_name,
+        rule_type: type,
+        enforcement_level: constraint.enforcement_level,
+        implementation_status: implementationStatus,
+        evaluation_scope: implementationStatus === 'direct'
+          ? '候補者ごとの配置可否判定'
+          : implementationStatus === 'delegated'
+            ? '専門ルールエンジンまたは業務マスタの判定（個別結果未連携）'
+            : '未実装',
+        outcome,
+        violation_count: matchingViolations.length,
+        violations: matchingViolations.map((violation) => violation.violation_description || '制約違反')
+      };
+    });
   }
 
   /**
