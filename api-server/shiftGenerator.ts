@@ -1702,6 +1702,9 @@ export async function generateShifts(
   const allUnassignedBusinesses: string[] = [];
   const allUnassignedEmployees: string[] = [];
   const allConstraintViolations: any[] = [];
+  const allRuleExecutionReports: any[] = [];
+  const allUnsupportedConstraints: Array<{ id: string; name: string; type: string; enforcement_level: string }> = [];
+  const perDateConstraintReports: any[] = [];
   let totalAssignedCount = multiDayResult.multiDayShifts.length;
   let totalBusinessCount = multiDayResult.processedBusinessIds.size;
   
@@ -1748,6 +1751,28 @@ export async function generateShifts(
     if (result.constraint_violations) {
       allConstraintViolations.push(...result.constraint_violations);
     }
+    const dateRuleExecutionReport = (result.rule_execution_report || []).map((rule: any) => ({
+      ...rule,
+      evaluation_date: normalizedDate
+    }));
+    allRuleExecutionReports.push(...dateRuleExecutionReport);
+    if (result.unsupported_constraints) {
+      allUnsupportedConstraints.push(...result.unsupported_constraints);
+    }
+    if (result.constraint_report) {
+      perDateConstraintReports.push({ date: normalizedDate, ...result.constraint_report });
+    }
+    if (result.constraint_report?.blocked_by_unsupported_mandatory_rule) {
+      // 必須ルールが未実装なら、他の日付の生成も継続せず、配置結果を返さない。
+      return {
+        ...result,
+        batch_id: batchId,
+        shifts: [],
+        rule_execution_report: dateRuleExecutionReport,
+        unsupported_constraints: result.unsupported_constraints || [],
+        business_history: cumulativeBusinessHistory
+      };
+    }
     totalAssignedCount += result.assigned_count || 0;
     totalBusinessCount += result.total_businesses || 0;
     
@@ -1787,7 +1812,17 @@ export async function generateShifts(
     assigned_count: totalAssignedCount,
     total_businesses: totalBusinessCount,
     constraint_violations: allConstraintViolations,
-    constraint_report: null,
+    constraint_report: {
+      total_constraints: perDateConstraintReports.reduce((max, report) => Math.max(max, report.total_constraints || 0), 0),
+      constraint_violations: allConstraintViolations.length,
+      mandatory_violations: perDateConstraintReports.reduce((sum, report) => sum + (report.mandatory_violations || 0), 0),
+      warning_violations: perDateConstraintReports.reduce((sum, report) => sum + (report.warning_violations || 0), 0),
+      unsupported_constraints: new Set(allUnsupportedConstraints.map((constraint) => constraint.id)).size,
+      blocked_by_unsupported_mandatory_rule: false,
+      by_date: perDateConstraintReports
+    },
+    unsupported_constraints: Array.from(new Map(allUnsupportedConstraints.map((constraint) => [constraint.id, constraint])).values()),
+    rule_execution_report: allRuleExecutionReports,
     business_history: cumulativeBusinessHistory
   };
 }
