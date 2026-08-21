@@ -73,7 +73,7 @@ export class BusinessRuleAdapter {
         .select('*')
         .eq('rule_type', 'filter')
         .eq('is_active', true)
-        .order('priority', { ascending: false });
+        .order('priority_level', { ascending: false });
 
       if (location) {
         // applicable_locationsに指定拠点または'全拠点'が含まれるルールを取得
@@ -146,7 +146,7 @@ export class BusinessRuleAdapter {
       rule_id: unifiedRule.id,
       rule_name: unifiedRule.rule_name,
       rule_type: config.rule_type || 'team_filter',
-      priority: unifiedRule.priority,
+      priority: unifiedRule.priority_level ?? 0,
       enabled: unifiedRule.is_active,
       営業所: this.extractLocation(unifiedRule.applicable_locations),
       conditions: config.conditions || {},

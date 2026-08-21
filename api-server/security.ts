@@ -94,6 +94,9 @@ export async function writeAuditLog(
     actor_email: req.auth.email,
     actor_role: req.auth.role,
     action,
+    // 旧監査スキーマの必須列とP0で追加した拡張列を両方満たす。
+    resource_type: entityType,
+    resource_id: entityId,
     entity_type: entityType,
     entity_id: entityId,
     metadata,

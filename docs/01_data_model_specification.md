@@ -141,7 +141,8 @@
 | `actor_user_id` | 操作したSupabase AuthユーザーID |
 | `actor_email` / `actor_role` | 操作者のメールアドレス・ロール |
 | `action` | `create` / `update` / `delete` / `replace` / `generate` 等の操作種別 |
-| `entity_type` / `entity_id` | 対象エンティティと識別子 |
+| `resource_type` / `resource_id` | 既存監査スキーマ上の必須対象種別と任意識別子。APIは対象エンティティを二重記録して後方互換性を確保 |
+| `entity_type` / `entity_id` | P0で統一した対象エンティティと識別子。対象のない操作では識別子を `NULL` とする |
 | `metadata` | 件数・対象日付等の最小限の操作要約（JSON） |
 | `request_method` / `request_path` | APIリクエスト情報 |
 | `created_at` | 記録日時 |
