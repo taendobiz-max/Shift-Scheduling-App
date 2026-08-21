@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
     "start:dev": "ts-node server.ts",
     "dev": "nodemon --exec ts-node server.ts",

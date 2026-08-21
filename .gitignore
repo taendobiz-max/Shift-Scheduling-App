@@ -70,3 +70,5 @@ api/
 # Operational backups and key-rotation remnants (never commit)
 _archive/
 .env*.pre-*
+# TypeScript incremental build metadata
+*.tsbuildinfo

@@ -1,15 +1,26 @@
 import { supabase } from './supabaseClient';
 
 export interface BusinessMaster {
+  // 現行DBの日本語カラム
   業務id?: string;
   業務名?: string;
+  営業所?: string;
   開始時間?: string;
   終了時間?: string;
   業務グループ?: string;
-  早朝手当?: string;
-  深夜手当?: string;
+  早朝手当?: string | boolean;
+  深夜手当?: string | boolean;
   スキルマップ項目名?: string;
   ペア業務id?: string;
+  ペア業務ID?: string;
+  // 旧画面・外部取込との後方互換プロパティ
+  id?: string;
+  name?: string;
+  location?: string;
+  start_time?: string;
+  end_time?: string;
+  pair_business_id?: string;
+  display_order?: number;
   is_active?: boolean;
 }
 
@@ -137,7 +148,7 @@ export const getBusinessMasterStats = async (): Promise<{
     const total = data?.length || 0;
     const byGroup: Record<string, number> = {};
     
-    data?.forEach(item => {
+    (data as unknown as BusinessMaster[] | null)?.forEach(item => {
       const group = item.業務グループ || '未設定';
       byGroup[group] = (byGroup[group] || 0) + 1;
     });

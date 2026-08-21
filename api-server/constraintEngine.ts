@@ -37,6 +37,7 @@ export interface RuleExecutionReportEntry {
   enforcement_level: string;
   implementation_status: 'direct' | 'delegated' | 'unsupported';
   evaluation_scope: string;
+  input: Record<string, unknown>;
   outcome: 'passed' | 'violated' | 'delegated_unreported' | 'blocked_before_generation' | 'not_supported';
   violation_count: number;
   violations: string[];
@@ -232,6 +233,11 @@ export class ConstraintEngine {
           : implementationStatus === 'delegated'
             ? '専門ルールエンジンまたは業務マスタの判定（個別結果未連携）'
             : '未実装',
+        input: {
+          constraint_value: constraint.constraint_value ?? null,
+          constraint_category: constraint.constraint_category ?? null,
+          configured_conditions: constraint.conditions ?? constraint.rule_config ?? null
+        },
         outcome,
         violation_count: matchingViolations.length,
         violations: matchingViolations.map((violation) => violation.violation_description || '制約違反')

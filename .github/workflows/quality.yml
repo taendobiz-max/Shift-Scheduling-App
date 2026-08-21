@@ -1,0 +1,39 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main, master, fix/shift-generation-quality]
+  push:
+    branches: [fix/shift-generation-quality]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-quality:
+    name: Frontend lint, typecheck, test and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  api-typecheck:
+    name: API typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: api-server/package-lock.json
+      - run: npm ci --prefix api-server
+      - run: npm run typecheck --prefix api-server

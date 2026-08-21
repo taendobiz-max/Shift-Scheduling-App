@@ -391,18 +391,39 @@ export default function ShiftGenerator() {
       console.log('📊 Loaded employee data:', employeeData);
       
       // Convert employee data to proper format
-      const convertedEmployees: Employee[] = employeeData.map((emp: EmployeeMaster, index) => ({
-        id: emp.employee_id || `emp_${index}`,
-        name: emp.name || emp.氏名 || '名前不明',
-        location: emp.office || emp.拠点 || '',
-        従業員ID: emp.employee_id,
-        氏名: emp.name || emp.氏名,
-        拠点: emp.office || emp.拠点,
-        roll_call_capable: emp.roll_call_capable || false,
-        roll_call_duty: emp.roll_call_duty as string | undefined,
-        team: (emp as any).team || (emp as any).班 || '',
-        班: (emp as any).班 || (emp as any).team || ''
-      }));
+      const convertedEmployees: Employee[] = employeeData.map((emp: EmployeeMaster, index) => {
+        const source = emp as Record<string, unknown>;
+        const employeeId = typeof emp.employee_id === 'string' && emp.employee_id.trim()
+          ? emp.employee_id
+          : `emp_${index}`;
+        const name = typeof emp.name === 'string' && emp.name.trim()
+          ? emp.name
+          : typeof emp.氏名 === 'string' && emp.氏名.trim()
+            ? emp.氏名
+            : '名前不明';
+        const location = typeof emp.office === 'string' && emp.office.trim()
+          ? emp.office
+          : typeof emp.拠点 === 'string' && emp.拠点.trim()
+            ? emp.拠点
+            : '';
+        const team = typeof source.team === 'string'
+          ? source.team
+          : typeof source.班 === 'string'
+            ? source.班
+            : '';
+        return {
+          id: employeeId,
+          name,
+          location,
+          従業員ID: employeeId,
+          氏名: name,
+          拠点: location,
+          roll_call_capable: emp.roll_call_capable === true,
+          roll_call_duty: typeof emp.roll_call_duty === 'string' ? emp.roll_call_duty : undefined,
+          team,
+          班: team
+        };
+      });
       
       setEmployees(convertedEmployees);
       console.log('✅ Converted employees:', convertedEmployees);
@@ -670,7 +691,22 @@ export default function ShiftGenerator() {
       const apiResult = await response.json();
       
       if (!apiResult.success) {
-        throw new Error(apiResult.error || 'Shift generation failed');
+        const ruleExecutionReport = Array.isArray(apiResult.rule_execution_report)
+          ? apiResult.rule_execution_report
+          : [];
+        const blockedRules = ruleExecutionReport.filter((rule: any) => rule.outcome === 'blocked_before_generation');
+        const apiViolations = Array.isArray(apiResult.violations) ? apiResult.violations : [];
+        let errorMessage = 'シフト生成を開始できませんでした。\n\n';
+        if (blockedRules.length > 0) {
+          errorMessage += '🚫 未実装の必須ルールが有効なため、安全のため生成を停止しました。\n';
+          errorMessage += blockedRules.map((rule: any) => `・${rule.rule_name}（ID: ${rule.rule_id}、型: ${rule.rule_type}）`).join('\n');
+          errorMessage += '\n\nルール管理で当該ルールを無効化するか、実装後に再実行してください。';
+        } else {
+          errorMessage += apiViolations.join('\n') || apiResult.error || 'Shift generation failed';
+        }
+        setGenerationResult(errorMessage);
+        setShowResults(false);
+        return;
       }
       
       console.log('✅ API response:', apiResult);
@@ -774,6 +810,27 @@ export default function ShiftGenerator() {
           message += unsupportedConstraints.map((constraint: any) => `・${constraint.name}（${constraint.type === 'unknown' ? '設定未完了' : constraint.type}）`).join('\n');
           message += `\nルール管理で設定を見直してください。`;
         }
+        const ruleExecutionReport = Array.isArray(apiResult.rule_execution_report)
+          ? apiResult.rule_execution_report
+          : [];
+        if (ruleExecutionReport.length > 0) {
+          const outcomeLabels: Record<string, string> = {
+            passed: '適用・違反なし',
+            violated: '違反あり',
+            delegated_unreported: '別エンジンで評価（個別結果未連携）',
+            not_supported: '未実装・未適用',
+            blocked_before_generation: '必須ルールにより生成停止'
+          };
+          message += `\n\n■ ルール適用状況:\n`;
+          message += ruleExecutionReport.map((rule: any) => {
+            const outcome = outcomeLabels[rule.outcome] || rule.outcome;
+            const violations = rule.violation_count > 0 ? `（違反 ${rule.violation_count}件）` : '';
+            const inputValue = rule.input?.constraint_value;
+            const inputSummary = inputValue !== null && inputValue !== undefined ? `、設定値: ${inputValue}` : '';
+            const scope = rule.evaluation_scope ? `、評価範囲: ${rule.evaluation_scope}` : '';
+            return `・${rule.rule_name} [${rule.rule_id}]：${outcome}${violations}${inputSummary}${scope}`;
+          }).join('\n');
+        }
         setGenerationResult(message);
         setShowResults(true);
       } else {
@@ -783,7 +840,7 @@ export default function ShiftGenerator() {
         // 各日付の結果を確認
         let hasConstraintViolations = false;
         let hasEmployeeShortage = false;
-        let violationDetails: string[] = [];
+        const violationDetails: string[] = [];
         
         for (const date of dateRange) {
           console.log(`📊 Checking generation result for ${date}`);
@@ -1380,7 +1437,7 @@ export default function ShiftGenerator() {
     const business = businessMasters.find(bm => 
       (bm.name || bm.業務名) === businessMaster
     );
-    return business && (business.ペア業務ID || business.pair_business_id);
+    return Boolean(business?.ペア業務ID || business?.pair_business_id);
   };
 
   const handleDeleteShift = (shiftId: string) => {

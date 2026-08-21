@@ -6,6 +6,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint --quiet ./src",
+    "typecheck": "tsc --project tsconfig.p1.json --pretty false",
+    "typecheck:full": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -66,6 +71,7 @@
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@metagptx/vite-plugin-source-locator": "latest",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@types/node": "^22.5.5",
     "@types/papaparse": "^5.3.16",
@@ -75,11 +81,13 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.5.4",
     "globals": "^15.9.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vitest": "^2.1.9"
   }
 }
