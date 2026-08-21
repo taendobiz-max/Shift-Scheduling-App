@@ -376,28 +376,60 @@ function checkRestTime(employeeId: string, business: any, currentDate: string, a
   return true;
 }
 
-// Helper function to check if a business can be assigned to an employee (time-wise)
-function canAssignBusiness(employeeId: string, business: any, currentShifts: Shift[], allBusinessMasters?: any[]): boolean {
-  const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
+// 開始日と開始・終了時刻から、日跨ぎを考慮した実勤務区間を作成する。
+// 終了時刻が開始時刻以下の場合は、翌日終了の夜間勤務として扱う。
+function createWorkInterval(date: string, startTime: string, endTime: string): { start: Date; end: Date } {
+  const normalizedDate = String(date).split('T')[0];
+  const normalizedStart = String(startTime || '09:00:00').padEnd(8, ':00');
+  const normalizedEnd = String(endTime || '17:00:00').padEnd(8, ':00');
+  const start = new Date(`${normalizedDate}T${normalizedStart}`);
+  const end = new Date(`${normalizedDate}T${normalizedEnd}`);
+
+  if (end <= start) {
+    end.setDate(end.getDate() + 1);
+  }
+  return { start, end };
+}
+
+function workIntervalsOverlap(
+  first: { start: Date; end: Date },
+  second: { start: Date; end: Date }
+): boolean {
+  return first.start < second.end && second.start < first.end;
+}
+
+// 対象日を含む実勤務区間だけを比較する。
+// これにより、別日の同時刻勤務を誤って時間重複と判定しない。
+function canAssignBusiness(
+  employeeId: string,
+  business: any,
+  targetDate: string,
+  currentShifts: Shift[],
+  allBusinessMasters?: any[]
+): boolean {
   const newStart = business.開始時間 || business.start_time || '09:00:00';
   const newEnd = business.終了時間 || business.end_time || '17:00:00';
   const businessName = business.業務名 || business.name || 'Unknown';
-  
-  console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} (${newStart}-${newEnd})`);
-  console.log(`🔍 [TIME_CHECK] Employee has ${employeeShifts.length} existing shifts:`, employeeShifts.map(s => `${s.business_group} (${s.start_time}-${s.end_time})`));
-  
+  const candidateInterval = createWorkInterval(targetDate, newStart, newEnd);
+  const employeeShifts = getEmployeeShifts(employeeId, currentShifts);
+
+  console.log(`🔍 [TIME_CHECK] Checking ${employeeId} for ${businessName} on ${targetDate} (${newStart}-${newEnd})`);
+
   for (const shift of employeeShifts) {
-    console.log(`🔍 [TIME_CHECK] Comparing with existing shift: ${shift.business_group} (${shift.start_time}-${shift.end_time})`);
-    const overlap = timeRangesOverlap(shift.start_time, shift.end_time, newStart, newEnd);
-    console.log(`🔍 [TIME_CHECK] Overlap result: ${overlap}`);
-    
+    const shiftDate = shift.shift_date || shift.date;
+    if (!shiftDate) continue;
+
+    const existingInterval = createWorkInterval(shiftDate, shift.start_time, shift.end_time);
+    const overlap = workIntervalsOverlap(existingInterval, candidateInterval);
+    console.log(`🔍 [TIME_CHECK] Comparing ${shift.business_group} ${existingInterval.start.toISOString()}-${existingInterval.end.toISOString()} => overlap: ${overlap}`);
+
     if (overlap) {
-      console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_group} (${shift.start_time}-${shift.end_time}), conflicts with ${businessName} (${newStart}-${newEnd})`);
-      return false; // Time conflict
+      console.log(`⚠️ [TIME_CONFLICT] ${employeeId} already assigned to ${shift.business_group} on ${shiftDate}, conflicts with ${businessName} on ${targetDate}`);
+      return false;
     }
   }
-  
-  console.log(`✅ [TIME_CHECK] No conflict found for ${employeeId} - ${businessName}`);
+
+  console.log(`✅ [TIME_CHECK] No actual interval conflict found for ${employeeId} - ${businessName} on ${targetDate}`);
   return true;
 }
 
@@ -878,7 +910,7 @@ async function generateShiftsForSingleDate(
         }
         
         // Check time conflicts
-        if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
+        if (!canAssignBusiness(empId, business, normalizedTargetDate, shifts, businessMasters)) continue;
         
         // Check rest time with previous and next day shifts
         if (!checkRestTime(empId, business, normalizedTargetDate, shifts)) continue;
@@ -1031,7 +1063,7 @@ async function generateShiftsForSingleDate(
         // Check time conflicts with existing shifts
         let hasTimeConflict = false;
         for (const business of businessGroup) {
-          if (!canAssignBusiness(empId, business, shifts, businessMasters)) {
+          if (!canAssignBusiness(empId, business, normalizedTargetDate, shifts, businessMasters)) {
             hasTimeConflict = true;
             break;
           }
@@ -1267,7 +1299,7 @@ async function generateShiftsForSingleDate(
         }
         
         // Check time conflicts
-        if (!canAssignBusiness(empId, business, shifts, businessMasters)) continue;
+        if (!canAssignBusiness(empId, business, normalizedTargetDate, shifts, businessMasters)) continue;
         
         // Check rest time with previous and next day shifts
         if (!checkRestTime(empId, business, normalizedTargetDate, shifts)) continue;

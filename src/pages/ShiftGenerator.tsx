@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -276,6 +276,19 @@ export default function ShiftGenerator() {
   const [cellEditTarget, setCellEditTarget] = useState<CellEditTarget | null>(null);
   const [cellEditMode, setCellEditMode] = useState<'menu' | 'candidates'>('menu');
   const [candidateSearch, setCandidateSearch] = useState('');
+  // 休暇者フレームと業務マトリクスは同じ列幅・横スクロール位置を共有する。
+  const vacationFrameRef = useRef<HTMLDivElement>(null);
+  const matrixScrollRef = useRef<HTMLDivElement>(null);
+  const isSynchronizingScrollRef = useRef(false);
+
+  const synchronizeHorizontalScroll = useCallback((source: HTMLDivElement, target: HTMLDivElement | null) => {
+    if (!target || isSynchronizingScrollRef.current) return;
+    isSynchronizingScrollRef.current = true;
+    target.scrollLeft = source.scrollLeft;
+    requestAnimationFrame(() => {
+      isSynchronizingScrollRef.current = false;
+    });
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -375,7 +388,9 @@ export default function ShiftGenerator() {
         氏名: emp.name || emp.氏名,
         拠点: emp.office || emp.拠点,
         roll_call_capable: emp.roll_call_capable || false,
-        roll_call_duty: emp.roll_call_duty as string | undefined
+        roll_call_duty: emp.roll_call_duty as string | undefined,
+        team: (emp as any).team || (emp as any).班 || '',
+        班: (emp as any).班 || (emp as any).team || ''
       }));
       
       setEmployees(convertedEmployees);
@@ -1659,11 +1674,77 @@ export default function ShiftGenerator() {
             </Alert>
           )}
 
+          {/* 常時表示する日付別休暇者フレーム。業務表と列幅・横スクロールを同期する。 */}
+          <div className="sticky top-2 z-20 mb-4 rounded-lg border border-orange-300 bg-white shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-orange-200 bg-orange-50 px-4 py-2">
+              <UserX className="h-4 w-4 text-orange-600" />
+              <div>
+                <div className="text-sm font-semibold text-orange-900">日付別休暇者</div>
+                <div className="text-xs text-orange-700">氏名と休暇区分を表示しています。業務表の横スクロールと連動します。</div>
+              </div>
+            </div>
+            <div
+              ref={vacationFrameRef}
+              className="overflow-x-auto"
+              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget, matrixScrollRef.current)}
+            >
+              <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
+                <colgroup>
+                  <col style={{ width: '200px' }} />
+                  {dates.map(date => <col key={`vacation-col-${date}`} style={{ width: '120px' }} />)}
+                </colgroup>
+                <tbody>
+                  <tr className="bg-orange-50">
+                    <th className="border-r border-orange-300 px-4 py-2 text-left align-top">
+                      <div className="font-medium text-sm text-orange-800">休暇者</div>
+                      <div className="text-xs text-orange-600">氏名・休暇区分</div>
+                    </th>
+                    {dates.map(date => {
+                      const vacationMembers = nonWorkingMembers.filter(
+                        nw => nw.date === date && nw.source === 'vacation_master'
+                      );
+                      return (
+                        <td key={`vacation-frame-${date}`} className="border-r border-orange-300 px-2 py-2 align-top">
+                          <div className="mb-1 text-center text-xs font-medium text-orange-700">
+                            {new Date(date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}
+                          </div>
+                          {vacationMembers.length === 0 ? (
+                            <div className="text-center text-orange-300 text-xs py-1">休暇者なし</div>
+                          ) : (
+                            <div className="space-y-1">
+                              {vacationMembers.map(nw => (
+                                <div
+                                  key={nw.id}
+                                  className="rounded border border-orange-300 bg-orange-100 px-2 py-1 text-xs text-orange-800"
+                                  title={`休暇区分：${nw.reason || '休暇'}`}
+                                >
+                                  <div className="font-medium">{nw.employeeName}</div>
+                                  <div className="text-orange-600">{nw.reason || '休暇'}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* シフトマトリクス */}
-          {/* スクロール可能な表コンテナ */}
           <div className="flex-1 min-w-0 border border-gray-300 rounded-lg overflow-hidden">
-            <div className="max-h-[600px] overflow-y-auto">
-              <table className="w-full border-collapse">
+            <div
+              ref={matrixScrollRef}
+              className="max-h-[600px] overflow-auto"
+              onScroll={(event) => synchronizeHorizontalScroll(event.currentTarget, vacationFrameRef.current)}
+            >
+              <table className="border-collapse table-fixed" style={{ minWidth: `${200 + dates.length * 120}px` }}>
+                <colgroup>
+                  <col style={{ width: '200px' }} />
+                  {dates.map(date => <col key={`matrix-col-${date}`} style={{ width: '120px' }} />)}
+                </colgroup>
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50">
                     <th className="border-b border-r border-gray-300 px-4 py-3 text-left font-medium min-w-[200px] bg-gray-50">
@@ -1724,43 +1805,6 @@ export default function ShiftGenerator() {
                       ))}
                     </tr>
                   ))}
-                  {/* 日付別休暇者欄：休暇がない日も常に表示する */}
-                  <tr className="bg-orange-50">
-                    <td className="border-t-2 border-r border-orange-300 px-4 py-2 bg-orange-100 align-top">
-                      <div className="flex items-center space-x-2">
-                        <UserX className="w-4 h-4 text-orange-600" />
-                        <div>
-                          <div className="font-medium text-sm text-orange-800">休暇者</div>
-                          <div className="text-xs text-orange-600">氏名・休暇区分</div>
-                        </div>
-                      </div>
-                    </td>
-                    {dates.map(date => {
-                      const vacationMembers = nonWorkingMembers.filter(
-                        nw => nw.date === date && nw.source === 'vacation_master'
-                      );
-                      return (
-                        <td key={`vacation-${date}`} className="border-t-2 border-r border-orange-300 px-2 py-2 align-top">
-                          {vacationMembers.length === 0 ? (
-                            <div className="text-center text-orange-300 text-xs py-1">休暇者なし</div>
-                          ) : (
-                            <div className="space-y-1">
-                              {vacationMembers.map(nw => (
-                                <div
-                                  key={nw.id}
-                                  className="bg-orange-100 text-orange-800 border border-orange-300 px-2 py-1 rounded text-xs"
-                                  title={`休暇区分：${nw.reason || '休暇'}`}
-                                >
-                                  <div className="font-medium">{nw.employeeName}</div>
-                                  <div className="text-orange-600">{nw.reason || '休暇'}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
                 </tbody>
               </table>
             </div>
